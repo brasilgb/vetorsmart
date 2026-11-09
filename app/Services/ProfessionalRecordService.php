@@ -18,10 +18,14 @@ class ProfessionalRecordService
      */
     public function create(Tenant $tenant, array $attributes, User $actor): Professional
     {
+        $attributes = $this->normalize($attributes);
+
         $professional = Professional::create([
             ...$attributes,
             'tenant_id' => $tenant->getKey(),
         ]);
+
+        $professional->refresh();
 
         $this->auditLogger->record('professional.created', $tenant, $professional, [
             'fields' => array_keys($attributes),
@@ -35,6 +39,8 @@ class ProfessionalRecordService
      */
     public function update(Professional $professional, array $attributes, User $actor): Professional
     {
+        $attributes = $this->normalize($attributes);
+
         $professional->fill($attributes);
         $changedFields = array_keys($professional->getDirty());
         $professional->save();
@@ -121,5 +127,24 @@ class ProfessionalRecordService
         });
 
         return $professional->refresh();
+    }
+
+    /**
+     * Store the phone as digits and the e-mail in lowercase, so searches match.
+     *
+     * @param  array<string, mixed>  $attributes
+     * @return array<string, mixed>
+     */
+    private function normalize(array $attributes): array
+    {
+        if (array_key_exists('phone', $attributes)) {
+            $attributes['phone'] = $attributes['phone'] === null ? null : (preg_replace('/\D+/', '', (string) $attributes['phone']) ?: null);
+        }
+
+        if (array_key_exists('email', $attributes)) {
+            $attributes['email'] = $attributes['email'] === null ? null : mb_strtolower(trim((string) $attributes['email']));
+        }
+
+        return $attributes;
     }
 }

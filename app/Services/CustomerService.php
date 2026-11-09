@@ -39,6 +39,8 @@ class CustomerService
                 'status' => $data['status'] ?? CustomerStatus::Active,
             ]);
 
+            $customer->refresh();
+
             $this->auditLogger->record('customer.created', $tenant, $customer, [
                 'fields' => array_keys($data),
             ], $actor);

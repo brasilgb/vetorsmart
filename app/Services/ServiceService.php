@@ -26,6 +26,8 @@ class ServiceService
             'tenant_id' => $tenant->getKey(),
         ]);
 
+        $service->refresh();
+
         $this->auditLogger->record('service.created', $tenant, $service, [
             'fields' => array_keys($data),
         ], $actor);
@@ -83,10 +85,12 @@ class ServiceService
      */
     private function applyPricingRules(array $attributes, ?Service $current): array
     {
-        $priceType = $attributes['price_type'] ?? $current?->price_type ?? PriceType::OnRequest;
+        $priceType = $attributes['price_type'] ?? ($current !== null ? $current->price_type : PriceType::OnRequest);
         $priceType = $priceType instanceof PriceType ? $priceType : PriceType::from((string) $priceType);
 
-        $price = array_key_exists('price', $attributes) ? $attributes['price'] : $current?->price;
+        $price = array_key_exists('price', $attributes)
+            ? $attributes['price']
+            : ($priceType->requiresAmount() ? $current?->price : null);
 
         if ($priceType->requiresAmount() && ($price === null || $price === '')) {
             throw ValidationException::withMessages([

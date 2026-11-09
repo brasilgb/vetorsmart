@@ -20,6 +20,8 @@ class ServiceCategoryService
             'tenant_id' => $tenant->getKey(),
         ]);
 
+        $category->refresh();
+
         $this->auditLogger->record('service_category.created', $tenant, $category, [
             'fields' => array_keys($attributes),
         ], $actor);

@@ -66,3 +66,18 @@ test('an inactive membership grants no tenant access', function () {
     expect(TenantUser::query()->value('status'))->toBe(MembershipStatus::Inactive)
         ->and(TenantUser::query()->value('role'))->toBe(TenantRole::Owner);
 });
+
+test('a cancelled tenant grants no access, although no operation sets this status yet', function () {
+    $tenant = Tenant::factory()->create(['status' => 'cancelled']);
+    $user = User::factory()->create();
+    TenantUser::factory()->owner()->create(['tenant_id' => $tenant->id, 'user_id' => $user->id]);
+
+    $this->actingAs($user)
+        ->getJson('/api/v1/tenant/settings')
+        ->assertForbidden();
+
+    $this->actingAs($user)
+        ->getJson('/api/v1/auth/tenants')
+        ->assertOk()
+        ->assertJsonCount(0, 'data');
+});

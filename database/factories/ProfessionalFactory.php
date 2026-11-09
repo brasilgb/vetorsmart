@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\Professional;
+use App\Models\Tenant;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -11,14 +12,22 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 class ProfessionalFactory extends Factory
 {
     /**
-     * Define the model's default state.
-     *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
         return [
-            //
+            'tenant_id' => Tenant::factory(),
+            'name' => fake()->name(),
+            'email' => null,
+            'phone' => null,
+            'active' => true,
+            'notes' => null,
         ];
+    }
+
+    public function inactive(): static
+    {
+        return $this->state(fn (array $attributes) => ['active' => false]);
     }
 }

@@ -123,7 +123,7 @@ class ProfessionalController extends Controller
 
         $this->authorize('syncServices', $record);
 
-        $updated = $professionals->syncServices($record, array_map('intval', $request->validated('service_ids')), $this->actor($request));
+        $updated = $professionals->syncServices($record, array_values(array_map('intval', $request->validated('service_ids'))), $this->actor($request));
 
         return new ProfessionalResource($updated);
     }
