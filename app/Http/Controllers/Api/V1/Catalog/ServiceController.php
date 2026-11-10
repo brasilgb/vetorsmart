@@ -38,6 +38,12 @@ class ServiceController extends Controller
             ->forTenant($context->requireTenant())
             ->with('category');
 
+        $term = $request->string('q')->trim()->value();
+
+        if ($term !== '') {
+            $query->where('name', 'like', '%'.addcslashes($term, '%_\\').'%');
+        }
+
         if ($request->filled('category_id')) {
             $query->where('service_category_id', $request->integer('category_id'));
         }

@@ -8,6 +8,7 @@ test('the initial segments are created', function () {
 
     expect(Segment::query()->pluck('name')->sort()->values()->all())->toBe([
         'Assistência técnica',
+        'Beleza e estética',
         'Climatização',
         'Eletricistas',
         'Encanadores',
@@ -15,6 +16,7 @@ test('the initial segments are created', function () {
         'Limpeza',
         'Oficinas',
         'Serviços gerais',
+        'Serviços profissionais',
     ]);
 });
 
@@ -22,6 +24,6 @@ test('running the segment seeder again does not duplicate segments', function ()
     $this->seed(SegmentSeeder::class);
     $this->seed(SegmentSeeder::class);
 
-    expect(Segment::query()->count())->toBe(8)
+    expect(Segment::query()->count())->toBe(10)
         ->and(Segment::query()->where('slug', 'assistencia-tecnica')->count())->toBe(1);
 });

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\GrowthEventType;
 use App\Enums\PriceType;
 use App\Models\Service;
 use App\Models\Tenant;
@@ -10,7 +11,7 @@ use Illuminate\Validation\ValidationException;
 
 class ServiceService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(private AuditLogger $auditLogger, private GrowthEventRecorder $growth) {}
 
     /**
      * Create a service. Only the name is required.
@@ -27,6 +28,8 @@ class ServiceService
         ]);
 
         $service->refresh();
+
+        $this->growth->record($tenant, GrowthEventType::ServiceCreated, $service);
 
         $this->auditLogger->record('service.created', $tenant, $service, [
             'fields' => array_keys($data),

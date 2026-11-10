@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TenantRole;
 use App\Enums\TenantStatus;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property int $id
  * @property string $uuid
  * @property string $name
+ * @property Segment|null $segment
  * @property string $slug
  * @property string|null $document
  * @property string|null $email
@@ -44,6 +46,14 @@ class Tenant extends Model
     public function segment(): BelongsTo
     {
         return $this->belongsTo(Segment::class);
+    }
+
+    /**
+     * @return HasMany<TenantUser, $this>
+     */
+    public function owners(): HasMany
+    {
+        return $this->hasMany(TenantUser::class)->where('role', TenantRole::Owner);
     }
 
     /**

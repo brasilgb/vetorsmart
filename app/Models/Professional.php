@@ -8,6 +8,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
  * A person who performs services. Does not need a login.
@@ -35,7 +37,15 @@ class Professional extends Model
     }
 
     /**
-     * @return BelongsToMany<Service, $this>
+     * @return HasMany<ProfessionalAvailability, $this>
+     */
+    public function availabilities(): HasMany
+    {
+        return $this->hasMany(ProfessionalAvailability::class);
+    }
+
+    /**
+     * @return BelongsToMany<Service, $this, Pivot, 'pivot'>
      */
     public function services(): BelongsToMany
     {

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\GrowthEventType;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Models\Tenant;
@@ -11,7 +12,7 @@ use Illuminate\Validation\ValidationException;
 
 class ProfessionalRecordService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(private AuditLogger $auditLogger, private GrowthEventRecorder $growth) {}
 
     /**
      * @param  array<string, mixed>  $attributes
@@ -26,6 +27,8 @@ class ProfessionalRecordService
         ]);
 
         $professional->refresh();
+
+        $this->growth->record($tenant, GrowthEventType::ProfessionalCreated, $professional);
 
         $this->auditLogger->record('professional.created', $tenant, $professional, [
             'fields' => array_keys($attributes),

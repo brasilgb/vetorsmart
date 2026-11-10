@@ -13,7 +13,7 @@ class TenantSettingsService
      *
      * @var list<string>
      */
-    private const array TENANT_FIELDS = ['phone', 'timezone'];
+    private const array TENANT_FIELDS = ['phone', 'timezone', 'segment_id'];
 
     public function __construct(private AuditLogger $auditLogger) {}
 

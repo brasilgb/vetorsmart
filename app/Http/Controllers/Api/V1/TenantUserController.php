@@ -104,6 +104,22 @@ class TenantUserController extends Controller
     }
 
     /**
+     * Reactivate a membership of the active tenant.
+     */
+    public function activate(Request $request, TenantContext $context, TenantUserService $users, int $membershipId): TenantUserResource
+    {
+        /** @var Tenant $tenant */
+        $tenant = $context->tenant();
+        $membership = $this->findMembership($tenant, $membershipId);
+
+        Gate::authorize('manageUser', [$tenant, $membership]);
+
+        $membership = $users->activate($membership, $request->user());
+
+        return new TenantUserResource($membership->loadMissing(['user', 'tenant']));
+    }
+
+    /**
      * Find a membership only inside the given tenant. Anything else is a 404,
      * so the existence of records in other tenants is not revealed.
      */

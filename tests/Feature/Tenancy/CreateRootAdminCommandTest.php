@@ -42,7 +42,7 @@ test('the command promotes an existing user without changing the password', func
 test('the command rejects a weak password', function () {
     $this->artisan('platform:root-admin', ['email' => 'fraco@abrasil.test', '--name' => 'Fraco'])
         ->expectsQuestion('Senha (mínimo 12 caracteres)', 'curta')
-        ->expectsOutput('Nome ou senha inválidos. A senha deve ter ao menos 12 caracteres.')
+        ->expectsOutput('Nome ou senha inválidos. Informe um nome e uma senha de ao menos 12 caracteres.')
         ->assertFailed();
 
     expect(User::query()->where('email', 'fraco@abrasil.test')->exists())->toBeFalse();
@@ -53,4 +53,59 @@ test('the command refuses to run without an interactive terminal', function () {
         ->assertFailed();
 
     expect(User::query()->where('email', 'nao@abrasil.test')->exists())->toBeFalse();
+});
+
+test('the command provisions a root admin without a terminal from an environment variable', function () {
+    putenv('TEST_ROOT_ADMIN_PASSWORD=senha-muito-segura-456');
+
+    try {
+        $this->artisan('platform:root-admin', [
+            'email' => 'ci-root@abrasil.test',
+            '--name' => 'Root CI',
+            '--password-env' => 'TEST_ROOT_ADMIN_PASSWORD',
+            '--no-interaction' => true,
+        ])->assertSuccessful();
+    } finally {
+        putenv('TEST_ROOT_ADMIN_PASSWORD');
+    }
+
+    $root = User::query()->where('email', 'ci-root@abrasil.test')->firstOrFail();
+
+    expect($root->is_root_admin)->toBeTrue()
+        ->and(Hash::check('senha-muito-segura-456', $root->password))->toBeTrue()
+        ->and(json_encode(AuditLog::query()->get()->toArray()))->not->toContain('senha-muito-segura-456');
+});
+
+test('an empty or missing environment variable is refused without creating anything', function () {
+    putenv('TEST_EMPTY_ROOT_PASSWORD=');
+
+    try {
+        $this->artisan('platform:root-admin', [
+            'email' => 'vazio@abrasil.test',
+            '--name' => 'Vazio',
+            '--password-env' => 'TEST_EMPTY_ROOT_PASSWORD',
+            '--no-interaction' => true,
+        ])->assertFailed();
+    } finally {
+        putenv('TEST_EMPTY_ROOT_PASSWORD');
+    }
+
+    expect(User::query()->where('email', 'vazio@abrasil.test')->exists())->toBeFalse();
+});
+
+test('a password shorter than the minimum is refused in non-interactive mode', function () {
+    putenv('TEST_SHORT_ROOT_PASSWORD=curta');
+
+    try {
+        $this->artisan('platform:root-admin', [
+            'email' => 'curta@abrasil.test',
+            '--name' => 'Curta',
+            '--password-env' => 'TEST_SHORT_ROOT_PASSWORD',
+            '--no-interaction' => true,
+        ])->assertFailed();
+    } finally {
+        putenv('TEST_SHORT_ROOT_PASSWORD');
+    }
+
+    expect(User::query()->where('email', 'curta@abrasil.test')->exists())->toBeFalse();
 });

@@ -86,6 +86,25 @@ class TenantUserService
     }
 
     /**
+     * Reactivate a membership, restoring the user's access to this company.
+     */
+    public function activate(TenantUser $membership, User $actor): TenantUser
+    {
+        if ($membership->isActive()) {
+            return $membership;
+        }
+
+        $membership->status = MembershipStatus::Active;
+        $membership->save();
+
+        $this->auditLogger->record('tenant_user.activated', $membership->tenant, $membership, [
+            'user_id' => $membership->user_id,
+        ], $actor);
+
+        return $membership;
+    }
+
+    /**
      * Deactivate the membership. The user account itself is kept.
      */
     public function deactivate(TenantUser $membership, User $actor): TenantUser

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
 /**
  * @property int $id
  * @property int $tenant_id
+ * @property array<string, mixed>|null $business_hours
  * @property string $business_name
  * @property string|null $description
  * @property string|null $whatsapp
@@ -24,7 +25,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property ConfirmationPolicy $confirmation_policy
  * @property array<string, mixed>|null $settings
  */
-#[Fillable(['tenant_id', 'business_name', 'description', 'whatsapp', 'address', 'city', 'state', 'locale', 'service_modes', 'welcome_message', 'confirmation_policy', 'settings'])]
+#[Fillable(['tenant_id', 'business_name', 'description', 'whatsapp', 'address', 'city', 'state', 'locale', 'service_modes', 'welcome_message', 'confirmation_policy', 'business_hours', 'brand_color', 'settings'])]
 class TenantSetting extends Model
 {
     /** @use HasFactory<TenantSettingFactory> */
@@ -39,6 +40,7 @@ class TenantSetting extends Model
     {
         return [
             'service_modes' => 'array',
+            'business_hours' => 'array',
             'confirmation_policy' => ConfirmationPolicy::class,
             'settings' => 'array',
         ];

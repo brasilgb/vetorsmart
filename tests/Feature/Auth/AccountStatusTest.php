@@ -7,8 +7,12 @@ use App\Models\TenantUser;
 use App\Models\User;
 
 test('a user without verified email can sign in and reach the dashboard', function () {
-    User::factory()->unverified()->create([
+    $unverified = User::factory()->unverified()->create([
         'email' => 'sem-verificacao@example.com',
+    ]);
+    TenantUser::factory()->owner()->create([
+        'tenant_id' => Tenant::factory()->create()->id,
+        'user_id' => $unverified->id,
     ]);
 
     $this->post(route('login.store'), [

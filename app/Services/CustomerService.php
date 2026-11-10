@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\CustomerStatus;
+use App\Enums\GrowthEventType;
 use App\Models\Customer;
 use App\Models\Tenant;
 use App\Models\User;
@@ -19,7 +20,7 @@ class CustomerService
      */
     private const array FIELDS = ['name', 'person_type', 'document', 'email', 'phone', 'whatsapp', 'address', 'city', 'state', 'notes', 'status'];
 
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(private AuditLogger $auditLogger, private GrowthEventRecorder $growth) {}
 
     /**
      * Create a customer. Only the name is required; the rest is optional.
@@ -40,6 +41,8 @@ class CustomerService
             ]);
 
             $customer->refresh();
+
+            $this->growth->record($tenant, GrowthEventType::CustomerCreated, $customer);
 
             $this->auditLogger->record('customer.created', $tenant, $customer, [
                 'fields' => array_keys($data),

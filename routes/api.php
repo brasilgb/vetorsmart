@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\Catalog\ServiceCategoryController;
 use App\Http\Controllers\Api\V1\Catalog\ServiceController;
 use App\Http\Controllers\Api\V1\CustomerController;
+use App\Http\Controllers\Api\V1\Professionals\ProfessionalAvailabilityController;
 use App\Http\Controllers\Api\V1\Professionals\ProfessionalController;
 use App\Http\Controllers\Api\V1\TenantSettingsController;
 use App\Http\Controllers\Api\V1\TenantUserController;
@@ -38,6 +39,9 @@ Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
         Route::patch('users/{membershipId}', [TenantUserController::class, 'update'])
             ->whereNumber('membershipId')
             ->name('api.v1.tenant.users.update');
+        Route::post('users/{membershipId}/activate', [TenantUserController::class, 'activate'])
+            ->whereNumber('membershipId')
+            ->name('api.v1.tenant.users.activate');
         Route::delete('users/{membershipId}', [TenantUserController::class, 'destroy'])
             ->whereNumber('membershipId')
             ->name('api.v1.tenant.users.destroy');
@@ -64,6 +68,12 @@ Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
         Route::get('professionals/{professional}/services', [ProfessionalController::class, 'services'])
             ->whereNumber('professional')
             ->name('api.v1.tenant.professionals.services.index');
+        Route::get('professionals/{professional}/availability', [ProfessionalAvailabilityController::class, 'index'])
+            ->whereNumber('professional')
+            ->name('api.v1.tenant.professionals.availability.index');
+        Route::put('professionals/{professional}/availability', [ProfessionalAvailabilityController::class, 'sync'])
+            ->whereNumber('professional')
+            ->name('api.v1.tenant.professionals.availability.sync');
         Route::put('professionals/{professional}/services', [ProfessionalController::class, 'syncServices'])
             ->whereNumber('professional')
             ->name('api.v1.tenant.professionals.services.sync');

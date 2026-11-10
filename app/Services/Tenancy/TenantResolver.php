@@ -7,6 +7,7 @@ use App\Enums\TenantStatus;
 use App\Models\TenantUser;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * Resolves which tenant a user may act on. Only memberships that are active,
@@ -29,6 +30,16 @@ final class TenantResolver
         }
 
         return $this->accessibleMemberships($user)->orderBy('id')->first();
+    }
+
+    /**
+     * List every tenant the user may act on, ordered for the tenant switcher.
+     *
+     * @return Collection<int, TenantUser>
+     */
+    public function accessibleFor(User $user): Collection
+    {
+        return $this->accessibleMemberships($user)->orderBy('id')->get();
     }
 
     /**

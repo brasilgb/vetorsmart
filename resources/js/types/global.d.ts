@@ -1,5 +1,6 @@
 import '@inertiajs/core';
 import type { Auth } from '@/types/auth';
+import type { TenantSummary } from '@/types/vetor-smart';
 
 declare module 'react' {
     interface InputHTMLAttributes<T> {
@@ -12,6 +13,8 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            tenant: TenantSummary | null;
+            tenants: TenantSummary[];
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

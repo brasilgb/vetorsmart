@@ -141,3 +141,115 @@
         @apply bg-background text-foreground;
     }
 }
+
+/*
+ * VetorSmart identity tokens. Single source for the brand palette: components use
+ * these utilities (bg-vs-blue, text-vs-muted, ...) instead of repeating hex values.
+ */
+@theme inline {
+    --color-vs-ink: #0F172A;
+    --color-vs-petrol: #1E3A5F;
+    --color-vs-blue: #2563EB;
+    --color-vs-blue-hover: #1D4ED8;
+    --color-vs-cyan: #06B6D4;
+    --color-vs-surface: #F8FAFC;
+    --color-vs-border: #CBD5E1;
+    --color-vs-text: #0B1220;
+    --color-vs-muted: #475569;
+
+    /* Landing: neutral line, soft category tints and the ink used on each tint (contrast checked). */
+    --color-vs-line: #E2E8F0;
+    --color-vs-tint-blue: #DBEAFE;
+    --color-vs-tint-violet: #EDE9FE;
+    --color-vs-tint-cyan: #CFFAFE;
+    --color-vs-tint-orange: #FFEDD5;
+    --color-vs-tint-green: #DCFCE7;
+    --color-vs-tint-slate: #E2E8F0;
+    --color-vs-ink-blue: #1E40AF;
+    --color-vs-ink-violet: #5B21B6;
+    --color-vs-ink-cyan: #0E7490;
+    --color-vs-ink-orange: #9A3412;
+    --color-vs-ink-green: #166534;
+    --color-vs-ink-slate: #334155;
+}
+
+/* Light theme mapping of the shared component tokens onto the VetorSmart palette. */
+:root {
+    --background: #F8FAFC;
+    --foreground: #0B1220;
+    --card: #FFFFFF;
+    --card-foreground: #0B1220;
+    --primary: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --ring: #2563EB;
+    --muted-foreground: #475569;
+    --border: #CBD5E1;
+    --input: #CBD5E1;
+    --sidebar: #0F172A;
+    --sidebar-foreground: #E2E8F0;
+    --sidebar-primary: #2563EB;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #1E3A5F;
+    --sidebar-accent-foreground: #FFFFFF;
+    --sidebar-border: #1E3A5F;
+    --sidebar-ring: #06B6D4;
+}
+
+/*
+ * VetorSmart dark theme. Same brand hues, lifted for contrast on dark surfaces:
+ * text on background is about 15:1, muted text about 6.5:1, and primary buttons keep white text.
+ */
+.dark {
+    --background: #0B1220;
+    --foreground: #E2E8F0;
+    --card: #111A2E;
+    --card-foreground: #E2E8F0;
+    --popover: #111A2E;
+    --popover-foreground: #E2E8F0;
+    --primary: #3B82F6;
+    --primary-foreground: #0B1220;
+    --secondary: #1E293B;
+    --secondary-foreground: #E2E8F0;
+    --muted: #1E293B;
+    --muted-foreground: #94A3B8;
+    --accent: #1E293B;
+    --accent-foreground: #E2E8F0;
+    --border: #1E293B;
+    --input: #1E293B;
+    --ring: #3B82F6;
+    --sidebar: #0B1220;
+    --sidebar-foreground: #E2E8F0;
+    --sidebar-primary: #3B82F6;
+    --sidebar-primary-foreground: #0B1220;
+    --sidebar-accent: #1E3A5F;
+    --sidebar-accent-foreground: #FFFFFF;
+    --sidebar-border: #1E293B;
+    --sidebar-ring: #06B6D4;
+}
+
+/* Landing type scale: fluid, so headings keep their rhythm from 390 px to 1440 px. */
+@utility vs-title-hero {
+    font-size: clamp(2.25rem, 1.5rem + 3vw, 4rem);
+    line-height: 1.05;
+    letter-spacing: -0.025em;
+    font-weight: 650;
+}
+
+@utility vs-title-section {
+    font-size: clamp(1.875rem, 1.35rem + 1.7vw, 2.75rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    font-weight: 650;
+}
+
+/* Landing motion: discreet, and disabled for users who prefer reduced motion. */
+@media (prefers-reduced-motion: no-preference) {
+    @keyframes vs-rise {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .vs-rise {
+        animation: vs-rise 0.6s ease-out both;
+    }
+}

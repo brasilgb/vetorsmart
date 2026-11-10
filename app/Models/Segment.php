@@ -6,6 +6,7 @@ use Database\Factories\SegmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * @property int $id
@@ -19,6 +20,14 @@ class Segment extends Model
 {
     /** @use HasFactory<SegmentFactory> */
     use HasFactory;
+
+    /**
+     * @return HasMany<Tenant, $this>
+     */
+    public function tenants(): HasMany
+    {
+        return $this->hasMany(Tenant::class);
+    }
 
     /**
      * Get the attributes that should be cast.

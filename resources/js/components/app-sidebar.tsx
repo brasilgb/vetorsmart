@@ -1,7 +1,5 @@
-import { Link } from '@inertiajs/react';
-import { BookOpen, FolderGit2, LayoutGrid } from 'lucide-react';
-import AppLogo from '@/components/app-logo';
-import { NavFooter } from '@/components/nav-footer';
+import { Link, usePage } from '@inertiajs/react';
+import { Briefcase, Building2, Contact, Globe, KeyRound, LayoutGrid, ScrollText, Settings, ShieldCheck, Tag, UsersRound } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -14,38 +12,62 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { dashboard as rootadminDashboard } from '@/routes/rootadmin';
+import { index as tenantsIndex } from '@/routes/rootadmin/tenants';
+import { index as segmentsIndex } from '@/routes/rootadmin/segments';
+import { index as usersIndex } from '@/routes/rootadmin/users';
+import { index as tenantCustomers } from '@/routes/tenant/customers';
+import { index as tenantServices } from '@/routes/tenant/services';
+import { index as tenantProfessionals } from '@/routes/tenant/professionals';
+import { index as tenantTeam } from '@/routes/tenant/team';
+import { show as tenantSettings } from '@/routes/tenant/settings';
+import { index as tenantWebsite } from '@/routes/tenant/website';
+import { index as auditIndex } from '@/routes/rootadmin/audit';
 import type { NavItem } from '@/types';
 
-const mainNavItems: NavItem[] = [
-    {
-        title: 'Dashboard',
-        href: dashboard(),
-        icon: LayoutGrid,
-    },
+const tenantNavItems: NavItem[] = [
+    { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+    { title: 'Clientes', href: tenantCustomers(), icon: Contact },
+    { title: 'Serviços', href: tenantServices(), icon: Briefcase },
+    { title: 'Profissionais', href: tenantProfessionals(), icon: UsersRound },
+    { title: 'Usuários e permissões', href: tenantTeam(), icon: KeyRound },
+    { title: 'Meu Site', href: tenantWebsite(), icon: Globe },
+    { title: 'Configurações', href: tenantSettings(), icon: Settings },
 ];
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Repository',
-        href: 'https://github.com/laravel/react-starter-kit',
-        icon: FolderGit2,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#react',
-        icon: BookOpen,
-    },
+/**
+ * The platform console has its own menu. Tenant users never see it, and the console
+ * never shows tenant operational menus, so the two areas stay separated.
+ */
+const rootadminNavItems: NavItem[] = [
+    { title: 'Console', href: rootadminDashboard(), icon: ShieldCheck },
+    { title: 'Empresas', href: tenantsIndex(), icon: Building2 },
+    { title: 'Segmentos', href: segmentsIndex(), icon: Tag },
+    { title: 'Usuários', href: usersIndex(), icon: UsersRound },
+    { title: 'Auditoria', href: auditIndex(), icon: ScrollText },
 ];
 
 export function AppSidebar() {
+    const { auth, tenant } = usePage().props;
+    const isRootAdmin = Boolean(auth.user.is_root_admin);
+    const canManageTeam = tenant?.role === 'owner' || tenant?.role === 'admin';
+    const items = isRootAdmin ? rootadminNavItems : tenantNavItems.filter((item) => item.title !== 'Usuários e permissões' || canManageTeam);
+
     return (
         <Sidebar collapsible="icon" variant="inset">
             <SidebarHeader>
                 <SidebarMenu>
                     <SidebarMenuItem>
                         <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
-                                <AppLogo />
+                            <Link href={isRootAdmin ? rootadminDashboard() : dashboard()} prefetch>
+                                <img
+                                    src="/images/vetor-smart-logo-reduced.png"
+                                    alt="Logo VetorSmart"
+                                    width={32}
+                                    height={23}
+                                    className="size-8 object-contain"
+                                />
+                                <span className="truncate font-semibold">VetorSmart</span>
                             </Link>
                         </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -53,11 +75,10 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={mainNavItems} />
+                <NavMain items={items} />
             </SidebarContent>
 
             <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>

@@ -34,6 +34,10 @@ class ResolveTenant
         $membership = $this->resolver->resolve($user, $request->session()->get('current_tenant_id'));
 
         if ($membership === null) {
+            if (! $request->expectsJson() && $user->isRootAdmin()) {
+                return redirect()->route('rootadmin.dashboard');
+            }
+
             abort(403, 'Nenhuma empresa ativa disponível para este usuário.');
         }
 

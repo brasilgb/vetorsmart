@@ -1,62 +1,44 @@
-# Execução — VETORSMART-BACKEND-01
+# Execução — VETORSMART-LANDING-REDESIGN-05
 
-Data: 09/11/2026. Local: `gateway/vetor-smart/`.
+Data: 10/11/2026. Local: `gateway/vetor-smart/`.
 
 ## Instrução
 
-- `correio.md`: VETORSMART-BACKEND-01 — Fundação do SaaS, Multi-tenancy, Autenticação e Administração.
-- Relatório técnico completo: `docs/VETORSMART-BACKEND-01.md`.
+- `correio.md` alterado em relação à execução anterior (REFINE-02 + IMAGES-03): agora é **VETORSMART-LANDING-REDESIGN-05**, repaginação estrutural completa da landing.
+- Relatório completo: `docs/VETORSMART-LANDING-REDESIGN-05.md`.
 
-## Resultado: CONCLUÍDO (com ressalvas)
+## Resultado: CONCLUÍDO COM PENDÊNCIAS
 
-Implementação executada no projeto existente. Desvios aprovados pelo usuário e pendências estão listados abaixo.
+- Landing reconstruída: header, hero com foto de serviço, mosaico de segmentos com ícones Lucide, seis cards de funcionalidades com status, jornada de crescimento, Meu Crescimento (ilustração conceitual), planos, FAQ, CTA final e rodapé.
+- Foto de serviço no fundo do hero (`hero-plumber.webp`), a pedido do usuário. Sem licença registrada: ver pendência 1.
+- Visualização real em navegador: feita em 1440, 1280, 768 e 390 px por captura automatizada. Sem overflow horizontal e sem erros de console. Inspeção visual feita em 1440, 768 e 390 px.
 
-## Código implementado
+## Implementado
 
-- Multi-tenancy: tabelas `segments`, `tenants`, `tenant_users`, `tenant_settings`, `audit_logs`, e coluna `status`/`is_root_admin` em `users`.
-- Contexto e resolução do tenant: `TenantContext` (scoped), `TenantResolver`, middleware `tenant.resolve`.
-- Isolamento: escopo explícito `forTenant()` em models de tenant, sem Global Scope.
-- Permissões: `TenantPolicy` (owner, admin, operator) e gate `platform-admin` para RootAdmin.
-- Cadastro público transacional (empresa, segmento, proprietário), com rate limiting por IP.
-- Login sem verificação de e-mail; contas e tenants suspensos bloqueados.
-- API REST `/api/v1`: autenticação, configurações, usuários do tenant, administração de tenants e segmentos.
-- Auditoria com filtro de dados sensíveis.
-- Job base `TenantScopedJob` com revalidação de contexto.
-- Comando `platform:root-admin` (senha oculta, sem registro em log).
-- Seeder idempotente de 8 segmentos.
-- Frontend: formulário de cadastro com empresa e segmento.
+- Componentes em `resources/js/components/landing/`: `landing-layout.ts`, `landing-header.tsx`, `landing-footer.tsx`, `segment-icons.ts`, `journey-section.tsx`, `growth-section.tsx`, `hero-section.tsx`, `segment-mosaic.tsx`, `feature-visual-grid.tsx`, `pricing-section.tsx`, `faq-section.tsx`, `final-cta-section.tsx`, `section-shell.tsx`.
+- Removido `photo-slots.ts` (sem uso).
+- `welcome.tsx` virou composição; seções alternam fundo branco e `vs-surface`.
+- Tokens novos em `resources/css/app.css`: linha neutra, tons pastel e tintas de texto; escala tipográfica fluida (`vs-title-hero`, `vs-title-section`).
+- Cabeçalho: navegação em disclosure abaixo de 1024 px; botão "Começar grátis" sem quebra de linha.
 
-## Testes
+## Testes e validação
 
-- `php artisan test --compact` em MySQL (`vetorsmart_test`): **80 testes, 77 aprovados, 3 pulados, 227 assertions**.
-- Os 3 pulados são de 2FA, desativado na configuração.
-- Pint: aprovado. PHPStan: 0 erros. Build do frontend: aprovado.
-- TypeScript: 12 erros pré-existentes em arquivos não alterados. Nenhum em `register.tsx`.
-
-## Desvios
-
-1. **MySQL em vez de PostgreSQL**, conforme orientação do usuário. PostgreSQL não foi validado.
-2. `phpunit.xml` passou de SQLite para MySQL (`vetorsmart_test`).
-3. Verificação de e-mail (`verified`) removida das rotas.
-4. Subpastas novas dentro de `app/` (`Enums`, `Services`, `Policies`, `Jobs`, `Concerns`).
+- `php artisan test --compact`: **231 testes, 228 aprovados, 0 falhas, 3 pulados** (2FA desativado). Mesmo resultado da execução anterior.
+- `npx tsc --noEmit`: **0 erros**. `npm run build`: aprovado.
+- Captura em 1440, 1280, 768 e 390 px: `scrollWidth` igual à largura da janela, zero erros de console, 10 segmentos e 6 funcionalidades.
+- Medição de sobreposição do cabeçalho em 768, 1024 e 1280 px: sem colisão.
+- Capturas em `/tmp/claude-1000/-home-anderson-projects-laravel-infra-abrasil-gateway-vetor-smart/eb928afc-efe2-46ed-bce4-b9d131353956/scratchpad/shots/`.
 
 ## Pendências
 
-1. Validar PostgreSQL, se a exigência original voltar a valer.
-2. Teste de navegador do cadastro e do login (não executado).
-3. Decidir se leituras do RootAdmin devem ser auditadas (hoje só mutações são).
-4. Nenhum job real usa `TenantScopedJob` ainda.
-5. Primeiro RootAdmin ainda não provisionado em nenhum ambiente.
-6. Usuário `test@example.com` do seeder legado.
-7. Sem Sanctum: a API depende da sessão web.
-8. Status `cancelled` existe, mas nenhuma operação o aplica.
-
-## Banco de desenvolvimento
-
-- Banco `vetorsmart` criado no MySQL local, migrations aplicadas, segmentos semeados.
-- Banco `vetorsmart_test` criado para a suíte.
-- Nenhuma migration destrutiva. Nenhum dado existente apagado.
+1. `public/images/landing/hero-plumber.webp` está no fundo do hero, a pedido do usuário, sem origem nem licença registradas em `docs/VETORSMART-IMAGE-CREDITS.md`. Verificar a licença e registrar antes de publicar, ou trocar a imagem.
+2. Validação visual humana recomendada em navegador real em 1440 e 390 px.
+3. Condições do "teste grátis" pendentes; a landing usa "Começar" e não promete condições.
+4. Páginas de privacidade e termos não existem; o rodapé não as referencia.
+5. Pendências anteriores sem alteração: `public/robots.txt` estático, rotação de MySQL e `APP_KEY`, remoção dos registros `[HOMOLOG]`, RootAdmin real, validação em MySQL 8.
 
 ## Não realizado (por restrição da instrução)
 
-- Nenhum commit, push, merge ou publicação em produção.
+- Nenhum commit, push, merge ou deploy.
+- Nenhum download de imagem de terceiros.
+- Nenhuma alteração de backend, rotas ou contratos de dados.

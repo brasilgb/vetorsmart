@@ -22,6 +22,8 @@ class SegmentSeeder extends Seeder
         ['name' => 'Jardinagem', 'description' => 'Paisagismo e jardinagem.'],
         ['name' => 'Limpeza', 'description' => 'Serviços de limpeza.'],
         ['name' => 'Serviços gerais', 'description' => 'Serviços gerais e manutenção predial.'],
+        ['name' => 'Beleza e estética', 'description' => 'Salões, estética e cuidados pessoais.'],
+        ['name' => 'Serviços profissionais', 'description' => 'Consultorias e serviços profissionais por atendimento.'],
     ];
 
     /**
