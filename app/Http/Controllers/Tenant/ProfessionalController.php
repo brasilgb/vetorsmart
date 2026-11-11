@@ -27,7 +27,7 @@ class ProfessionalController extends Controller
 
         $query = Professional::query()->forTenant($context->requireTenant())->orderBy('name')->orderBy('id');
 
-        if ($request->has('active')) {
+        if ($request->filled('active')) {
             $query->where('active', $request->boolean('active'));
         }
 

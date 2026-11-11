@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Enums\TenantRole;
 use App\Enums\TenantStatus;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\TenantFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -38,6 +40,30 @@ class Tenant extends Model
     public function isActive(): bool
     {
         return $this->status === TenantStatus::Active;
+    }
+
+    /**
+     * Read a wall-clock value typed by the tenant's operators (in the tenant's timezone) and return the instant in UTC.
+     */
+    public function instantFromLocal(string $value, string $format = 'Y-m-d H:i'): CarbonImmutable
+    {
+        return CarbonImmutable::createFromFormat($format, $value, $this->timezone)->utc();
+    }
+
+    /**
+     * Local midnight of the given Y-m-d day, in the tenant's timezone.
+     */
+    public function startOfLocalDay(string $value): CarbonImmutable
+    {
+        return CarbonImmutable::createFromFormat('!Y-m-d', $value, $this->timezone);
+    }
+
+    /**
+     * Express a stored instant in the tenant's timezone, for display and for weekday/time checks.
+     */
+    public function toLocal(CarbonInterface $instant): CarbonImmutable
+    {
+        return CarbonImmutable::instance($instant)->setTimezone($this->timezone);
     }
 
     /**

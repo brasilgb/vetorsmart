@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Briefcase, Building2, Contact, Globe, KeyRound, LayoutGrid, ScrollText, Settings, ShieldCheck, Tag, UsersRound } from 'lucide-react';
+import { Briefcase, Building2, CalendarDays, ClipboardList, Contact, Globe, KeyRound, LayoutGrid, MessageSquare, ScrollText, Settings, ShieldCheck, Tag, UsersRound } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -17,6 +17,9 @@ import { index as tenantsIndex } from '@/routes/rootadmin/tenants';
 import { index as segmentsIndex } from '@/routes/rootadmin/segments';
 import { index as usersIndex } from '@/routes/rootadmin/users';
 import { index as tenantCustomers } from '@/routes/tenant/customers';
+import { index as tenantRequests } from '@/routes/tenant/requests';
+import { index as tenantAssistant } from '@/routes/tenant/assistant';
+import { index as tenantAgenda } from '@/routes/tenant/agenda';
 import { index as tenantServices } from '@/routes/tenant/services';
 import { index as tenantProfessionals } from '@/routes/tenant/professionals';
 import { index as tenantTeam } from '@/routes/tenant/team';
@@ -28,6 +31,9 @@ import type { NavItem } from '@/types';
 const tenantNavItems: NavItem[] = [
     { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
     { title: 'Clientes', href: tenantCustomers(), icon: Contact },
+    { title: 'Solicitações', href: tenantRequests(), icon: ClipboardList },
+    { title: 'Atendimento IA', href: tenantAssistant(), icon: MessageSquare },
+    { title: 'Agenda', href: tenantAgenda(), icon: CalendarDays },
     { title: 'Serviços', href: tenantServices(), icon: Briefcase },
     { title: 'Profissionais', href: tenantProfessionals(), icon: UsersRound },
     { title: 'Usuários e permissões', href: tenantTeam(), icon: KeyRound },

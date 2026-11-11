@@ -16,11 +16,20 @@ class SiteHostGuard
     private const array PUBLIC_PATHS = ['/', '/sitemap.xml', '/robots.txt'];
 
     /**
+     * The visitor assistant of the site: its page and its two public endpoints. Nothing else under /atendimento.
+     */
+    private const array ASSISTANT_PATHS = ['/atendimento', '/atendimento/conversa', '/atendimento/mensagens'];
+
+    /**
      * @param  Closure(Request): Response  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->getHost() === (string) config('platform.central_host')) {
+            return $next($request);
+        }
+
+        if (in_array($request->getPathInfo(), self::ASSISTANT_PATHS, true) && in_array($request->getMethod(), ['GET', 'HEAD', 'POST'], true)) {
             return $next($request);
         }
 

@@ -1,7 +1,6 @@
 import { Link } from '@inertiajs/react';
 import { register } from '@/routes';
 import { landingButtonOnDark, landingButtonPrimary, landingContainer } from './landing-layout';
-import { ElectricianAppIllustration } from './electrician-app-illustration';
 
 /**
  * Service photograph (plumber at work) under a navy film for contrast. Its licence is not yet
@@ -39,9 +38,18 @@ export function HeroSection() {
                     </div>
                 </div>
 
-                <div className="vs-rise">
-                    <ElectricianAppIllustration />
-                </div>
+                <figure className="vs-rise relative mx-auto w-full max-w-xl overflow-hidden rounded-3xl border border-white/10 shadow-2xl">
+                    <img
+                        src="/images/workshop.png"
+                        alt="Técnico de uniforme azul-marinho consultando um tablet em uma oficina de serviços"
+                        width="1672"
+                        height="941"
+                        className="aspect-[4/3] w-full object-cover"
+                    />
+                    <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-vs-ink/90 to-transparent px-6 pb-5 pt-16 text-lg font-semibold text-white sm:text-xl">
+                        Tenha tudo em sua mão
+                    </figcaption>
+                </figure>
             </div>
         </section>
     );

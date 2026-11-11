@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Enums\GrowthEventType;
 use App\Enums\PriceType;
+use App\Models\Professional;
 use App\Models\Service;
 use App\Models\Tenant;
 use App\Models\User;
@@ -52,6 +53,41 @@ class ServiceService
         if ($changedFields !== []) {
             $this->auditLogger->record('service.updated', $service->tenant, $service, [
                 'fields' => $changedFields,
+            ], $actor);
+        }
+
+        return $service;
+    }
+
+    /**
+     * Replace the set of professionals enabled for a service. Only active professionals of the
+     * same company can be linked; the rest of the company's links are left untouched.
+     *
+     * @param  list<int>  $professionalIds
+     */
+    public function syncProfessionals(Service $service, array $professionalIds, User $actor): Service
+    {
+        $tenant = $service->tenant;
+        $professionalIds = array_values(array_unique(array_map('intval', $professionalIds)));
+
+        $found = Professional::query()->forTenant($tenant)->whereIn('id', $professionalIds)->where('active', true)->pluck('id')->all();
+
+        if (count($found) !== count($professionalIds)) {
+            throw ValidationException::withMessages([
+                'professional_ids' => ['Um ou mais profissionais não existem nesta empresa ou estão inativos.'],
+            ]);
+        }
+
+        $before = $service->professionals()->pluck('professionals.id')->map(fn ($id) => (int) $id)->sort()->values()->all();
+
+        $service->professionals()->sync(array_fill_keys($professionalIds, ['tenant_id' => $tenant->getKey()]));
+
+        $after = collect($professionalIds)->sort()->values()->all();
+
+        if ($before !== $after) {
+            $this->auditLogger->record('service.professionals_synced', $tenant, $service, [
+                'added' => array_values(array_diff($after, $before)),
+                'removed' => array_values(array_diff($before, $after)),
             ], $actor);
         }
 

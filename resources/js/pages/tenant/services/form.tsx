@@ -1,10 +1,11 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Field, selectClass } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
-import { index as servicesIndex, store, update } from '@/routes/tenant/services';
+import { index as servicesIndex, professionals as syncProfessionalsRoute, store, update } from '@/routes/tenant/services';
 
 type Service = {
     id: number;
@@ -22,13 +23,15 @@ type Service = {
 type Props = {
     service: Service | null;
     categories: { id: number; name: string }[];
+    professionals: { id: number; name: string }[];
+    linked_professional_ids: number[];
 };
 
 /**
  * Price rules mirror the server: a fixed or starting-at price needs an amount;
  * "on request" must have no amount.
  */
-export default function ServiceForm({ service, categories }: Props) {
+export default function ServiceForm({ service, categories, professionals, linked_professional_ids }: Props) {
     const form = useForm({
         name: service?.name ?? '',
         description: service?.description ?? '',
@@ -40,6 +43,9 @@ export default function ServiceForm({ service, categories }: Props) {
         active: service?.active ?? true,
     });
 
+    const [linkedIds, setLinkedIds] = useState<number[]>(linked_professional_ids);
+    const [linking, setLinking] = useState(false);
+
     const needsAmount = form.data.price_type !== 'on_request';
 
     const submit = (event: React.FormEvent) => {
@@ -50,6 +56,24 @@ export default function ServiceForm({ service, categories }: Props) {
         } else {
             form.post(store.url());
         }
+    };
+
+    const toggleProfessional = (professionalId: number) => {
+        setLinkedIds((current) => (current.includes(professionalId) ? current.filter((id) => id !== professionalId) : [...current, professionalId]));
+    };
+
+    const saveProfessionals = (event: React.FormEvent) => {
+        event.preventDefault();
+
+        if (!service) {
+            return;
+        }
+
+        setLinking(true);
+        router.put(syncProfessionalsRoute.url({ service: service.id }), { professional_ids: linkedIds }, {
+            preserveScroll: true,
+            onFinish: () => setLinking(false),
+        });
     };
 
     return (
@@ -76,7 +100,7 @@ export default function ServiceForm({ service, categories }: Props) {
                             </select>
                         </Field>
 
-                        <Field id="duration_minutes" label="Duração estimada (minutos)" error={form.errors.duration_minutes}>
+                        <Field id="duration_minutes" label="Duração estimada (minutos)" error={form.errors.duration_minutes} hint="Necessária para agendar. Informe entre 1 e 1440 minutos.">
                             <Input id="duration_minutes" type="number" min={1} max={1440} value={form.data.duration_minutes} onChange={(e) => form.setData('duration_minutes', e.target.value)} className="h-10" />
                         </Field>
 
@@ -113,6 +137,37 @@ export default function ServiceForm({ service, categories }: Props) {
                             <Button asChild variant="outline" className="h-10"><Link href={servicesIndex.url()}>Cancelar</Link></Button>
                         </div>
                     </form>
+                </Card>
+
+                <Card className="border-vs-border/70 p-6 shadow-sm">
+                    <h2 className="text-base font-semibold text-vs-text">Profissionais habilitados</h2>
+                    {!service ? (
+                        <p className="mt-2 text-sm text-vs-muted">Salve o serviço para habilitar profissionais.</p>
+                    ) : professionals.length === 0 ? (
+                        <p className="mt-2 text-sm text-vs-muted">Nenhum profissional ativo. Cadastre um profissional para habilitá-lo neste serviço.</p>
+                    ) : (
+                        <form onSubmit={saveProfessionals} className="mt-4 grid gap-4">
+                            <fieldset className="grid gap-3 sm:grid-cols-2">
+                                <legend className="sr-only">Profissionais que executam este serviço</legend>
+                                {professionals.map((professional) => (
+                                    <label key={professional.id} className="flex items-center gap-3 text-sm text-vs-text">
+                                        <input
+                                            type="checkbox"
+                                            checked={linkedIds.includes(professional.id)}
+                                            onChange={() => toggleProfessional(professional.id)}
+                                            className="size-4 accent-vs-blue"
+                                        />
+                                        {professional.name}
+                                    </label>
+                                ))}
+                            </fieldset>
+                            <div>
+                                <Button type="submit" disabled={linking} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">
+                                    {linking ? 'Salvando…' : 'Salvar profissionais'}
+                                </Button>
+                            </div>
+                        </form>
+                    )}
                 </Card>
             </div>
         </>

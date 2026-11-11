@@ -29,6 +29,22 @@ class TenantPolicy
     }
 
     /**
+     * Owners and admins configure the visitor assistant.
+     */
+    public function manageAssistant(User $user, Tenant $tenant): bool
+    {
+        return $this->isActiveTenant($tenant) && $this->hasRoleIn([TenantRole::Owner, TenantRole::Admin]);
+    }
+
+    /**
+     * Any member may read the conversation inbox and take conversations; operators included.
+     */
+    public function handleAssistant(User $user, Tenant $tenant): bool
+    {
+        return $this->isActiveTenant($tenant) && $this->hasRoleIn([TenantRole::Owner, TenantRole::Admin, TenantRole::Operator]);
+    }
+
+    /**
      * Determine whether the user may list the tenant's users.
      */
     public function viewUsers(User $user, Tenant $tenant): bool

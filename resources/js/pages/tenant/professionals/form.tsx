@@ -85,7 +85,7 @@ export default function ProfessionalForm({ professional, services }: Props) {
                             <Input id="phone" value={form.data.phone} onChange={(e) => form.setData('phone', e.target.value)} className="h-10" />
                         </Field>
                         <Field id="email" label="E-mail" error={form.errors.email}>
-                            <Input id="email" type="email" value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} className="h-10" />
+                            <Input id="email" type="email" value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} onInvalid={(e) => e.currentTarget.setCustomValidity('Informe um e-mail válido, como nome@empresa.com.br.')} onInput={(e) => e.currentTarget.setCustomValidity('')} className="h-10" />
                         </Field>
                         <div className="md:col-span-2">
                             <Field id="notes" label="Especialidades e observações" error={form.errors.notes}>

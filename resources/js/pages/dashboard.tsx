@@ -1,11 +1,23 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { CheckCircle2, Circle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { index as requestsIndex } from '@/routes/tenant/requests';
+import { index as agendaIndex } from '@/routes/tenant/agenda';
 
 type Metrics = {
     customers: number;
     services: number;
     professionals: number;
+};
+
+type Operations = {
+    open_requests: number;
+    today_appointments: number;
+    in_progress: number;
+    completed_30_days: number;
+    cancelled_30_days: number;
+    conversion_30_days: number | null;
+    upcoming: { id: number; starts_at: string; customer: string | null; service: string | null; professional: string | null }[];
 };
 
 type ChecklistItem = {
@@ -16,15 +28,25 @@ type ChecklistItem = {
 
 type Props = {
     metrics: Metrics;
+    operations: Operations;
     checklist: ChecklistItem[];
     needsSetup: boolean;
 };
 
-export default function Dashboard({ metrics, checklist, needsSetup }: Props) {
+export default function Dashboard({ metrics, operations, checklist, needsSetup }: Props) {
     const indicators = [
         { label: 'Clientes ativos', value: metrics.customers },
         { label: 'Serviços ativos', value: metrics.services },
         { label: 'Profissionais ativos', value: metrics.professionals },
+    ];
+
+    const operational = [
+        { label: 'Solicitações abertas', value: operations.open_requests, href: requestsIndex.url() },
+        { label: 'Agendamentos de hoje', value: operations.today_appointments, href: agendaIndex.url({ query: { view: 'day' } }) },
+        { label: 'Em andamento', value: operations.in_progress, href: requestsIndex.url({ query: { status: 'in_progress' } }) },
+        { label: 'Concluídos (30 dias)', value: operations.completed_30_days, href: requestsIndex.url({ query: { status: 'completed' } }) },
+        { label: 'Cancelados (30 dias)', value: operations.cancelled_30_days, href: requestsIndex.url({ query: { status: 'cancelled' } }) },
+        { label: 'Conversão (30 dias)', value: operations.conversion_30_days === null ? '—' : `${operations.conversion_30_days}%`, href: null },
     ];
 
     return (
@@ -47,6 +69,38 @@ export default function Dashboard({ metrics, checklist, needsSetup }: Props) {
                         </Card>
                     ))}
                 </div>
+
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {operational.map((item) => (
+                        <Card key={item.label} className="border-vs-border/70 shadow-sm">
+                            <CardHeader>
+                                <CardDescription>{item.label}</CardDescription>
+                                <CardTitle className="text-2xl text-vs-text">
+                                    {item.href ? <Link href={item.href} className="hover:underline">{item.value}</Link> : item.value}
+                                </CardTitle>
+                            </CardHeader>
+                        </Card>
+                    ))}
+                </div>
+
+                <Card className="border-vs-border/70 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-vs-text">Próximos compromissos</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {operations.upcoming.length === 0 ? (
+                            <p className="text-sm text-vs-muted">Nenhum atendimento agendado à frente.</p>
+                        ) : (
+                            <ul className="grid gap-2 text-sm text-vs-text">
+                                {operations.upcoming.map((item) => (
+                                    <li key={item.id} className="rounded-md border border-vs-border/70 p-3">
+                                        <span className="font-medium">{item.starts_at}</span> · {item.service ?? 'Serviço'} · {item.customer ?? '—'} · {item.professional ?? '—'}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {needsSetup && (
                     <Card className="border-vs-border/70 shadow-sm">
@@ -72,10 +126,6 @@ export default function Dashboard({ metrics, checklist, needsSetup }: Props) {
                         </CardContent>
                     </Card>
                 )}
-
-                <p className="text-xs text-vs-muted">
-                    Solicitações e agendamentos aparecerão aqui quando os módulos forem implementados.
-                </p>
             </div>
         </>
     );

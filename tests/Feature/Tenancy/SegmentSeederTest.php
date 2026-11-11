@@ -8,10 +8,10 @@ test('the initial segments are created', function () {
 
     expect(Segment::query()->pluck('name')->sort()->values()->all())->toBe([
         'Assistência técnica',
-        'Beleza e estética',
         'Climatização',
         'Eletricistas',
         'Encanadores',
+        'Energia solar',
         'Jardinagem',
         'Limpeza',
         'Oficinas',

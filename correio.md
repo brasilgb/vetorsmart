@@ -1,597 +1,353 @@
-# VETORSMART-LANDING-REDESIGN-05
-## Repaginação Completa da Landing Page — SaaS Premium Minimalista
+# VETORSMART-BACKEND-05 — Atendimento Inteligente, API Operacional e Recepcionista IA
 
-**Projeto:** VetorSmart — ABrasilSistemas  
-**Diretório:** `gateway/vetor-smart/`  
-**Referência obrigatória:** `docs/VETORSMART-PRODUCT-VISION.md`
+**Projeto:** VetorSmart  
+**Empresa:** ABrasilSistemas  
+**Data:** 11/11/2026  
+**Diretório oficial:** `gateway/vetorsmart/`  
+**Prioridade:** Alta
 
-### DECISÃO DO USUÁRIO
+## 1. Instrução
 
-A landing atual foi rejeitada visualmente.
+Ler `correio.md`, `executed.md` e os relatórios BACKEND-01 até BACKEND-04.3 disponíveis no projeto.
 
-O resultado das execuções anteriores não atingiu o padrão esperado.
+Inspecionar a arquitetura existente antes de implementar.
 
-Os principais problemas identificados são:
+O objetivo é desenvolver a primeira versão funcional do atendimento inteligente, integrada ao catálogo de serviços, profissionais, clientes, solicitações e agenda.
 
-- Elementos visualmente espalhados.
-- Falta de unidade entre seções.
-- Hero sem composição satisfatória.
-- Cards pouco elegantes.
-- Carrossel visualmente inadequado.
-- Excesso de elementos decorativos.
-- Hierarquia visual inconsistente.
-- Aparência inferior ao padrão esperado de um SaaS profissional.
-
-**Esta tarefa não é uma correção de cores, imagens ou margens. É uma repaginação estrutural completa.**
-
-Não preservar o layout anterior por conveniência.
-
-Preservar somente as funcionalidades, contratos, integrações, rotas e dados que já estejam corretos.
-
----
-
-# 1. DIREÇÃO CRIATIVA
-
-Adotar uma estética:
-
-**Premium Minimalist SaaS / Modern Enterprise**
-
-Características:
-
-- Moderna.
-- Elegante.
-- Profissional.
-- Organizada.
-- Visualmente consistente.
-- Com personalidade própria.
-- Forte sem ser exagerada.
-- Fácil de navegar.
-- Focada em conversão comercial.
-
-Utilizar referências de qualidade de interfaces SaaS modernas, sem copiar identidades de concorrentes.
-
-A landing deve transmitir uma empresa tecnológica confiável e madura.
-
-Evitar aparência de template genérico montado com componentes desconectados.
-
----
-
-# 2. DESIGN SYSTEM
-
-Antes de reconstruir a página, definir um sistema visual consistente.
-
-### Cores
-
-Paleta principal:
-
-- Azul-marinho: `#0F172A`.
-- Azul de ação: `#2563EB`.
-- Branco: `#FFFFFF`.
-- Fundo alternativo: `#F8FAFC`.
-- Texto secundário: `#64748B`.
-
-Utilizar cores complementares suaves nos cards de funcionalidades.
-
-Sugestões:
-
-- Azul-claro: `#DBEAFE`.
-- Verde-claro: `#DCFCE7`.
-- Violeta-claro: `#EDE9FE`.
-- Laranja-claro: `#FFEDD5`.
-- Ciano-claro: `#CFFAFE`.
-
-As cores complementares devem ter finalidade de identificação e diferenciação, não apenas decoração.
-
-Manter tokens centralizados e respeitar os componentes existentes quando apropriado.
-
-### Tipografia
-
-Utilizar fonte profissional com excelente legibilidade.
-
-Definir escala consistente para:
-
-- Título principal.
-- Títulos das seções.
-- Subtítulos.
-- Descrições.
-- Botões.
-- Legendas.
-
-Não misturar tamanhos arbitrários.
-
-### Layout
-
-Utilizar container central consistente, com largura máxima aproximada de 1200 a 1280 px.
-
-Aplicar:
-
-- Grid responsivo.
-- Alinhamento rigoroso.
-- Espaçamento vertical consistente.
-- Bordas e raios padronizados.
-- Sombras discretas.
-- Hierarquia tipográfica clara.
-
-Evitar seções com larguras e alinhamentos incoerentes.
-
----
-
-# 3. NOVO HEADER
-
-Reconstruir o cabeçalho público.
-
-Estrutura:
-
-**Esquerda:** logotipo VetorSmart.
-
-**Centro:** navegação simplificada.
-
-- Plataforma.
-- Funcionalidades.
-- Segmentos.
-- Planos.
-
-**Direita:**
-
-- Entrar.
-- Começar grátis.
-
-Requisitos:
-
-- Header elegante.
-- Altura equilibrada.
-- Excelente espaçamento.
-- CTA principal destacado.
-- Navegação mobile acessível.
-- Comportamento sticky discreto, se adequado.
-
-Não adicionar menus desnecessários.
-
----
-
-# 4. NOVO HERO
-
-Refazer completamente o Hero.
-
-Não reutilizar a composição anterior se estiver visualmente comprometida.
-
-### Estrutura recomendada
-
-Desktop:
-
-- Coluna esquerda: mensagem comercial.
-- Coluna direita: demonstração visual do VetorSmart.
-
-Mobile:
-
-- Mensagem principal primeiro.
-- CTAs.
-- Visual do produto abaixo.
-
-### Conteúdo
-
-Pequeno destaque:
-
-**A plataforma inteligente para sua empresa crescer**
-
-Título principal:
-
-**Seu crescimento é o nosso propósito.**
-
-Descrição:
-
-"Conquiste oportunidades, organize seus atendimentos e acompanhe seus resultados com site, gestão e ferramentas inteligentes em uma única plataforma."
-
-CTA principal:
-
-**Venha crescer com a gente**
-
-CTA secundário:
-
-**Conheça a plataforma**
-
-### Apresentação visual
-
-Utilizar uma composição moderna baseada em:
-
-- Interface real do dashboard.
-- Prévia real do sistema.
-- Mockup de dispositivo, quando adequado.
-- Elementos discretos que mostrem os recursos.
-
-Não fabricar resultados comerciais ou screenshots apresentados como reais.
-
-Não usar imagens de fundo que prejudiquem o contraste.
-
-Não utilizar grandes quantidades de cards sobrepostos.
-
-A prioridade é uma primeira dobra elegante e memorável.
-
----
-
-# 5. CARROSSEL DE PROFISSIONAIS E SEGMENTOS
-
-Eliminar a dependência de fotografias externas.
-
-**Utilizar ícones profissionais padronizados, preferencialmente Lucide.**
-
-O carrossel deve apresentar segmentos com clareza, simplicidade e elegância.
-
-### Direção visual
-
-Cards compactos contendo:
-
-- Ícone principal.
-- Nome do segmento.
-- Estado de hover discreto.
-- Área de clique funcional.
-
-Duas possibilidades visuais aceitáveis:
-
-**Opção A — Monocromática**
-
-Cards brancos ou cinza-claro, ícones azul-marinho e tipografia escura.
-
-**Opção B — Cores suaves**
-
-Cada card recebe fundo pastel suave, com ícone e texto de contraste adequado.
-
-Escolher a alternativa que melhor se integrar à composição geral.
-
-Não utilizar cores fortes aleatórias.
-
-Não misturar fotografias e ícones no mesmo carrossel.
-
-### Segmentos
-
-Utilizar os dez segmentos existentes no banco.
-
-Mapear cada segmento para um ícone coerente.
-
-Criar fallback para segmentos futuros.
-
-### Comportamento
-
-- Rolagem horizontal.
-- Botões anterior/próximo.
-- Arraste em dispositivos touch.
-- Navegação por teclado.
-- Indicadores somente quando úteis.
-- Cards com altura uniforme.
-- Espaçamentos consistentes.
-
-Não criar cartões excessivamente largos.
-
-Não deixar itens cortados de forma visualmente desorganizada.
-
----
-
-# 6. SEÇÃO DE FUNCIONALIDADES
-
-Criar uma das seções visualmente mais importantes da landing.
-
-Título sugerido:
-
-**Tudo o que sua empresa precisa para crescer.**
-
-Subtítulo:
-
-"Da presença digital ao relacionamento com seus clientes, uma plataforma para simplificar sua rotina e impulsionar seus resultados."
-
-### Cards coloridos
-
-Criar um grid organizado com seis cards.
-
-**1. Site profissional e SEO**
-
-Cor suave azul.
-
-Ícone: globo.
-
-Apresentar presença digital, domínio próprio e otimização para buscas.
-
-**2. Atendimento inteligente**
-
-Cor suave violeta.
-
-Ícone: bot ou mensagens.
-
-Apresentar recepcionista IA e qualificação de contatos.
-
-**3. Agenda e agendamentos**
-
-Cor suave ciano.
-
-Ícone: calendário.
-
-Apresentar organização de horários e profissionais.
-
-**4. Gestão de serviços**
-
-Cor suave laranja.
-
-Ícone: ferramentas ou clipboard.
-
-Apresentar clientes, serviços, profissionais e operação.
-
-**5. Meu Crescimento**
-
-Cor suave verde.
-
-Ícone: gráfico de crescimento.
-
-Apresentar indicadores e resultados mensuráveis.
-
-**6. Aplicativo VetorSmart**
-
-Cor suave azul-acinzentado.
-
-Ícone: smartphone.
-
-Apresentar mobilidade e acesso à operação.
-
-### Regras dos cards
-
-- Alturas equilibradas.
-- Ícones grandes e consistentes.
-- Títulos curtos.
-- Descrições objetivas.
-- Espaçamento interno generoso.
-- Bordas discretas.
-- Hover suave.
-- Hierarquia clara.
-- Layout de três colunas em desktop, duas quando adequado e uma no mobile.
-
-Identificar funcionalidades futuras de maneira discreta e honesta.
-
-Não inventar módulos concluídos.
-
----
-
-# 7. JORNADA DE CRESCIMENTO
-
-Criar uma seção que mostre claramente o diferencial estratégico do produto.
-
-Título:
-
-**Do primeiro contato ao crescimento do seu negócio.**
-
-Representar visualmente a jornada:
-
-Atrair → Atender → Converter → Organizar → Fidelizar → Crescer.
-
-Usar uma composição linear, timeline ou sequência de etapas.
-
-Manter textos curtos e fáceis de entender.
-
-Essa seção deve mostrar que o VetorSmart não é apenas um sistema administrativo, mas uma plataforma para ajudar empresas a crescer.
-
----
-
-# 8. MEU CRESCIMENTO
-
-Criar uma seção visualmente forte para apresentar o conceito do painel Meu Crescimento.
-
-Utilizar dados reais quando o módulo estiver disponível.
-
-Se não existir implementação concluída, utilizar uma apresentação conceitual claramente identificada como ilustração, sem apresentar números inventados como resultados verdadeiros.
-
-Mostrar o benefício:
-
-**Saiba de onde vêm suas oportunidades e acompanhe a evolução da sua empresa.**
-
-Evitar dashboards enormes ou imagens de baixa qualidade.
-
----
-
-# 9. PLANOS E PREÇOS
-
-Redesenhar os cards comerciais.
-
-Planos propostos:
-
-- Essencial — R$ 99,90/mês.
-- Profissional — R$ 199,90/mês.
-- Premium — R$ 349,90/mês.
-
-Os preços continuam sujeitos à validação comercial.
-
-Destacar o Profissional como plano principal.
-
-Manter os cards alinhados, com comparações claras e sem excesso de informação.
-
-Distinguir os recursos disponíveis daqueles em desenvolvimento.
-
-Não anunciar franquias ou condições como definitivas sem validação.
-
----
-
-# 10. FAQ E CTA FINAL
-
-Simplificar o FAQ.
-
-Utilizar accordion acessível e visualmente discreto.
-
-O CTA final deve possuir uma composição forte, mas simples.
-
-Título:
-
-**Pronto para dar o próximo passo?**
-
-Descrição:
-
-"Sua empresa merece uma plataforma que acompanhe seu crescimento."
-
-Botão:
-
-**Venha crescer com a gente!**
-
-Utilizar o fluxo de cadastro existente.
-
----
-
-# 11. FOOTER
-
-Criar um rodapé profissional e compacto.
-
-Incluir:
-
-- Logotipo VetorSmart.
-- Descrição institucional curta.
-- Links relevantes.
-- Planos.
-- Login.
-- Informações da ABrasilSistemas.
-- Política de privacidade e termos, quando disponíveis.
-
-Não criar links quebrados.
-
----
-
-# 12. COMPONENTIZAÇÃO
-
-Revisar os componentes atuais:
-
-- `HeroSection`
-- `SegmentCarousel`
-- `FeatureVisualGrid`
-- `PricingSection`
-- `FaqSection`
-- `FinalCtaSection`
-- `SectionShell`
-
-Refatorar, substituir ou reorganizar conforme necessário.
-
-Evitar duplicação de código.
-
-Não carregar componentes antigos sem uso.
-
-Não modificar estruturas administrativas que não fazem parte da landing.
-
----
-
-# 13. EXPERIÊNCIA E PERFORMANCE
-
-Obrigatório:
-
-- Layout responsivo.
-- Excelente experiência mobile.
-- Tipografia fluida.
-- Contraste acessível.
-- Navegação por teclado.
-- Estados de foco visíveis.
-- Suporte a movimento reduzido.
-- Carregamento eficiente.
-- Evitar layout shifts.
-- Nenhum overflow horizontal indevido.
-- Nenhuma animação excessiva.
-
-A landing deve funcionar bem mesmo sem imagens externas.
-
----
-
-# 14. HOMOLOGAÇÃO VISUAL OBRIGATÓRIA
-
-Esta etapa não deve ser validada apenas com testes automatizados e build.
-
-É necessário visualizar o resultado.
-
-Verificar se existe navegador disponível no ambiente.
-
-Se possível, configurar navegador de testes utilizando ferramentas já suportadas pelo projeto, como Playwright.
-
-Validar ao menos:
-
-- Desktop 1440 px.
-- Notebook 1280 px.
-- Tablet 768 px.
-- Mobile 390 px.
-
-Capturar screenshots para comparação.
-
-Inspecionar:
-
-- Alinhamento.
-- Espaçamento.
-- Quebras de texto.
-- Proporções.
-- Cards.
-- Hero.
-- Header.
-- Carrossel.
-- Rodapé.
-
-Corrigir os problemas encontrados antes de encerrar.
-
-Se a instalação do navegador estiver bloqueada, registrar a limitação e não declarar homologação visual concluída.
-
----
-
-# 15. DOCUMENTAÇÃO
-
-Criar:
-
-`docs/VETORSMART-LANDING-REDESIGN-05.md`
-
-Registrar:
-
-- Estrutura anterior e nova.
-- Componentes alterados.
-- Decisões de design.
-- Screenshots obtidos.
-- Validações realizadas.
-- Pendências.
-- Resultado final.
-
-Atualizar `executed.md` com o resultado desta execução.
-
-Preservar os relatórios anteriores.
-
----
-
-# 16. RESTRIÇÕES
-
-Não executar:
-
-- Commit.
-- Push.
-- Merge.
-- Deploy.
-- Alterações de produção.
-- Exclusão de dados.
-- Mudanças desnecessárias no backend.
+Não duplicar a lógica operacional existente.
 
 Preservar:
 
-- Landing pública.
-- Cadastro funcional.
-- Autenticação.
-- CTAs reais.
-- Segmentos vindos do banco.
-- SEO existente.
-- Identidade administrativa.
-- Visão oficial do produto.
+- Laravel, React e Inertia.
+- Banco de dados MySQL/MariaDB conforme configuração existente.
+- Isolamento multi-tenant.
+- Autenticação e permissões.
+- Interface, login e paleta visual aprovados.
+- Timezone por tenant.
+- Regras transacionais de agendamento.
 
----
+Não executar commit, push, merge ou deploy.
 
-# CRITÉRIO FINAL
+## 2. API operacional
 
-Não considerar a tarefa concluída apenas porque os componentes renderizam.
+Criar uma camada de serviços internos reutilizáveis pela recepcionista IA, evitando que o modelo acesse diretamente o banco de dados.
 
-A landing deve demonstrar melhora significativa em:
+Disponibilizar operações para:
 
-- Organização.
-- Hierarquia.
-- Coerência visual.
-- Profissionalismo.
-- Usabilidade.
-- Experiência mobile.
-- Clareza comercial.
+1. Listar serviços ativos do tenant.
+2. Consultar descrições, duração e preços.
+3. Consultar profissionais habilitados.
+4. Consultar horários disponíveis.
+5. Criar ou localizar cliente com regras de identificação e prevenção de duplicatas.
+6. Criar solicitação.
+7. Encaminhar solicitação para triagem.
+8. Solicitar agendamento.
+9. Consultar status do atendimento.
+10. Encaminhar para atendimento humano.
 
-**A prioridade é qualidade visual, não quantidade de componentes.**
+Reutilizar os services, policies e validadores existentes.
 
-O resultado esperado é uma landing SaaS premium, bonita, funcional e visualmente organizada.
+Não permitir que endpoints públicos recebam livremente um `tenant_id` e acessem outro tenant.
 
-**VetorSmart — Seu crescimento é o nosso propósito.**
+Separar contratos internos da IA e rotas públicas necessárias ao atendimento.
 
-**Venha crescer com a gente!**
+Validar todos os parâmetros no backend.
+
+## 3. Recepcionista IA por segmento
+
+Criar uma estrutura de atendimento especializada por segmento de negócio.
+
+Exemplos de segmentos suportados pela arquitetura:
+
+- Ar-condicionado e climatização.
+- Eletricistas.
+- Encanadores.
+- Manutenção residencial.
+- Assistência técnica.
+- Limpeza e conservação.
+- Serviços profissionais em geral.
+
+Não criar uma implementação independente para cada segmento.
+
+Utilizar uma base comum e configurações especializadas.
+
+Cada tenant deverá poder configurar:
+
+- Nome comercial.
+- Saudação inicial.
+- Apresentação da empresa.
+- Serviços atendidos.
+- Região de atendimento.
+- Horário comercial.
+- Informações comerciais adicionais.
+- Orientações específicas.
+- Condições para encaminhamento humano.
+- Ativação ou desativação da IA.
+
+Essas configurações devem permanecer isoladas por tenant.
+
+O modelo nunca deve receber dados internos de outros tenants.
+
+## 4. Conversas e identificação
+
+Implementar persistência de conversas contendo:
+
+- Tenant.
+- Canal de origem.
+- Identificador seguro da sessão.
+- Cliente identificado, quando existir.
+- Mensagens.
+- Datas e horários.
+- Status da conversa.
+- Serviço de interesse.
+- Solicitação vinculada.
+- Agendamento vinculado.
+- Indicador de intervenção humana.
+
+Adotar controle de retenção configurável e medidas de proteção de dados compatíveis com a LGPD.
+
+Permitir atendimento inicial sem exigir cadastro completo.
+
+Coletar somente os dados necessários para avançar.
+
+Evitar perguntas repetidas quando a informação já estiver disponível na conversa.
+
+## 5. Fluxo de atendimento
+
+Implementar o fluxo:
+
+**Saudação → Identificação da necessidade → Qualificação → Serviço → Disponibilidade → Solicitação/Agendamento → Confirmação.**
+
+A recepcionista deverá:
+
+1. Entender o que o cliente deseja.
+2. Identificar se o serviço existe no catálogo.
+3. Consultar informações reais.
+4. Solicitar dados faltantes.
+5. Consultar disponibilidade.
+6. Apresentar opções reais de horário.
+7. Solicitar confirmação do cliente.
+8. Executar o agendamento por operação transacional autorizada.
+9. Informar o resultado confirmado pelo backend.
+10. Registrar o atendimento e seus eventos.
+
+Quando não houver serviço ou horário disponível, oferecer encaminhamento humano.
+
+A IA não pode inventar valores, disponibilidade, diagnóstico ou prazo.
+
+Não deve informar que um agendamento foi confirmado antes do sucesso da transação.
+
+## 6. Ferramentas controladas da IA
+
+Criar ferramentas internas com contratos tipados e validação explícita.
+
+Exemplos de operações:
+
+- `list_services`
+- `get_service_details`
+- `list_available_slots`
+- `create_service_request`
+- `request_appointment`
+- `get_request_status`
+- `handoff_to_human`
+
+Esses nomes são sugestões; adaptar à arquitetura existente.
+
+A IA poderá solicitar uma operação, mas a aplicação deverá validar autorização, regras comerciais, tenant, parâmetros e integridade antes de executá-la.
+
+Limitar operações permitidas por estado da conversa.
+
+Aplicar idempotência nas operações que criam solicitações e agendamentos.
+
+Não permitir que instruções enviadas por clientes substituam políticas de segurança ou regras do sistema.
+
+## 7. Integração com agenda
+
+A IA deve utilizar exclusivamente o mecanismo de disponibilidade existente.
+
+Regras obrigatórias:
+
+- Respeitar profissionais habilitados.
+- Respeitar serviços ativos.
+- Respeitar duração.
+- Respeitar horário comercial.
+- Respeitar bloqueios.
+- Respeitar timezone do tenant.
+- Impedir conflitos e reservas duplicadas.
+- Confirmar disponibilidade novamente no momento da reserva.
+- Registrar corretamente a origem do agendamento.
+
+Não criar uma segunda agenda nem reservar horários apenas pela resposta textual da IA.
+
+## 8. Atendimento humano
+
+Permitir transferência da conversa para um operador autorizado.
+
+Implementar:
+
+- Estado aguardando atendimento.
+- Identificação de conversa assumida.
+- Histórico visível ao operador.
+- Resumo contextual para continuidade.
+- Bloqueio de respostas automáticas enquanto o humano conduz o atendimento.
+- Encerramento ou devolução à IA por ação autorizada.
+
+Preservar o contexto para que o cliente não precise repetir todas as informações.
+
+## 9. Interface de atendimento
+
+Criar uma primeira interface funcional para atendimento no site público do tenant, utilizando a identidade visual existente.
+
+O chat deverá ser responsivo e acessível.
+
+Preservar o padrão do VetorSmart:
+
+- Desktop 1440 px.
+- Mobile 390 px.
+- Sem overflow.
+- Mensagens claras.
+- Indicador de atendimento.
+- Estados de carregamento e erro.
+- Identificação visual da empresa.
+
+Não adicionar chatbot indiscriminadamente às áreas administrativas.
+
+A interface de atendimento ao visitante e a caixa de entrada operacional dos atendentes devem ter responsabilidades distintas.
+
+## 10. IA de baixo custo
+
+O VetorSmart deverá suportar provedores de IA por configuração, com a implementação inicial escolhida conforme os recursos realmente existentes no projeto.
+
+Não presumir credenciais ou provedores já configurados.
+
+Implementar:
+
+- Interface de provedor substituível.
+- Configuração segura de chave.
+- Limite de tokens.
+- Limite de mensagens e requisições.
+- Histórico contextual compacto.
+- Controle de custo por tenant.
+- Tratamento de indisponibilidade.
+- Possibilidade de desativar a IA.
+- Fluxo básico de atendimento sem IA quando o provedor estiver indisponível.
+
+Nunca enviar senhas, tokens, dados de outros tenants ou informações desnecessárias ao provedor.
+
+Não criar consumo pago obrigatório para executar os testes locais.
+
+## 11. Indicadores iniciais
+
+Registrar eventos que permitam medir futuramente:
+
+- Conversas iniciadas.
+- Conversas qualificadas.
+- Solicitações criadas.
+- Agendamentos realizados.
+- Encaminhamentos humanos.
+- Falhas de atendimento.
+- Consumo de IA.
+- Origem do contato.
+
+Não desenvolver o dashboard comercial completo nesta etapa.
+
+Preparar os dados para o BACKEND-06.
+
+## 12. Correções operacionais pontuais
+
+Aproveitar esta etapa para resolver somente estes ajustes, sem ampliar indevidamente o escopo:
+
+- Mensagens de validação de e-mail em português.
+- Configurações do operador estritamente em modo somente leitura, sem ações administrativas.
+- Testes de regressão para garantir que falhas de formulário não removam acidentalmente profissionais associados a um serviço.
+
+Não modificar `homolog:purge` nem excluir registros de homologação sem autorização.
+
+Não alterar horários históricos sem confirmação.
+
+Manter as pendências de MySQL 8 e licenciamento das imagens explicitamente registradas.
+
+## 13. Segurança
+
+Verificar:
+
+- Isolamento entre tenants.
+- Autorização nas operações internas.
+- Rate limiting nas rotas públicas.
+- Proteção contra abuso e automação.
+- Validação de entradas.
+- Prevenção contra prompt injection.
+- Proteção contra vazamento de dados.
+- Idempotência das operações.
+- Logs sem informações sensíveis.
+- Retenção de dados e acesso autorizado às conversas.
+
+A IA não deve poder executar ações administrativas.
+
+## 14. Testes obrigatórios
+
+Criar testes para:
+
+1. Conversa de atendimento completa.
+2. Serviço existente.
+3. Serviço inexistente.
+4. Serviço inativo.
+5. Consulta de disponibilidade.
+6. Horário indisponível.
+7. Agendamento com sucesso.
+8. Conflito de agendamento.
+9. Encaminhamento humano.
+10. Tenant incorreto.
+11. Resposta inválida do modelo.
+12. Falha do provedor de IA.
+13. Limite de consumo excedido.
+14. Repetição de requisição de agendamento.
+15. Tentativa de manipular instruções do assistente.
+
+Usar provedor simulado para testes automatizados determinísticos.
+
+Executar:
+
+```bash
+php artisan test --compact
+vendor/bin/pint --dirty
+npx tsc --noEmit
+npm run build
+```
+
+Homologar no navegador quando houver acesso autorizado.
+
+## 15. Entrega
+
+Criar:
+
+`docs/VETORSMART-BACKEND-05-ATENDIMENTO-IA.md`
+
+Incluir:
+
+- Arquitetura implementada.
+- Migrations.
+- APIs e contratos.
+- Ferramentas disponíveis.
+- Configurações de IA.
+- Fluxos de atendimento.
+- Integração com agenda.
+- Segurança.
+- Testes executados.
+- Evidências do navegador.
+- Consumo e limites.
+- Pendências e próximos passos.
+
+Atualizar `executed.md` com o resultado fiel da execução.
+
+Não declarar integração real com o provedor de IA se apenas mocks tiverem sido utilizados.
+
+**Não executar commit, push, merge ou deploy.**
+
+## 16. Critério principal de aceite
+
+Um visitante deve conseguir abrir o atendimento do tenant, informar sua necessidade, receber informações de serviços existentes, consultar horários disponíveis e, após confirmação explícita, criar um agendamento real e persistido.
+
+Quando a IA não puder resolver, o atendimento deverá ser transferido para um humano sem perda do contexto.
+
+Todo o fluxo deve utilizar os recursos operacionais existentes do VetorSmart, sem duplicação de regras.

@@ -1,44 +1,44 @@
-# Execução — VETORSMART-LANDING-REDESIGN-05
+# Execução — VETORSMART-BACKEND-05 (Atendimento Inteligente, API Operacional e Recepcionista IA)
 
-Data: 10/11/2026. Local: `gateway/vetor-smart/`.
+Data: 11/11/2026. Local: `gateway/vetorsmart/`.
 
 ## Instrução
 
-- `correio.md` alterado em relação à execução anterior (REFINE-02 + IMAGES-03): agora é **VETORSMART-LANDING-REDESIGN-05**, repaginação estrutural completa da landing.
-- Relatório completo: `docs/VETORSMART-LANDING-REDESIGN-05.md`.
+- `correio.md` difere da versão commitada (LANDING-REDESIGN-05): agora é **VETORSMART-BACKEND-05**. Executado.
+- Relatório completo: `docs/VETORSMART-BACKEND-05-ATENDIMENTO-IA.md`.
 
 ## Resultado: CONCLUÍDO COM PENDÊNCIAS
 
-- Landing reconstruída: header, hero com foto de serviço, mosaico de segmentos com ícones Lucide, seis cards de funcionalidades com status, jornada de crescimento, Meu Crescimento (ilustração conceitual), planos, FAQ, CTA final e rodapé.
-- Foto de serviço no fundo do hero (`hero-plumber.webp`), a pedido do usuário. Sem licença registrada: ver pendência 1.
-- Visualização real em navegador: feita em 1440, 1280, 768 e 390 px por captura automatizada. Sem overflow horizontal e sem erros de console. Inspeção visual feita em 1440, 768 e 390 px.
-
-## Implementado
-
-- Componentes em `resources/js/components/landing/`: `landing-layout.ts`, `landing-header.tsx`, `landing-footer.tsx`, `segment-icons.ts`, `journey-section.tsx`, `growth-section.tsx`, `hero-section.tsx`, `segment-mosaic.tsx`, `feature-visual-grid.tsx`, `pricing-section.tsx`, `faq-section.tsx`, `final-cta-section.tsx`, `section-shell.tsx`.
-- Removido `photo-slots.ts` (sem uso).
-- `welcome.tsx` virou composição; seções alternam fundo branco e `vs-surface`.
-- Tokens novos em `resources/css/app.css`: linha neutra, tons pastel e tintas de texto; escala tipográfica fluida (`vs-title-hero`, `vs-title-section`).
-- Cabeçalho: navegação em disclosure abaixo de 1024 px; botão "Começar grátis" sem quebra de linha.
+- Camada operacional (`app/Services/Assistant/AssistantOperations.php`) reutiliza `AppointmentScheduler`, `ServiceRequestService` e `CustomerService`. A IA não acessa o banco diretamente.
+- Fluxo do visitante (`AssistantFlow`): saudação, serviço, cliente, data, horário, confirmação, com encaminhamento humano. O sucesso só é informado após o agendamento persistido.
+- Página pública do chat em `/atendimento` (host do site publicado do tenant), com cookie httpOnly e token guardado só em hash.
+- Caixa de atendimento no painel (`/atendimento-ia`): assumir, responder, devolver, encerrar. Configurações editáveis por proprietário e administrador.
+- Provedor de IA substituível. **Padrão `none`: nenhuma integração real foi feita nem declarada.**
+- Correções pontuais: e-mail em português; operador somente leitura nas configurações; testes de preservação de profissionais. Corrigido também contador de consumo que contava mensagens em dobro.
+- Comando `assistant:purge` para retenção de conversas.
+- **Não homologado no navegador.**
 
 ## Testes e validação
 
-- `php artisan test --compact`: **231 testes, 228 aprovados, 0 falhas, 3 pulados** (2FA desativado). Mesmo resultado da execução anterior.
-- `npx tsc --noEmit`: **0 erros**. `npm run build`: aprovado.
-- Captura em 1440, 1280, 768 e 390 px: `scrollWidth` igual à largura da janela, zero erros de console, 10 segmentos e 6 funcionalidades.
-- Medição de sobreposição do cabeçalho em 768, 1024 e 1280 px: sem colisão.
-- Capturas em `/tmp/claude-1000/-home-anderson-projects-laravel-infra-abrasil-gateway-vetor-smart/eb928afc-efe2-46ed-bce4-b9d131353956/scratchpad/shots/`.
+- Testes do assistente e correções: `php artisan test --compact tests/Feature/Assistant tests/Feature/Operations/OperationalCorrectionsTest.php`: **29 aprovados, 0 falhas**.
+- Suíte completa: **311 testes, 301 aprovados, 2 falhas, 8 pulados**. As 2 falhas (`PlatformStartTest`, landing) já existiam antes desta etapa e vêm das alterações não commitadas da landing.
+- `vendor/bin/pint --dirty`: aplicado.
+- `npx tsc --noEmit`: 0 erros.
+- `npm run build`: aprovado.
 
 ## Pendências
 
-1. `public/images/landing/hero-plumber.webp` está no fundo do hero, a pedido do usuário, sem origem nem licença registradas em `docs/VETORSMART-IMAGE-CREDITS.md`. Verificar a licença e registrar antes de publicar, ou trocar a imagem.
-2. Validação visual humana recomendada em navegador real em 1440 e 390 px.
-3. Condições do "teste grátis" pendentes; a landing usa "Começar" e não promete condições.
-4. Páginas de privacidade e termos não existem; o rodapé não as referencia.
-5. Pendências anteriores sem alteração: `public/robots.txt` estático, rotação de MySQL e `APP_KEY`, remoção dos registros `[HOMOLOG]`, RootAdmin real, validação em MySQL 8.
+1. **Integração real com provedor de IA**: não feita. Requer escolha de provedor e credencial no ambiente.
+2. **Homologação no navegador** em 1440 px e 390 px (chat do visitante e caixa do atendente): não realizada.
+3. **Migrations**: aplicar `php artisan migrate` no banco de desenvolvimento. Inclui `2026_11_11_170000_add_provider_failures_to_assistant_usage_table` e as migrations `160408`–`160413`, já existentes como arquivos não commitados.
+4. **Limite por minuto das rotas públicas**: configurado, sem teste automatizado.
+5. **MySQL 8**: concorrência testada somente no MariaDB de testes.
+6. **LGPD**: aviso de privacidade e base legal ainda não definidos.
+7. Pendências anteriores mantidas: `homolog:purge` (não alterado), horários históricos (não alterados), licenciamento das imagens, MySQL 8 e produção.
 
-## Não realizado (por restrição da instrução)
+## Não realizado (por restrição do brief)
 
 - Nenhum commit, push, merge ou deploy.
-- Nenhum download de imagem de terceiros.
-- Nenhuma alteração de backend, rotas ou contratos de dados.
+- Nenhuma integração real com provedor de IA.
+- `homolog:purge` e horários históricos não foram alterados.
+- Landing não foi alterada.

@@ -30,4 +30,15 @@ class StoreCustomerRequest extends FormRequest
             'status' => ['sometimes', Rule::enum(CustomerStatus::class)],
         ];
     }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'email.email' => 'Informe um e-mail válido, como nome@empresa.com.br.',
+            'email.max' => 'O e-mail pode ter até 255 caracteres.',
+        ];
+    }
 }

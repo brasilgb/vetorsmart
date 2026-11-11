@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Catalog\IndexServiceRequest;
 use App\Http\Requests\Api\V1\Catalog\StoreServiceRequest;
 use App\Http\Requests\Api\V1\Catalog\UpdateServiceRequest;
+use App\Http\Requests\Tenant\Operations\SyncServiceProfessionalsRequest;
+use App\Models\Professional;
 use App\Models\Service;
 use App\Models\ServiceCategory;
 use App\Services\ServiceService;
@@ -31,14 +33,16 @@ class ServiceController extends Controller
         $term = $request->string('q')->trim()->value();
 
         if ($term !== '') {
-            $query->where('name', 'like', '%'.addcslashes($term, '%_\\').'%');
+            $like = '%'.addcslashes($term, '%_\\').'%';
+
+            $query->where(fn ($inner) => $inner->where('name', 'like', $like)->orWhere('description', 'like', $like));
         }
 
         if ($request->filled('category_id')) {
             $query->where('service_category_id', $request->integer('category_id'));
         }
 
-        if ($request->has('active')) {
+        if ($request->filled('active')) {
             $query->where('active', $request->boolean('active'));
         }
 
@@ -100,7 +104,29 @@ class ServiceController extends Controller
                 'sort_order' => $record->sort_order,
             ],
             'categories' => $this->categories($context),
+            'professionals' => Professional::query()->forTenant($record->tenant_id)->where('active', true)
+                ->orderBy('name')->get(['id', 'name'])
+                ->map(fn (Professional $professional): array => ['id' => $professional->id, 'name' => $professional->name])
+                ->values()
+                ->all(),
+            'linked_professional_ids' => $record->professionals()->where('professionals.active', true)->pluck('professionals.id')->map(fn ($id) => (int) $id)->values()->all(),
         ]);
+    }
+
+    /**
+     * Replace the professionals enabled for this service. Changes are audited by ServiceService.
+     */
+    public function syncProfessionals(SyncServiceProfessionalsRequest $request, TenantContext $context, ServiceService $services, int $service): RedirectResponse
+    {
+        $record = $this->findService($context, $service);
+
+        $this->authorize('update', $record);
+
+        $services->syncProfessionals($record, $request->validated('professional_ids'), $this->actor($request));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Profissionais do serviço atualizados.']);
+
+        return back();
     }
 
     public function update(UpdateServiceRequest $request, TenantContext $context, ServiceService $services, int $service): RedirectResponse

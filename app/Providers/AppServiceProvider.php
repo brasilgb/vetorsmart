@@ -3,14 +3,18 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Services\Assistant\AssistantProvider;
+use App\Services\Assistant\Providers\NullAssistantProvider;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Websites\DnsDomainVerifier;
 use App\Services\Websites\DomainVerifier;
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -24,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
         // Scoped so each request and each queued job starts without a previous tenant.
         $this->app->scoped(TenantContext::class);
         $this->app->bind(DomainVerifier::class, DnsDomainVerifier::class);
+
+        // No language-model provider is bundled or assumed. The deterministic flow runs with the null provider.
+        $this->app->bind(AssistantProvider::class, NullAssistantProvider::class);
     }
 
     /**
@@ -34,6 +41,16 @@ class AppServiceProvider extends ServiceProvider
         $this->configureDefaults();
         $this->configureGates();
         $this->configureTrustedProxies();
+        $this->configureRateLimiters();
+    }
+
+    /**
+     * Public visitor routes: limited per client and per company hostname, so one visitor cannot flood a company's chat.
+     */
+    protected function configureRateLimiters(): void
+    {
+        RateLimiter::for('assistant-public', fn (Request $request): Limit => Limit::perMinute((int) config('assistant.public_requests_per_minute', 30))
+            ->by($request->ip().'|'.$request->getHost()));
     }
 
     /**

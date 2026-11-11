@@ -8,10 +8,12 @@ use App\Http\Requests\Api\V1\Customers\IndexCustomerRequest;
 use App\Http\Requests\Api\V1\Customers\StoreCustomerRequest;
 use App\Http\Requests\Api\V1\Customers\UpdateCustomerRequest;
 use App\Models\Customer;
+use App\Models\ServiceRequest;
 use App\Services\CustomerService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -64,13 +66,65 @@ class CustomerController extends Controller
         return to_route('tenant.customers.index');
     }
 
-    public function edit(TenantContext $context, int $customer): Response
+    public function edit(Request $request, TenantContext $context, int $customer): Response
     {
         $record = $this->findCustomer($context, $customer);
 
         $this->authorize('update', $record);
 
-        return Inertia::render('tenant/customers/form', ['customer' => $this->form($record)]);
+        return Inertia::render('tenant/customers/form', [
+            'customer' => $this->form($record),
+            'history' => $this->history($request, $context, $record),
+        ]);
+    }
+
+    /**
+     * Requests of this customer with their appointments, cancellations and last history note.
+     * Read from the existing records (no copies), most recent activity first, 10 per page.
+     *
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    private function history(Request $request, TenantContext $context, Customer $customer): LengthAwarePaginator
+    {
+        $tenant = $context->requireTenant();
+
+        return ServiceRequest::query()
+            ->forTenant($tenant)
+            ->where('customer_id', $customer->getKey())
+            ->with([
+                'service:id,name',
+                'professional:id,name',
+                'appointments.professional:id,name',
+                'appointments.cancelledBy:id,name',
+                'events.user:id,name',
+            ])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->paginate(10, ['*'], 'historico')
+            ->withQueryString()
+            ->through(fn (ServiceRequest $serviceRequest): array => [
+                'id' => $serviceRequest->id,
+                'service' => $serviceRequest->service?->name,
+                'priority' => $serviceRequest->priority->label(),
+                'status' => $serviceRequest->status->label(),
+                'professional' => $serviceRequest->professional?->name,
+                'created_at' => $tenant->toLocal($serviceRequest->created_at)->format('d/m/Y H:i'),
+                'closed_at' => $serviceRequest->closed_at ? $tenant->toLocal($serviceRequest->closed_at)->format('d/m/Y H:i') : null,
+                'closing_reason' => $serviceRequest->closing_reason,
+                'appointments' => $serviceRequest->appointments->map(fn ($appointment): array => [
+                    'starts_at' => $tenant->toLocal($appointment->starts_at)->format('d/m/Y H:i'),
+                    'professional' => $appointment->professional?->name,
+                    'status' => $appointment->status->label(),
+                    'cancelling_reason' => $appointment->cancelling_reason,
+                    'cancelled_by' => $appointment->cancelledBy?->name,
+                    'cancelled_at' => $appointment->cancelled_at ? $tenant->toLocal($appointment->cancelled_at)->format('d/m/Y H:i') : null,
+                ])->values()->all(),
+                'last_event' => $serviceRequest->events->last() ? [
+                    'note' => $serviceRequest->events->last()->note,
+                    'user' => $serviceRequest->events->last()->user?->name,
+                    'at' => $tenant->toLocal($serviceRequest->events->last()->created_at)->format('d/m/Y H:i'),
+                ] : null,
+            ]);
     }
 
     public function update(UpdateCustomerRequest $request, TenantContext $context, CustomerService $customers, int $customer): RedirectResponse

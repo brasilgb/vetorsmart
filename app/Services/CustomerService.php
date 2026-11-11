@@ -27,7 +27,7 @@ class CustomerService
      *
      * @param  array<string, mixed>  $attributes
      */
-    public function create(Tenant $tenant, array $attributes, User $actor): Customer
+    public function create(Tenant $tenant, array $attributes, ?User $actor): Customer
     {
         $data = $this->normalize($attributes);
 

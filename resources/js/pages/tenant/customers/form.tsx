@@ -4,7 +4,9 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Field, selectClass } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
+import { Pagination } from '@/components/vetor-smart/pagination';
 import { index as customersIndex, store, update } from '@/routes/tenant/customers';
+import type { Paginator } from '@/types';
 
 type Customer = {
     id: number;
@@ -21,14 +23,35 @@ type Customer = {
     status: string;
 };
 
+type HistoryItem = {
+    id: number;
+    service: string | null;
+    priority: string;
+    status: string;
+    professional: string | null;
+    created_at: string;
+    closed_at: string | null;
+    closing_reason: string | null;
+    appointments: {
+        starts_at: string;
+        professional: string | null;
+        status: string;
+        cancelling_reason: string | null;
+        cancelled_by: string | null;
+        cancelled_at: string | null;
+    }[];
+    last_event: { note: string | null; user: string | null; at: string } | null;
+};
+
 type Props = {
     customer: Customer | null;
+    history?: Paginator<HistoryItem>;
 };
 
 /**
  * One form for create and edit. Only the name is required; everything else is optional.
  */
-export default function CustomerForm({ customer }: Props) {
+export default function CustomerForm({ customer, history }: Props) {
     const form = useForm({
         name: customer?.name ?? '',
         person_type: customer?.person_type ?? 'individual',
@@ -88,7 +111,7 @@ export default function CustomerForm({ customer }: Props) {
 
                         <div className="md:col-span-2">
                             <Field id="email" label="E-mail" error={form.errors.email}>
-                                <Input id="email" type="email" value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} className="h-10" />
+                                <Input id="email" type="email" value={form.data.email} onChange={(e) => form.setData('email', e.target.value)} onInvalid={(e) => e.currentTarget.setCustomValidity('Informe um e-mail válido, como nome@empresa.com.br.')} onInput={(e) => e.currentTarget.setCustomValidity('')} className="h-10" />
                             </Field>
                         </div>
 
@@ -122,6 +145,53 @@ export default function CustomerForm({ customer }: Props) {
                         </div>
                     </form>
                 </Card>
+
+                {customer && history && (
+                    <Card className="border-vs-border/70 p-6 shadow-sm">
+                        <h2 className="text-base font-semibold text-vs-text">Histórico operacional</h2>
+                        <p className="mt-1 text-sm text-vs-muted">Solicitações deste cliente, da mais recente para a mais antiga.</p>
+
+                        {history.data.length === 0 ? (
+                            <p className="mt-4 text-sm text-vs-muted">Nenhuma solicitação registrada para este cliente.</p>
+                        ) : (
+                            <ol className="mt-4 grid gap-4">
+                                {history.data.map((item) => (
+                                    <li key={item.id} className="rounded-md border border-vs-border/70 p-4 text-sm">
+                                        <p className="font-medium text-vs-text">
+                                            Solicitação #{item.id} · {item.service ?? 'Serviço a definir'} · {item.status}
+                                        </p>
+                                        <p className="text-vs-muted">
+                                            Aberta em {item.created_at} · Prioridade {item.priority}
+                                            {item.closed_at ? ` · Encerrada em ${item.closed_at}` : ''}
+                                        </p>
+                                        {item.closing_reason && <p className="text-vs-muted">Motivo do encerramento: {item.closing_reason}</p>}
+                                        {item.last_event && (
+                                            <p className="text-vs-muted">Último evento: {item.last_event.at}{item.last_event.user ? ` por ${item.last_event.user}` : ''}{item.last_event.note ? ` — ${item.last_event.note}` : ''}</p>
+                                        )}
+                                        {item.appointments.length > 0 && (
+                                            <ul className="mt-2 grid gap-1">
+                                                {item.appointments.map((appointment, index) => (
+                                                    <li key={index} className="text-vs-text">
+                                                        {appointment.starts_at} · {appointment.professional ?? 'Profissional a definir'} · {appointment.status}
+                                                        {appointment.cancelling_reason && (
+                                                            <span className="block text-vs-muted">
+                                                                Cancelado{appointment.cancelled_by ? ` por ${appointment.cancelled_by}` : ''}{appointment.cancelled_at ? ` em ${appointment.cancelled_at}` : ''}: {appointment.cancelling_reason}
+                                                            </span>
+                                                        )}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </li>
+                                ))}
+                            </ol>
+                        )}
+
+                        <div className="mt-4">
+                            <Pagination links={history.links} />
+                        </div>
+                    </Card>
+                )}
             </div>
         </>
     );

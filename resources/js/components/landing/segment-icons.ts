@@ -1,4 +1,4 @@
-import { Briefcase, Building2, Car, Cog, Droplets, Hammer, Leaf, Scissors, Snowflake, Sparkles, Zap, type LucideIcon } from 'lucide-react';
+import { Briefcase, Building2, Car, Cog, Droplets, Hammer, Leaf, Snowflake, Sparkles, Sun, Zap, type LucideIcon } from 'lucide-react';
 
 /** Keyed by the segment name stored in the database (see SegmentSeeder). */
 const segmentIcons: Record<string, LucideIcon> = {
@@ -10,7 +10,7 @@ const segmentIcons: Record<string, LucideIcon> = {
     Jardinagem: Leaf,
     Limpeza: Sparkles,
     'Serviços gerais': Hammer,
-    'Beleza e estética': Scissors,
+    'Energia solar': Sun,
     'Serviços profissionais': Briefcase,
 };
 
