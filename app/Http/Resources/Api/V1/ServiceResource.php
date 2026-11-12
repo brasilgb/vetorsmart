@@ -2,13 +2,14 @@
 
 namespace App\Http\Resources\Api\V1;
 
+use App\Models\Service;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * Prices are returned as decimal strings to avoid floating-point rounding.
  *
- * @mixin \App\Models\Service
+ * @mixin Service
  */
 class ServiceResource extends JsonResource
 {
