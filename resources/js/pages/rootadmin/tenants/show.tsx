@@ -29,6 +29,13 @@ type Props = {
         service_modes: string[];
         confirmation_policy: string;
     } | null;
+    operations: {
+        active_users: number;
+        primary_domain: { hostname: string; kind: string; status: string } | null;
+        website: { name: string; status: string } | null;
+        assistant_enabled: boolean;
+    };
+    history: { id: number; action: string; user: string | null; created_at: string | null }[];
     users: Paginator<{
         id: number;
         name: string | null;
@@ -41,7 +48,12 @@ type Props = {
 
 const roleLabel: Record<string, string> = { owner: 'Proprietário', admin: 'Administrador', operator: 'Operador' };
 
-export default function TenantShow({ tenant, settings, users }: Props) {
+const actionLabel: Record<string, string> = {
+    'tenant.suspended': 'Empresa suspensa',
+    'tenant.activated': 'Empresa ativada',
+};
+
+export default function TenantShow({ tenant, settings, operations, history, users }: Props) {
     const isActive = tenant.status === 'active';
 
     const form = useForm({
@@ -107,6 +119,30 @@ export default function TenantShow({ tenant, settings, users }: Props) {
 
                 <Card className="border-vs-border/70 shadow-sm">
                     <CardHeader>
+                        <CardTitle className="text-vs-text">Operação</CardTitle>
+                        <CardDescription>Situação atual. Os dados de atendimento da empresa não são exibidos nesta área.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-2 text-sm">
+                        <Info label="Usuários ativos" value={String(operations.active_users)} />
+                        <Info label="Limite contratado" value="Não definido (plano ainda não cadastrado)" />
+                        <Info
+                            label="Domínio principal"
+                            value={
+                                operations.primary_domain
+                                    ? `${operations.primary_domain.hostname} · ${operations.primary_domain.status === 'verified' ? 'verificado' : 'pendente'}`
+                                    : 'Não configurado'
+                            }
+                        />
+                        <Info
+                            label="Site"
+                            value={operations.website ? `${operations.website.name} · ${operations.website.status === 'published' ? 'publicado' : 'não publicado'}` : 'Não criado'}
+                        />
+                        <Info label="Atendimento IA" value={operations.assistant_enabled ? 'Ativado pela empresa' : 'Desativado'} />
+                    </CardContent>
+                </Card>
+
+                <Card className="border-vs-border/70 shadow-sm">
+                    <CardHeader>
                         <CardTitle className="text-vs-text">{isActive ? 'Suspender empresa' : 'Ativar empresa'}</CardTitle>
                         <CardDescription>
                             {isActive
@@ -140,7 +176,7 @@ export default function TenantShow({ tenant, settings, users }: Props) {
                         <CardTitle className="text-vs-text">Usuários vinculados</CardTitle>
                         <CardDescription>Sem senhas ou dados de acesso. Alterações de permissão não são feitas por esta tela.</CardDescription>
                     </CardHeader>
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Usuários vinculados à empresa">
                         <table className="w-full min-w-[640px] text-left text-sm">
                             <thead className="bg-vs-surface text-vs-muted">
                                 <tr>
@@ -167,6 +203,27 @@ export default function TenantShow({ tenant, settings, users }: Props) {
                     <div className="px-4 py-4">
                         <Pagination links={users.links} />
                     </div>
+                </Card>
+
+                <Card className="overflow-hidden border-vs-border/70 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-vs-text">Histórico administrativo</CardTitle>
+                        <CardDescription>Últimas ações administrativas sobre esta empresa. Não inclui conteúdo de atendimento.</CardDescription>
+                    </CardHeader>
+                    {history.length === 0 ? (
+                        <p className="px-6 pb-6 text-sm text-vs-muted">Nenhuma ação administrativa registrada.</p>
+                    ) : (
+                        <ul className="grid gap-2 px-6 pb-6 text-sm">
+                            {history.map((entry) => (
+                                <li key={entry.id} className="flex flex-wrap justify-between gap-2 border-t border-vs-border/70 pt-2">
+                                    <span className="text-vs-text">{actionLabel[entry.action] ?? entry.action}</span>
+                                    <span className="text-vs-muted">
+                                        {entry.user ?? 'Sistema'} · {entry.created_at ?? '—'}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
                 </Card>
             </div>
         </>

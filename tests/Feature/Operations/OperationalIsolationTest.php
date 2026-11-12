@@ -117,7 +117,7 @@ test('switching to a tenant without membership does not reveal its data', functi
 });
 
 test('the platform root admin cannot read operational data of a tenant', function () {
-    $root = User::factory()->rootAdmin()->create();
+    $root = User::factory()->rootAdmin()->withConfirmedTwoFactor()->create();
 
     $this->actingAs($root)->getJson('/api/v1/tenant/customers')->assertForbidden();
     $this->actingAs($root)->getJson('/api/v1/tenant/services')->assertForbidden();

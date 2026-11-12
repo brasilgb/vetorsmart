@@ -1,3 +1,4 @@
+import { emailValidationProps } from '@/lib/email-validation';
 import { Form, Head } from '@inertiajs/react';
 import AuthShell from '@/components/vetor-smart/auth-shell';
 import InputError from '@/components/input-error';
@@ -103,6 +104,7 @@ export default function Register({ passwordRules, segments }: Props) {
                                 id="email"
                                 name="email"
                                 type="email"
+                                {...emailValidationProps}
                                 required
                                 autoComplete="email"
                                 placeholder="voce@empresa.com.br"

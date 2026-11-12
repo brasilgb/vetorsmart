@@ -2,6 +2,7 @@ import { Form, Head } from '@inertiajs/react';
 import { useRef } from 'react';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
 import Heading from '@/components/heading';
+import TwoFactorSection from '@/components/two-factor-section';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +12,11 @@ import { edit } from '@/routes/security';
 // oxfmt-ignore
 type Props = {
     passwordRules: string;
+    status?: string | null;
+    canManageTwoFactor: boolean;
+    twoFactorEnabled?: boolean;
+    requiresConfirmation?: boolean;
+    twoFactor?: { confirmed: boolean; pending: boolean; required: boolean };
 };
 
 export default function Security(props: Props) {
@@ -19,15 +25,29 @@ export default function Security(props: Props) {
 
     return (
         <>
-            <Head title="Security settings" />
+            <Head title="Segurança" />
 
-            <h1 className="sr-only">Security settings</h1>
+            <h1 className="sr-only">Segurança da conta</h1>
 
             <div className="space-y-6">
+                {props.status && (
+                    <p role="status" className="rounded-md bg-vs-surface px-3 py-2 text-sm text-vs-text">
+                        {props.status}
+                    </p>
+                )}
+
+                {props.canManageTwoFactor && props.twoFactor && (
+                    <TwoFactorSection
+                        confirmed={props.twoFactor.confirmed}
+                        pending={props.twoFactor.pending}
+                        required={props.twoFactor.required}
+                    />
+                )}
+
                 <Heading
                     variant="small"
-                    title="Update password"
-                    description="Ensure your account is using a long, random password to stay secure"
+                    title="Alterar senha"
+                    description="Use uma senha longa e aleatória para manter sua conta segura. Todos os campos são obrigatórios."
                 />
 
                 <Form
@@ -56,7 +76,7 @@ export default function Security(props: Props) {
                         <>
                             <div className="grid gap-2">
                                 <Label htmlFor="current_password">
-                                    Current password
+                                    Senha atual <span aria-hidden="true">*</span>
                                 </Label>
 
                                 <PasswordInput
@@ -65,14 +85,17 @@ export default function Security(props: Props) {
                                     name="current_password"
                                     className="mt-1 block w-full"
                                     autoComplete="current-password"
-                                    placeholder="Current password"
+                                    placeholder="Senha atual"
+                                    aria-required="true"
                                 />
 
                                 <InputError message={errors.current_password} />
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="password">New password</Label>
+                                <Label htmlFor="password">
+                                    Nova senha <span aria-hidden="true">*</span>
+                                </Label>
 
                                 <PasswordInput
                                     id="password"
@@ -80,8 +103,9 @@ export default function Security(props: Props) {
                                     name="password"
                                     className="mt-1 block w-full"
                                     autoComplete="new-password"
-                                    placeholder="New password"
+                                    placeholder="Nova senha"
                                     passwordrules={props.passwordRules}
+                                    aria-required="true"
                                 />
 
                                 <InputError message={errors.password} />
@@ -89,7 +113,7 @@ export default function Security(props: Props) {
 
                             <div className="grid gap-2">
                                 <Label htmlFor="password_confirmation">
-                                    Confirm password
+                                    Confirmar nova senha <span aria-hidden="true">*</span>
                                 </Label>
 
                                 <PasswordInput
@@ -97,8 +121,9 @@ export default function Security(props: Props) {
                                     name="password_confirmation"
                                     className="mt-1 block w-full"
                                     autoComplete="new-password"
-                                    placeholder="Confirm password"
+                                    placeholder="Confirmar nova senha"
                                     passwordrules={props.passwordRules}
+                                    aria-required="true"
                                 />
 
                                 <InputError
@@ -111,7 +136,7 @@ export default function Security(props: Props) {
                                     disabled={processing}
                                     data-test="update-password-button"
                                 >
-                                    Save
+                                    Salvar nova senha
                                 </Button>
                             </div>
                         </>
@@ -125,7 +150,7 @@ export default function Security(props: Props) {
 Security.layout = {
     breadcrumbs: [
         {
-            title: 'Security settings',
+            title: 'Segurança',
             href: edit(),
         },
     ],

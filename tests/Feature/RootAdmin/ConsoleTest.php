@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\TenantStatus;
+use App\Models\AssistantUsage;
 use App\Models\AuditLog;
 use App\Models\Segment;
 use App\Models\Tenant;
@@ -12,7 +13,7 @@ use Inertia\Testing\AssertableInertia;
 beforeEach(function () {
     $this->seed(SegmentSeeder::class);
 
-    $this->root = User::factory()->rootAdmin()->create(['name' => 'Root ABrasil']);
+    $this->root = User::factory()->rootAdmin()->withConfirmedTwoFactor()->create(['name' => 'Root ABrasil']);
 
     $this->segment = Segment::query()->where('slug', 'limpeza')->firstOrFail();
     $this->active = Tenant::factory()->create(['name' => 'Empresa Ativa', 'segment_id' => $this->segment->id]);
@@ -167,4 +168,53 @@ test('the root admin without a company lands on the console, not the tenant area
     $this->actingAs($this->root)
         ->get('/dashboard')
         ->assertRedirect('/rootadmin');
+});
+
+test('the dashboard reports AI consumption of the current month and lists unavailable indicators', function () {
+    AssistantUsage::query()->create([
+        'tenant_id' => $this->active->id,
+        'usage_date' => now()->toDateString(),
+        'messages' => 4,
+        'provider_calls' => 2,
+        'provider_failures' => 1,
+        'tokens' => 900,
+    ]);
+
+    AssistantUsage::query()->create([
+        'tenant_id' => $this->suspended->id,
+        'usage_date' => now()->subMonths(2)->startOfMonth()->toDateString(),
+        'messages' => 50,
+        'provider_calls' => 50,
+        'provider_failures' => 0,
+        'tokens' => 50000,
+    ]);
+
+    $this->actingAs($this->root)
+        ->get('/rootadmin')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('rootadmin/dashboard')
+            ->where('ai.messages', 4)
+            ->where('ai.provider_calls', 2)
+            ->where('ai.provider_failures', 1)
+            ->where('ai.tokens', 900)
+            ->where('sites.published', 0)
+            ->where('appointments.upcoming', 0)
+            ->has('pending', 5));
+});
+
+test('the company detail shows operational state and its administrative history', function () {
+    $this->actingAs($this->root)
+        ->post("/rootadmin/tenants/{$this->active->id}/status", ['status' => 'suspended', 'confirm' => true]);
+
+    $this->actingAs($this->root)
+        ->get("/rootadmin/tenants/{$this->active->id}")
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('rootadmin/tenants/show')
+            ->where('operations.active_users', 1)
+            ->where('operations.primary_domain', null)
+            ->where('operations.website', null)
+            ->where('operations.assistant_enabled', false)
+            ->has('history', 1)
+            ->where('history.0.action', 'tenant.suspended')
+            ->where('history.0.user', 'Root ABrasil'));
 });

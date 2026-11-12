@@ -76,7 +76,7 @@ export default function AuditIndex({ filters, entries }: Props) {
                                         <td className="px-4 py-3 text-vs-muted">{entry.subject ?? '—'}</td>
                                         <td className="px-4 py-3">
                                             {entry.metadata && Object.keys(entry.metadata).length > 0 ? (
-                                                <pre className="max-w-[320px] overflow-x-auto rounded bg-vs-surface p-2 text-xs text-vs-muted">
+                                                <pre tabIndex={0} aria-label="Metadados da ação" className="max-w-[320px] overflow-x-auto rounded bg-vs-surface p-2 text-xs text-vs-muted">
                                                     {JSON.stringify(entry.metadata, null, 2)}
                                                 </pre>
                                             ) : (

@@ -11,4 +11,6 @@ export type NavItem = {
     href: NonNullable<InertiaLinkProps['href']>;
     icon?: LucideIcon | null;
     isActive?: boolean;
+    /** Listed for the roadmap but not operational yet: shown as "Em breve" and never linked. */
+    disabled?: boolean;
 };

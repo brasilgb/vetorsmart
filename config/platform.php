@@ -40,4 +40,37 @@ return [
     | forwarded headers are ignored.
     */
     'trusted_proxies' => env('PLATFORM_TRUSTED_PROXIES', ''),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Commercial plans (preparation only)
+    |--------------------------------------------------------------------------
+    |
+    | Prices are in centavos (BRL) and come from the environment, so they can change
+    | without a deploy. This configuration does not enable charging: billing needs its
+    | own specification and financial homologation. Discounts per cycle are not defined
+    | yet and default to 0.
+    |
+    */
+
+    'plans' => [
+        'professional' => [
+            'name' => 'Profissional',
+            'included_users' => 1,
+            'monthly_price_cents' => (int) env('PLATFORM_PLAN_PROFESSIONAL_MONTHLY_CENTS', 8990),
+        ],
+        'premium' => [
+            'name' => 'Premium',
+            'included_users' => 5,
+            'monthly_price_cents' => (int) env('PLATFORM_PLAN_PREMIUM_MONTHLY_CENTS', 18990),
+        ],
+    ],
+
+    'additional_user_monthly_price_cents' => (int) env('PLATFORM_ADDITIONAL_USER_MONTHLY_CENTS', 1990),
+
+    'billing_cycles' => [
+        'monthly' => ['months' => 1, 'discount_percent' => 0],
+        'semiannual' => ['months' => 6, 'discount_percent' => (int) env('PLATFORM_CYCLE_SEMIANNUAL_DISCOUNT_PERCENT', 0)],
+        'annual' => ['months' => 12, 'discount_percent' => (int) env('PLATFORM_CYCLE_ANNUAL_DISCOUNT_PERCENT', 0)],
+    ],
 ];

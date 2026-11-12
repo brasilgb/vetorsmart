@@ -126,7 +126,7 @@ test('a tenant suspended after membership is not reachable through a switch', fu
 });
 
 test('a platform root admin without membership gets no tenant data', function () {
-    $root = User::factory()->rootAdmin()->create();
+    $root = User::factory()->rootAdmin()->withConfirmedTwoFactor()->create();
 
     $this->actingAs($root)
         ->getJson('/api/v1/tenant/settings')

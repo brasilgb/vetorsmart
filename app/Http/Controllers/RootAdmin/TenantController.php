@@ -2,12 +2,17 @@
 
 namespace App\Http\Controllers\RootAdmin;
 
+use App\Enums\MembershipStatus;
 use App\Enums\TenantStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RootAdmin\UpdateTenantStatusRequest;
+use App\Models\AssistantSetting;
+use App\Models\AuditLog;
 use App\Models\Segment;
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Models\TenantUser;
+use App\Models\TenantWebsite;
 use App\Models\User;
 use App\Services\TenantStatusService;
 use Illuminate\Http\RedirectResponse;
@@ -63,6 +68,31 @@ class TenantController extends Controller
             ->orderBy('id')
             ->paginate(20, ['*'], 'users');
 
+        $activeUsers = TenantUser::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->where('status', MembershipStatus::Active)
+            ->count();
+
+        $primaryDomain = TenantDomain::query()
+            ->forTenant($tenant)
+            ->where('is_primary', true)
+            ->first(['hostname', 'kind', 'status']);
+
+        $website = TenantWebsite::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->first(['name', 'status']);
+
+        $assistant = AssistantSetting::query()
+            ->forTenant($tenant)
+            ->first(['enabled']);
+
+        $history = AuditLog::query()
+            ->where('tenant_id', $tenant->getKey())
+            ->with('user:id,name')
+            ->latest('id')
+            ->limit(20)
+            ->get(['id', 'action', 'user_id', 'created_at']);
+
         return Inertia::render('rootadmin/tenants/show', [
             'tenant' => [
                 ...$this->summary($tenant),
@@ -71,6 +101,25 @@ class TenantController extends Controller
                 'phone' => $tenant->phone,
                 'timezone' => $tenant->timezone,
             ],
+            'operations' => [
+                'active_users' => $activeUsers,
+                'primary_domain' => $primaryDomain === null ? null : [
+                    'hostname' => $primaryDomain->hostname,
+                    'kind' => $primaryDomain->kind->value,
+                    'status' => $primaryDomain->status->value,
+                ],
+                'website' => $website === null ? null : [
+                    'name' => $website->name,
+                    'status' => $website->status->value,
+                ],
+                'assistant_enabled' => (bool) ($assistant?->enabled ?? false),
+            ],
+            'history' => $history->map(fn (AuditLog $entry): array => [
+                'id' => $entry->id,
+                'action' => $entry->action,
+                'user' => $entry->user?->name,
+                'created_at' => $entry->created_at?->format('d/m/Y H:i'),
+            ]),
             'settings' => $tenant->settings === null ? null : [
                 'business_name' => $tenant->settings->business_name,
                 'description' => $tenant->settings->description,

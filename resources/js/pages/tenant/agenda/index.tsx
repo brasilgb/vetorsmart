@@ -22,6 +22,7 @@ type Appointment = {
     service: string | null;
     status: string;
     status_label: string;
+    can_change: boolean;
     starts_at: string;
 };
 
@@ -143,11 +144,15 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
                                     <p className="text-vs-muted">Situação: {appointment.status_label}</p>
                                     <div className="mt-2 flex flex-wrap gap-3 text-sm">
                                         <Link href={requestShow.url({ serviceRequest: appointment.request_id })} className="font-medium text-vs-blue hover:underline">Abrir solicitação</Link>
-                                        <details>
-                                            <summary className="cursor-pointer font-medium text-vs-blue hover:underline">Remarcar</summary>
-                                            <RescheduleForm appointmentId={appointment.id} current={appointment.starts_at} />
-                                        </details>
-                                        <CancelAppointment appointmentId={appointment.id} />
+                                        {appointment.can_change && (
+                                            <>
+                                                <details>
+                                                    <summary className="cursor-pointer font-medium text-vs-blue hover:underline">Remarcar</summary>
+                                                    <RescheduleForm appointmentId={appointment.id} current={appointment.starts_at} />
+                                                </details>
+                                                <CancelAppointment appointmentId={appointment.id} />
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             ))}
@@ -280,21 +285,77 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
     );
 }
 
+/**
+ * A refused reschedule (occupied slot, outside working hours) is answered with a JSON validation error, so the
+ * message is shown next to the field and the operator sees why the visit did not move. A saved change reloads the agenda.
+ */
 function RescheduleForm({ appointmentId, current }: { appointmentId: number; current: string }) {
     const [startsAt, setStartsAt] = useState(current.replace(' ', 'T'));
+    const [error, setError] = useState<string | null>(null);
+    const [sending, setSending] = useState(false);
+
+    const submit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setError(null);
+        setSending(true);
+
+        try {
+            const response = await fetch(reschedule.url({ appointment: appointmentId }), {
+                method: 'PATCH',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    'X-XSRF-TOKEN': xsrfToken(),
+                },
+                body: JSON.stringify({ starts_at: startsAt.replace('T', ' ') }),
+            });
+
+            if (response.ok) {
+                router.reload();
+
+                return;
+            }
+
+            if (response.status === 422) {
+                const data = (await response.json()) as { errors?: Record<string, string[]>; message?: string };
+                setError(Object.values(data.errors ?? {})[0]?.[0] ?? data.message ?? 'Não foi possível remarcar.');
+
+                return;
+            }
+
+            setError(`Não foi possível remarcar agora (resposta ${response.status}). Tente novamente.`);
+        } finally {
+            setSending(false);
+        }
+    };
 
     return (
-        <form
-            className="mt-2 flex flex-wrap items-end gap-2"
-            onSubmit={(event) => {
-                event.preventDefault();
-                router.patch(reschedule.url({ appointment: appointmentId }), { starts_at: startsAt.replace('T', ' ') }, { preserveScroll: true });
-            }}
-        >
-            <Input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} aria-label="Nova data e horário" required className="h-9 w-auto" />
-            <Button type="submit" size="sm" variant="outline">Confirmar</Button>
+        <form className="mt-2 flex flex-wrap items-end gap-2" onSubmit={submit}>
+            <Input
+                type="datetime-local"
+                value={startsAt}
+                onChange={(event) => setStartsAt(event.target.value)}
+                aria-label="Nova data e horário"
+                aria-invalid={error !== null}
+                aria-describedby={error ? `reschedule-error-${appointmentId}` : undefined}
+                required
+                className="h-9 w-auto"
+            />
+            <Button type="submit" size="sm" variant="outline" disabled={sending}>Confirmar</Button>
+            {error && (
+                <p id={`reschedule-error-${appointmentId}`} role="alert" className="w-full text-sm text-red-600">
+                    {error}
+                </p>
+            )}
         </form>
     );
+}
+
+function xsrfToken(): string {
+    const match = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/);
+
+    return match ? decodeURIComponent(match[1]) : '';
 }
 
 /**

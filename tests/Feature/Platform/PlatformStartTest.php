@@ -9,6 +9,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\CustomerService;
 use App\Services\ServiceService;
+use Illuminate\Support\Facades\File;
 use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
@@ -35,20 +36,34 @@ test('the landing call-to-actions point to real routes', function () {
     $this->get('/')->assertOk();
 });
 
-test('an authenticated visitor on the landing is offered the panel instead of sign-up', function () {
+test('an authenticated visitor on the landing receives the session that the header uses to offer the panel', function () {
+    // The landing is rendered by React, so the server response carries the Inertia props, not the button text.
+    // The header shows "Ir para o painel" when auth.user is present (resources/js/components/landing/landing-header.tsx).
     $this->actingAs($this->owner)
         ->get('/')
         ->assertOk()
-        ->assertSee('Ir para o painel', false);
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('welcome')
+            ->where('auth.user.id', $this->owner->id));
 });
 
-test('the landing never shows invented client counts, testimonials or guaranteed results', function () {
-    $body = $this->get('/')->getContent();
+test('a visitor without a session receives no authenticated user on the landing', function () {
+    $this->get('/')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('welcome')
+            ->where('auth.user', null));
+});
 
-    expect($body)->not->toContain('clientes atendidos')
-        ->and($body)->not->toContain('depoimento')
-        ->and($body)->not->toContain('garantido')
-        ->and($body)->toContain('Em desenvolvimento');
+test('the landing sources never claim invented client counts, testimonials or guaranteed results', function () {
+    $sources = collect(File::allFiles(resource_path('js/components/landing')))
+        ->push(new SplFileInfo(resource_path('js/pages/welcome.tsx')))
+        ->map(fn (SplFileInfo $file): string => File::get($file->getPathname()))
+        ->implode("\n");
+
+    expect($sources)->not->toContain('clientes atendidos')
+        ->and($sources)->not->toContain('depoimento')
+        ->and($sources)->not->toContain('garantido')
+        ->and($sources)->toContain('Em desenvolvimento');
 });
 
 test('creating a customer, service or professional records one growth event for that company', function () {

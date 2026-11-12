@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Briefcase, Building2, CalendarDays, ClipboardList, Contact, Globe, KeyRound, LayoutGrid, MessageSquare, ScrollText, Settings, ShieldCheck, Tag, UsersRound } from 'lucide-react';
+import { Bot, Briefcase, Building2, CalendarDays, ClipboardList, Contact, CreditCard, Globe, KeyRound, LayoutDashboard, LayoutGrid, LifeBuoy, MessageSquare, ScrollText, Settings, Tag, TrendingUp, UsersRound } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -42,15 +42,24 @@ const tenantNavItems: NavItem[] = [
 ];
 
 /**
+ * The platform console has its own menu, grouped by responsibility. Areas without a screen yet are
+ * listed as disabled, so they do not look operational.
+ *
  * The platform console has its own menu. Tenant users never see it, and the console
  * never shows tenant operational menus, so the two areas stay separated.
  */
 const rootadminNavItems: NavItem[] = [
-    { title: 'Console', href: rootadminDashboard(), icon: ShieldCheck },
+    { title: 'Visão Geral', href: rootadminDashboard(), icon: LayoutDashboard },
     { title: 'Empresas', href: tenantsIndex(), icon: Building2 },
+    { title: 'Assinaturas e Financeiro', href: rootadminDashboard(), icon: CreditCard, disabled: true },
+    { title: 'IA e Créditos', href: rootadminDashboard(), icon: Bot, disabled: true },
+    { title: 'Sites e Domínios', href: rootadminDashboard(), icon: Globe, disabled: true },
     { title: 'Segmentos', href: segmentsIndex(), icon: Tag },
-    { title: 'Usuários', href: usersIndex(), icon: UsersRound },
-    { title: 'Auditoria', href: auditIndex(), icon: ScrollText },
+    { title: 'Usuários e Acessos', href: usersIndex(), icon: UsersRound },
+    { title: 'Crescimento e SEO', href: rootadminDashboard(), icon: TrendingUp, disabled: true },
+    { title: 'Suporte', href: rootadminDashboard(), icon: LifeBuoy, disabled: true },
+    { title: 'Segurança e Auditoria', href: auditIndex(), icon: ScrollText },
+    { title: 'Configurações Globais', href: rootadminDashboard(), icon: Settings, disabled: true },
 ];
 
 export function AppSidebar() {

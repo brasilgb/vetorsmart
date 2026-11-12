@@ -1,0 +1,96 @@
+<?php
+
+/*
+ * Mensagens de validação em português do Brasil. Regras ausentes aqui usam o idioma de fallback (inglês).
+ */
+
+return [
+    'accepted' => 'O campo :attribute deve ser aceito.',
+    'accepted_if' => 'O campo :attribute deve ser aceito quando :other for :value.',
+    'active_url' => 'O campo :attribute deve ser uma URL válida.',
+    'after' => 'O campo :attribute deve ser uma data posterior a :date.',
+    'alpha' => 'O campo :attribute deve conter apenas letras.',
+    'alpha_dash' => 'O campo :attribute deve conter apenas letras, números, traços e sublinhados.',
+    'alpha_num' => 'O campo :attribute deve conter apenas letras e números.',
+    'array' => 'O campo :attribute deve ser uma lista.',
+    'before' => 'O campo :attribute deve ser uma data anterior a :date.',
+    'boolean' => 'O campo :attribute deve ser verdadeiro ou falso.',
+    'confirmed' => 'A confirmação de :attribute não corresponde.',
+    'current_password' => 'A senha atual está incorreta.',
+    'date' => 'O campo :attribute deve ser uma data válida.',
+    'declined' => 'O campo :attribute deve ser recusado.',
+    'different' => 'Os campos :attribute e :other devem ser diferentes.',
+    'digits' => 'O campo :attribute deve ter :digits dígitos.',
+    'email' => 'O campo :attribute deve ser um endereço de e-mail válido.',
+    'exists' => 'O valor selecionado em :attribute é inválido.',
+    'file' => 'O campo :attribute deve ser um arquivo.',
+    'filled' => 'O campo :attribute é obrigatório.',
+    'gt' => [
+        'numeric' => 'O campo :attribute deve ser maior que :value.',
+        'string' => 'O campo :attribute deve ter mais de :value caracteres.',
+    ],
+    'gte' => [
+        'numeric' => 'O campo :attribute deve ser maior ou igual a :value.',
+        'string' => 'O campo :attribute deve ter pelo menos :value caracteres.',
+    ],
+    'in' => 'O valor selecionado em :attribute é inválido.',
+    'integer' => 'O campo :attribute deve ser um número inteiro.',
+    'ip' => 'O campo :attribute deve ser um endereço IP válido.',
+    'json' => 'O campo :attribute deve ser um JSON válido.',
+    'lt' => [
+        'numeric' => 'O campo :attribute deve ser menor que :value.',
+        'string' => 'O campo :attribute deve ter menos de :value caracteres.',
+    ],
+    'lte' => [
+        'numeric' => 'O campo :attribute deve ser menor ou igual a :value.',
+        'string' => 'O campo :attribute deve ter no máximo :value caracteres.',
+    ],
+    'max' => [
+        'array' => 'O campo :attribute não pode ter mais de :max itens.',
+        'file' => 'O arquivo :attribute não pode ter mais de :max kilobytes.',
+        'numeric' => 'O campo :attribute não pode ser maior que :max.',
+        'string' => 'O campo :attribute não pode ter mais de :max caracteres.',
+    ],
+    'min' => [
+        'array' => 'O campo :attribute deve ter pelo menos :min itens.',
+        'file' => 'O arquivo :attribute deve ter pelo menos :min kilobytes.',
+        'numeric' => 'O campo :attribute deve ser pelo menos :min.',
+        'string' => 'O campo :attribute deve ter pelo menos :min caracteres.',
+    ],
+    'not_in' => 'O valor selecionado em :attribute é inválido.',
+    'numeric' => 'O campo :attribute deve ser um número.',
+    'password' => [
+        'letters' => 'O campo :attribute deve conter pelo menos uma letra.',
+        'mixed' => 'O campo :attribute deve conter pelo menos uma letra maiúscula e uma minúscula.',
+        'numbers' => 'O campo :attribute deve conter pelo menos um número.',
+        'symbols' => 'O campo :attribute deve conter pelo menos um símbolo.',
+        'uncompromised' => 'A senha informada apareceu em vazamentos de dados. Escolha outra senha.',
+    ],
+    'present' => 'O campo :attribute deve estar presente.',
+    'prohibited' => 'O campo :attribute é proibido.',
+    'regex' => 'O formato do campo :attribute é inválido.',
+    'required' => 'O campo :attribute é obrigatório.',
+    'required_if' => 'O campo :attribute é obrigatório quando :other for :value.',
+    'same' => 'Os campos :attribute e :other devem ser iguais.',
+    'size' => [
+        'array' => 'O campo :attribute deve conter :size itens.',
+        'file' => 'O arquivo :attribute deve ter :size kilobytes.',
+        'numeric' => 'O campo :attribute deve ser :size.',
+        'string' => 'O campo :attribute deve ter :size caracteres.',
+    ],
+    'string' => 'O campo :attribute deve ser um texto.',
+    'timezone' => 'O campo :attribute deve ser um fuso horário válido.',
+    'unique' => 'O valor informado em :attribute já está em uso.',
+    'url' => 'O formato da URL em :attribute é inválido.',
+    'uuid' => 'O campo :attribute deve ser um UUID válido.',
+
+    'attributes' => [
+        'email' => 'e-mail',
+        'name' => 'nome',
+        'password' => 'senha',
+        'password_confirmation' => 'confirmação da senha',
+        'current_password' => 'senha atual',
+        'code' => 'código',
+        'recovery_code' => 'código de recuperação',
+    ],
+];

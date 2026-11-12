@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('rootadmin')
     ->name('rootadmin.')
-    ->middleware(['auth', 'can:platform-admin'])
+    ->middleware(['auth', 'rootadmin.mfa', 'can:platform-admin'])
     ->group(function () {
         Route::get('/', DashboardController::class)->name('dashboard');
 

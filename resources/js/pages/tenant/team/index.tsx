@@ -1,3 +1,4 @@
+import { emailValidationProps } from '@/lib/email-validation';
 import { Head, router, useForm } from '@inertiajs/react';
 import { ConfirmAction } from '@/components/vetor-smart/confirm-action';
 import { Field, selectClass } from '@/components/vetor-smart/field';
@@ -52,7 +53,7 @@ export default function TeamIndex({ memberships, roles }: Props) {
                             <Input id="invite-name" value={invite.data.name} onChange={(e) => invite.setData('name', e.target.value)} required className="h-10" />
                         </Field>
                         <Field id="invite-email" label="E-mail" error={invite.errors.email}>
-                            <Input id="invite-email" type="email" value={invite.data.email} onChange={(e) => invite.setData('email', e.target.value)} required className="h-10" />
+                            <Input id="invite-email" type="email" {...emailValidationProps} value={invite.data.email} onChange={(e) => invite.setData('email', e.target.value)} required className="h-10" />
                         </Field>
                         <Field id="invite-role" label="Perfil" error={invite.errors.role}>
                             <select id="invite-role" value={invite.data.role} onChange={(e) => invite.setData('role', e.target.value)} className={selectClass}>

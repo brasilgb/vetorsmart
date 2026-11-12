@@ -1,3 +1,4 @@
+import { emailValidationProps } from '@/lib/email-validation';
 // Components
 import { Form, Head } from '@inertiajs/react';
 import { LoaderCircle } from 'lucide-react';
@@ -29,6 +30,7 @@ export default function ForgotPassword({ status }: { status?: string }) {
                                 <Input
                                     id="email"
                                     type="email"
+                                    {...emailValidationProps}
                                     name="email"
                                     autoComplete="off"
                                     autoFocus

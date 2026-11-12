@@ -64,4 +64,26 @@ class UserFactory extends Factory
             'is_root_admin' => true,
         ]);
     }
+
+    /**
+     * Indicate that the user has a confirmed TOTP factor with recovery codes, stored encrypted as Fortify does.
+     */
+    public function withConfirmedTwoFactor(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'two_factor_secret' => encrypt(self::TWO_FACTOR_SECRET),
+            'two_factor_recovery_codes' => encrypt(json_encode(self::TWO_FACTOR_RECOVERY_CODES)),
+            'two_factor_confirmed_at' => now(),
+        ]);
+    }
+
+    /**
+     * Base32 secret used by test fixtures. Never used outside tests.
+     */
+    public const string TWO_FACTOR_SECRET = 'JBSWY3DPEHPK3PXP';
+
+    /**
+     * @var list<string>
+     */
+    public const array TWO_FACTOR_RECOVERY_CODES = ['testcode1-aaaa', 'testcode2-bbbb'];
 }

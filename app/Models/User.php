@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
+use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
  * @property int $id
@@ -33,7 +34,7 @@ use Illuminate\Support\Carbon;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, TwoFactorAuthenticatable;
 
     /**
      * Determine whether the account may sign in and act.
@@ -51,6 +52,14 @@ class User extends Authenticatable
     public function isRootAdmin(): bool
     {
         return $this->is_root_admin && $this->isActive();
+    }
+
+    /**
+     * Global administration requires a validated second factor, not only the password.
+     */
+    public function hasConfirmedTwoFactor(): bool
+    {
+        return $this->two_factor_confirmed_at !== null && $this->two_factor_secret !== null;
     }
 
     /**
@@ -84,6 +93,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'status' => UserStatus::class,
             'is_root_admin' => 'boolean',
+            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 }

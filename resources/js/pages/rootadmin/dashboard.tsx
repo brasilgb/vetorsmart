@@ -1,33 +1,53 @@
 import { Head, Link } from '@inertiajs/react';
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { show as tenantShow } from '@/routes/rootadmin/tenants';
 
 type Props = {
     totals: { tenants: number; active: number; suspended: number; users: number };
+    sites: { published: number };
+    appointments: { upcoming: number };
+    ai: { period: string; messages: number; provider_calls: number; provider_failures: number; tokens: number };
+    pending: { label: string; reason: string }[];
     distribution: { name: string; total: number }[];
     recent: { id: number; name: string; segment: string | null; status: string; created_at: string | null }[];
 };
 
-export default function RootadminDashboard({ totals, distribution, recent }: Props) {
+export default function RootadminDashboard({ totals, sites, appointments, ai, pending, distribution, recent }: Props) {
     const maxDistribution = Math.max(1, ...distribution.map((item) => item.total));
 
     return (
         <>
-            <Head title="Console RootAdmin" />
+            <Head title="Visão Geral · RootAdmin" />
 
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <div>
-                    <h1 className="text-2xl font-semibold text-vs-text">Console RootAdmin</h1>
-                    <p className="text-sm text-vs-muted">Visão global da plataforma. Não exibe dados operacionais das empresas.</p>
+                    <h1 className="text-2xl font-semibold text-vs-text">Visão Geral</h1>
+                    <p className="text-sm text-vs-muted">Indicadores reais da plataforma. Não exibe dados operacionais das empresas.</p>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-                    <Metric label="Total de empresas" value={totals.tenants} />
-                    <Metric label="Empresas ativas" value={totals.active} />
-                    <Metric label="Empresas suspensas" value={totals.suspended} />
-                    <Metric label="Total de usuários" value={totals.users} />
-                </div>
+                <section aria-labelledby="indicadores-empresas" className="grid gap-4">
+                    <h2 id="indicadores-empresas" className="text-sm font-medium text-vs-muted">Empresas e uso</h2>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <Metric label="Empresas cadastradas" value={totals.tenants} />
+                        <Metric label="Empresas ativas" value={totals.active} />
+                        <Metric label="Empresas suspensas" value={totals.suspended} />
+                        <Metric label="Usuários cadastrados" value={totals.users} />
+                        <Metric label="Sites publicados" value={sites.published} />
+                        <Metric label="Agendamentos futuros" value={appointments.upcoming} />
+                    </div>
+                </section>
+
+                <section aria-labelledby="indicadores-ia" className="grid gap-4">
+                    <h2 id="indicadores-ia" className="text-sm font-medium text-vs-muted">Atendimento IA · {ai.period}</h2>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                        <Metric label="Mensagens processadas" value={ai.messages} />
+                        <Metric label="Chamadas ao provedor" value={ai.provider_calls} />
+                        <Metric label="Falhas do provedor" value={ai.provider_failures} />
+                        <Metric label="Tokens consumidos" value={ai.tokens} />
+                    </div>
+                    <p className="text-sm text-vs-muted">Custo estimado indisponível: ainda não há tabela de preços do provedor cadastrada.</p>
+                </section>
 
                 <div className="grid gap-4 xl:grid-cols-2">
                     <Card className="border-vs-border/70 shadow-sm">
@@ -89,6 +109,23 @@ export default function RootadminDashboard({ totals, distribution, recent }: Pro
                         </div>
                     </Card>
                 </div>
+
+                <Card className="border-vs-border/70 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-vs-text">Indisponíveis no momento</CardTitle>
+                        <CardDescription>Estes indicadores dependem de módulos ainda não implementados. Nenhum valor é estimado.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ul className="grid gap-2 text-sm">
+                            {pending.map((item) => (
+                                <li key={item.label} className="flex flex-wrap items-baseline justify-between gap-2 border-t border-vs-border/70 pt-2">
+                                    <span className="font-medium text-vs-text">{item.label}</span>
+                                    <span className="text-vs-muted">{item.reason}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </CardContent>
+                </Card>
             </div>
         </>
     );

@@ -15,7 +15,7 @@ export function Pagination({ links }: { links: PaginationLink[] }) {
         <nav aria-label="Paginação" className="flex flex-wrap gap-2">
             {links.map((link) =>
                 link.url === null ? (
-                    <span key={link.label} className="rounded-md px-3 py-1 text-sm text-vs-muted/60">
+                    <span key={link.label} aria-disabled="true" className="rounded-md px-3 py-1 text-sm text-vs-muted">
                         {plainLabel(link.label)}
                     </span>
                 ) : (

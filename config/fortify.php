@@ -116,6 +116,7 @@ return [
 
     'limiters' => [
         'login' => 'login',
+        'two-factor' => 'two-factor',
     ],
 
     /*
@@ -145,6 +146,12 @@ return [
     'features' => [
         Features::registration(),
         Features::resetPasswords(),
+        // Two-factor (TOTP) is mandatory for RootAdmin (see EnsureRootAdminHasTwoFactor) and optional for tenant users.
+        // Enrollment requires a valid code (confirm) and a recent password confirmation.
+        Features::twoFactorAuthentication([
+            'confirm' => true,
+            'confirmPassword' => true,
+        ]),
     ],
 
 ];

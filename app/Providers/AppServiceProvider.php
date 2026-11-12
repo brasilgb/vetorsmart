@@ -60,6 +60,9 @@ class AppServiceProvider extends ServiceProvider
     {
         Date::use(CarbonImmutable::class);
 
+        // The product is Portuguese (Brazil). Strings missing in lang/pt_BR fall back to English.
+        app()->setLocale('pt_BR');
+
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
         );
@@ -81,7 +84,8 @@ class AppServiceProvider extends ServiceProvider
     protected function configureGates(): void
     {
         // Platform authority, separate from tenant roles. It never grants access to tenant data.
-        Gate::define('platform-admin', fn (User $user): bool => $user->isRootAdmin());
+        // Requires a confirmed second factor as well, so a password alone never grants platform access.
+        Gate::define('platform-admin', fn (User $user): bool => $user->isRootAdmin() && $user->hasConfirmedTwoFactor());
     }
 
     /**

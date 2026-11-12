@@ -1,3 +1,4 @@
+import { emailValidationProps } from '@/lib/email-validation';
 import { Form, Head } from '@inertiajs/react';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
@@ -30,6 +31,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                             <Input
                                 id="email"
                                 type="email"
+                                {...emailValidationProps}
                                 name="email"
                                 autoComplete="email"
                                 value={email}
