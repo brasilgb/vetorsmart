@@ -15,13 +15,16 @@ export default function ConfirmPassword() {
                 {({ processing, errors }) => (
                     <div className="space-y-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Senha</Label>
+                            <Label htmlFor="password" className="text-vs-text">
+                                Senha
+                            </Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
                                 placeholder="Senha"
                                 autoComplete="current-password"
                                 autoFocus
+                                className="h-11 border-vs-border"
                             />
 
                             <InputError message={errors.password} />
@@ -29,7 +32,7 @@ export default function ConfirmPassword() {
 
                         <div className="flex items-center">
                             <Button
-                                className="w-full"
+                                className="h-11 w-full bg-vs-blue text-white hover:bg-vs-blue-hover"
                                 disabled={processing}
                                 data-test="confirm-password-button"
                             >

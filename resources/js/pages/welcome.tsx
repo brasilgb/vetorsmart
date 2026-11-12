@@ -1,4 +1,5 @@
 import { Head } from '@inertiajs/react';
+import { AiAssistantSection } from '@/components/landing/ai-assistant-section';
 import { FaqSection } from '@/components/landing/faq-section';
 import { FeatureVisualGrid } from '@/components/landing/feature-visual-grid';
 import { FinalCtaSection } from '@/components/landing/final-cta-section';
@@ -14,46 +15,55 @@ import { SegmentMosaic, type LandingSegment } from '@/components/landing/segment
 type Props = { segments: LandingSegment[] };
 
 /**
- * Public commercial page. Composition only: every block lives in components/landing. Sections
- * alternate between white and the soft surface so the page reads as one sequence.
+ * Public commercial page, following the Stitch "VetorSmart — Landing Page Oficial" screens with the
+ * hero imagery kept. Composition only: every block lives in components/landing.
  */
 export default function Welcome({ segments }: Props) {
     return (
         <>
-            <Head title="VetorSmart — Seu crescimento é o nosso propósito" />
+            <Head title="VetorSmart — Seu negócio mais organizado" />
 
-            <div className="flex min-h-dvh flex-col overflow-x-clip bg-white text-vs-text antialiased">
+            <div className="flex min-h-dvh flex-col overflow-x-clip bg-vs-canvas text-vs-text antialiased">
                 <LandingHeader />
 
                 <main className="flex-1">
                     <HeroSection />
 
-                    <SegmentMosaic segments={segments} />
-
                     <SectionShell
                         id="funcionalidades"
-                        eyebrow="Funcionalidades"
-                        title="Tudo o que sua empresa precisa para crescer."
-                        lead="Da presença digital ao relacionamento com seus clientes, uma plataforma para simplificar sua rotina e impulsionar seus resultados. Recursos em desenvolvimento estão identificados em cada card."
+                        tone="canvas"
+                        eyebrow="Recursos essenciais"
+                        title="Tudo o que sua empresa precisa em um único lugar."
+                        lead="Projetado para simplificar o dia a dia e gerar novos negócios sem complexidade. Recursos em desenvolvimento estão identificados em cada card."
                     >
                         <FeatureVisualGrid />
                     </SectionShell>
 
                     <JourneySection />
 
+                    <AiAssistantSection />
+
+                    <SegmentMosaic segments={segments} />
+
                     <GrowthSection />
 
                     <SectionShell
                         id="planos"
-                        tone="surface"
-                        eyebrow="Planos"
-                        title="Planos e preços"
-                        lead="Recursos marcados como em desenvolvimento ainda não estão disponíveis."
+                        tone="tint"
+                        eyebrow="Sem surpresas"
+                        title="Planos simples e transparentes."
+                        lead="Sem taxas escondidas. Cada recurso mostra se já está disponível ou em desenvolvimento."
                     >
                         <PricingSection />
                     </SectionShell>
 
-                    <SectionShell id="faq" eyebrow="Dúvidas" title="Perguntas frequentes">
+                    <SectionShell
+                        id="faq"
+                        tone="canvas"
+                        eyebrow="Tire suas dúvidas"
+                        title="Perguntas frequentes"
+                        lead="Respostas diretas sobre como o VetorSmart funciona hoje."
+                    >
                         <FaqSection />
                     </SectionShell>
 

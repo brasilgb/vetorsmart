@@ -124,6 +124,7 @@ export default function Register({ passwordRules, segments }: Props) {
                                     required
                                     autoComplete="new-password"
                                     passwordrules={passwordRules}
+                                    aria-describedby="password-hint"
                                     className={fieldClass}
                                 />
                                 <InputError message={errors.password} />
@@ -144,6 +145,10 @@ export default function Register({ passwordRules, segments }: Props) {
                                 <InputError message={errors.password_confirmation} />
                             </div>
                         </div>
+
+                        <p id="password-hint" className="-mt-2 text-xs text-vs-muted">
+                            Senha com no mínimo 8 caracteres. Pode conter apenas números.
+                        </p>
 
                         <Button
                             type="submit"

@@ -5,7 +5,8 @@
 @source '../views';
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
-@custom-variant dark (&:is(.dark *));
+/* Auth screens (.vs-auth) always render the light brand surface, so dark variants skip them. */
+@custom-variant dark (&:is(.dark *):not(:is(.vs-auth, .vs-auth *)));
 
 @theme {
     --font-sans:
@@ -171,6 +172,14 @@
     --color-vs-ink-orange: #9A3412;
     --color-vs-ink-green: #166534;
     --color-vs-ink-slate: #334155;
+
+    /* Landing (Stitch reference): blue-tinted canvas for alternating sections and the deep CTA navy. */
+    --color-vs-canvas: #F8F9FF;
+    --color-vs-canvas-blue: #EFF4FF;
+    --color-vs-night: #0B132B;
+
+    /* Landing headings use Plus Jakarta Sans, loaded by the Vite fonts plugin. */
+    --font-display: var(--font-plus-jakarta-sans), 'Instrument Sans', ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Light theme mapping of the shared component tokens onto the VetorSmart palette. */
@@ -229,17 +238,27 @@
 
 /* Landing type scale: fluid, so headings keep their rhythm from 390 px to 1440 px. */
 @utility vs-title-hero {
-    font-size: clamp(2.25rem, 1.5rem + 3vw, 4rem);
-    line-height: 1.05;
-    letter-spacing: -0.025em;
-    font-weight: 650;
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 1.6rem + 2.6vw, 3.5rem);
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    font-weight: 700;
 }
 
 @utility vs-title-section {
-    font-size: clamp(1.875rem, 1.35rem + 1.7vw, 2.75rem);
-    line-height: 1.15;
-    letter-spacing: -0.02em;
-    font-weight: 650;
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 1.35rem + 1.4vw, 2.5rem);
+    line-height: 1.2;
+    letter-spacing: -0.025em;
+    font-weight: 700;
+}
+
+@utility vs-title-card {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    line-height: 1.6rem;
+    letter-spacing: -0.01em;
+    font-weight: 700;
 }
 
 /* Landing motion: discreet, and disabled for users who prefer reduced motion. */
@@ -252,4 +271,77 @@
     .vs-rise {
         animation: vs-rise 0.6s ease-out both;
     }
+}
+
+/*
+ * Authentication screens. The form sits on a white card over the brand background, so the
+ * light tokens are pinned here even when the app runs in dark mode. Without this, dark mode
+ * gave inputs near-white text on the white card. Contrast on white: text 18:1, labels and
+ * hints (#475569) 7.6:1, placeholders (#64748B) 4.8:1, errors (#B91C1C) 6.5:1.
+ */
+.vs-auth {
+    color-scheme: light;
+    --background: #FFFFFF;
+    --foreground: #0B1220;
+    --card: #FFFFFF;
+    --card-foreground: #0B1220;
+    --popover: #FFFFFF;
+    --popover-foreground: #0B1220;
+    --primary: #2563EB;
+    --primary-foreground: #FFFFFF;
+    --secondary: #F1F5F9;
+    --secondary-foreground: #0B1220;
+    --muted: #F1F5F9;
+    --muted-foreground: #475569;
+    --accent: #F1F5F9;
+    --accent-foreground: #0B1220;
+    --destructive: #B91C1C;
+    --border: #CBD5E1;
+    --input: #94A3B8;
+    --ring: #2563EB;
+    color: var(--foreground);
+}
+
+.vs-auth input:not([type='checkbox']):not([type='radio']),
+.vs-auth select {
+    background-color: #FFFFFF;
+    color: #0B1220;
+    -webkit-text-fill-color: #0B1220;
+}
+
+.vs-auth input::placeholder {
+    color: #64748B;
+    -webkit-text-fill-color: #64748B;
+    opacity: 1;
+}
+
+/* Browser autofill: keep dark text on a light fill (Chrome/Safari tint the field otherwise). */
+.vs-auth input:-webkit-autofill,
+.vs-auth input:-webkit-autofill:hover,
+.vs-auth input:-webkit-autofill:focus {
+    -webkit-text-fill-color: #0B1220;
+    caret-color: #0B1220;
+    box-shadow: 0 0 0 1000px #EFF6FF inset;
+    transition: background-color 9999s ease-out 0s;
+}
+
+.vs-auth input:autofill {
+    color: #0B1220;
+    background-color: #EFF6FF;
+}
+
+.vs-auth input:focus-visible,
+.vs-auth select:focus-visible {
+    border-color: #2563EB;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.3);
+}
+
+.vs-auth input[aria-invalid='true'] {
+    border-color: #B91C1C;
+}
+
+.vs-auth input:-webkit-autofill:focus-visible {
+    box-shadow:
+        0 0 0 1000px #EFF6FF inset,
+        0 0 0 3px rgb(37 99 235 / 0.3);
 }
