@@ -30,10 +30,11 @@
             }
         </style>
 
-        <link rel="icon" href="/favicon.ico" sizes="any">
-        <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-        <link rel="icon" href="/images/vetor-smart-favicon.png" type="image/png" sizes="64x64">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        {{-- VetorSmart symbol. Bump the "v" query when the icon files change, so browsers drop the cached copy. --}}
+        <link rel="icon" href="/favicon.ico?v=2" sizes="16x16 32x32 48x48">
+        <link rel="icon" href="/images/vetor-smart-favicon-32.png?v=2" type="image/png" sizes="32x32">
+        <link rel="icon" href="/images/vetor-smart-favicon-192.png?v=2" type="image/png" sizes="192x192">
+        <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" sizes="180x180">
 
         @fonts
 

@@ -40,7 +40,7 @@ export default function TwoFactorChallenge() {
             <Head title="Verificação em dois fatores" />
 
             <div className="mb-6 grid gap-1 text-center">
-                <h1 className="text-xl font-semibold text-vs-text">Verificação em dois fatores</h1>
+                <h2 className="text-xl font-semibold text-vs-text">Verificação em dois fatores</h2>
                 <p className="text-sm text-vs-muted">
                     {useRecoveryCode
                         ? 'Informe um dos códigos de recuperação guardados. Cada código funciona uma única vez.'
@@ -61,6 +61,7 @@ export default function TwoFactorChallenge() {
                             autoComplete="one-time-code"
                             autoFocus
                             value={form.data.recovery_code}
+                            className="h-11 border-vs-border"
                             onChange={(event) => form.setData('recovery_code', event.target.value)}
                             aria-invalid={Boolean(form.errors.recovery_code)}
                             aria-describedby={form.errors.recovery_code ? 'recovery_code-error' : undefined}
@@ -82,6 +83,7 @@ export default function TwoFactorChallenge() {
                             autoComplete="one-time-code"
                             autoFocus
                             value={form.data.code}
+                            className="h-11 border-vs-border"
                             onChange={(event) => form.setData('code', event.target.value.replace(/\D/g, ''))}
                             aria-invalid={Boolean(form.errors.code)}
                             aria-describedby={form.errors.code ? 'code-error' : undefined}
@@ -90,7 +92,7 @@ export default function TwoFactorChallenge() {
                     </div>
                 )}
 
-                <Button type="submit" className="w-full bg-vs-blue text-white hover:bg-vs-blue-hover" disabled={form.processing}>
+                <Button type="submit" className="h-11 w-full bg-vs-blue text-white hover:bg-vs-blue-hover" disabled={form.processing}>
                     {form.processing && <Spinner />}
                     Verificar e entrar
                 </Button>

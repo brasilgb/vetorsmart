@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
 use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
 use App\Models\User;
+use App\Services\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
 use Inertia\Response;
 use Laravel\Fortify\Features;
@@ -23,7 +23,7 @@ class SecurityController extends Controller
         $user = $request->user();
 
         $props = [
-            'passwordRules' => Password::defaults()->toPasswordRulesString(),
+            'passwordRules' => PasswordPolicy::for($user)->toPasswordRulesString(),
             'status' => $request->session()->get('status'),
             'canManageTwoFactor' => Features::enabled(Features::twoFactorAuthentication()),
         ];

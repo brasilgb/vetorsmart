@@ -1,5 +1,5 @@
 import { Link } from '@inertiajs/react';
-import { Check, Clock, type LucideIcon } from 'lucide-react';
+import { ArrowRight, CircleCheck, Clock, type LucideIcon } from 'lucide-react';
 import { register } from '@/routes';
 import { landingButtonPrimary, landingButtonSecondary } from './landing-layout';
 import type { CapabilityStatus } from './section-shell';
@@ -56,7 +56,7 @@ const plans: Plan[] = [
 ];
 
 const itemIcon: Record<CapabilityStatus, { icon: LucideIcon; className: string; label: string }> = {
-    available: { icon: Check, className: 'text-vs-ink-green', label: 'Disponível' },
+    available: { icon: CircleCheck, className: 'text-emerald-600', label: 'Disponível' },
     development: { icon: Clock, className: 'text-vs-ink-orange', label: 'Em desenvolvimento' },
     soon: { icon: Clock, className: 'text-vs-ink-slate', label: 'Em breve' },
 };
@@ -72,27 +72,24 @@ export function PricingSection() {
                 {plans.map((plan) => (
                     <article
                         key={plan.name}
-                        className={`relative flex flex-col gap-6 rounded-2xl bg-white p-7 sm:p-8 ${plan.featured ? 'border-2 border-vs-blue shadow-xl lg:-my-4' : 'border border-vs-line shadow-sm'}`}
+                        className={`relative flex flex-col rounded-2xl bg-white p-8 ${plan.featured ? 'border-2 border-vs-blue-hover/30 shadow-xl lg:-my-4' : 'border border-vs-line shadow-sm'}`}
                     >
                         {plan.featured && (
-                            <span className="absolute -top-3 left-8 rounded-full bg-vs-blue px-3 py-1 text-xs font-semibold text-white">Recomendado</span>
+                            <span className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-vs-blue-hover px-4 py-1 text-xs font-semibold text-white shadow-sm">
+                                Recomendado
+                            </span>
                         )}
 
-                        <div>
-                            <h3 className="text-xl font-semibold text-vs-text">{plan.name}</h3>
-                            <p className="mt-2 min-h-[3rem] text-sm leading-relaxed text-vs-muted">{plan.summary}</p>
+                        <div className="border-b border-slate-100 pb-6 text-center">
+                            <h3 className="font-display text-xl font-bold text-vs-text">{plan.name}</h3>
+                            <p className="mt-1 min-h-[2.75rem] text-sm leading-relaxed text-vs-muted">{plan.summary}</p>
+                            <p className="mt-4 flex items-baseline justify-center gap-1.5 text-vs-text">
+                                <span className="font-display text-5xl font-extrabold tracking-tight">{plan.price}</span>
+                                <span className="text-sm font-medium text-vs-muted">/mês</span>
+                            </p>
                         </div>
 
-                        <p className="flex items-baseline gap-1.5 text-vs-text">
-                            <span className="text-4xl font-semibold tracking-tight">{plan.price}</span>
-                            <span className="text-sm text-vs-muted">/mês</span>
-                        </p>
-
-                        <Link href={register()} className={plan.featured ? landingButtonPrimary : landingButtonSecondary}>
-                            Começar
-                        </Link>
-
-                        <ul className="grid gap-3 border-t border-vs-line pt-6 text-sm">
+                        <ul className="grid gap-3.5 py-6 text-sm">
                             {plan.items.map((item) => {
                                 const { icon: Icon, className, label } = itemIcon[item.status];
 
@@ -107,10 +104,15 @@ export function PricingSection() {
                                 );
                             })}
                         </ul>
+
+                        <Link href={register()} className={`mt-auto w-full ${plan.featured ? landingButtonPrimary : landingButtonSecondary}`}>
+                            Começar agora
+                            <ArrowRight aria-hidden="true" className="size-4" />
+                        </Link>
                     </article>
                 ))}
             </div>
-            <p className="mt-10 max-w-3xl text-sm leading-relaxed text-vs-muted">
+            <p className="mx-auto mt-12 max-w-3xl text-center text-sm leading-relaxed text-vs-muted">
                 Os valores são hipóteses a validar, não preços aprovados. Não há cobrança ativa nesta versão, e condições como o período de teste ainda serão definidas.
             </p>
         </>

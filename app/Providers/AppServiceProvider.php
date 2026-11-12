@@ -67,15 +67,10 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        Password::defaults(fn (): ?Password => app()->isProduction()
-            ? Password::min(12)
-                ->mixedCase()
-                ->letters()
-                ->numbers()
-                ->symbols()
-                ->uncompromised()
-            : null,
-        );
+        // Simple policy for common users: at least 8 characters of any kind (digits only is accepted),
+        // no upper bound below the framework limits. Global administrators keep a strict policy,
+        // see App\Services\PasswordPolicy.
+        Password::defaults(fn (): Password => Password::min(8));
     }
 
     /**

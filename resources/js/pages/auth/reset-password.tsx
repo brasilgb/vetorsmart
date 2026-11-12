@@ -14,20 +14,25 @@ type Props = {
     passwordRules: string;
 };
 
+const fieldClass = 'h-11 border-vs-border';
+
 export default function ResetPassword({ token, email, passwordRules }: Props) {
     return (
         <>
-            <Head title="Reset password" />
+            <Head title="Redefinir senha" />
 
             <Form
                 {...update.form()}
                 transform={(data) => ({ ...data, token, email })}
                 resetOnSuccess={['password', 'password_confirmation']}
+                className="flex flex-col gap-5"
             >
                 {({ processing, errors }) => (
-                    <div className="grid gap-6">
+                    <>
                         <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email" className="text-vs-text">
+                                E-mail
+                            </Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -35,57 +40,57 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                                 name="email"
                                 autoComplete="email"
                                 value={email}
-                                className="mt-1 block w-full"
+                                className={fieldClass}
                                 readOnly
                             />
-                            <InputError
-                                message={errors.email}
-                                className="mt-2"
-                            />
+                            <InputError message={errors.email} />
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password" className="text-vs-text">
+                                Nova senha
+                            </Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
+                                required
                                 autoComplete="new-password"
-                                className="mt-1 block w-full"
                                 autoFocus
-                                placeholder="Password"
                                 passwordrules={passwordRules}
+                                aria-describedby="password-hint"
+                                className={fieldClass}
                             />
+                            <p id="password-hint" className="text-xs text-vs-muted">
+                                Mínimo de 8 caracteres. Pode conter apenas números.
+                            </p>
                             <InputError message={errors.password} />
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password_confirmation">
-                                Confirm password
+                            <Label htmlFor="password_confirmation" className="text-vs-text">
+                                Confirmar nova senha
                             </Label>
                             <PasswordInput
                                 id="password_confirmation"
                                 name="password_confirmation"
+                                required
                                 autoComplete="new-password"
-                                className="mt-1 block w-full"
-                                placeholder="Confirm password"
                                 passwordrules={passwordRules}
+                                className={fieldClass}
                             />
-                            <InputError
-                                message={errors.password_confirmation}
-                                className="mt-2"
-                            />
+                            <InputError message={errors.password_confirmation} />
                         </div>
 
                         <Button
                             type="submit"
-                            className="mt-4 w-full"
+                            className="h-11 w-full bg-vs-blue text-white hover:bg-vs-blue-hover"
                             disabled={processing}
                             data-test="reset-password-button"
                         >
                             {processing && <Spinner />}
-                            Reset password
+                            Redefinir senha
                         </Button>
-                    </div>
+                    </>
                 )}
             </Form>
         </>
@@ -93,6 +98,6 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 }
 
 ResetPassword.layout = {
-    title: 'Reset password',
-    description: 'Please enter your new password below',
+    title: 'Redefinir senha',
+    description: 'Crie uma nova senha para acessar sua conta.',
 };
