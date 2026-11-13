@@ -58,7 +58,7 @@ test('a common user can reset the password to 8 digits', function () {
     expect(Hash::check('87654321', $user->refresh()->password))->toBeTrue();
 });
 
-test('a root admin keeps the strict policy when resetting the password', function () {
+test('a root admin can reset the password to 8 digits', function () {
     $root = User::factory()->rootAdmin()->create();
 
     $this->post(route('password.update'), [
@@ -66,9 +66,9 @@ test('a root admin keeps the strict policy when resetting the password', functio
         'email' => $root->email,
         'password' => '87654321',
         'password_confirmation' => '87654321',
-    ])->assertSessionHasErrors('password');
+    ])->assertSessionHasNoErrors();
 
-    expect(Hash::check('87654321', $root->refresh()->password))->toBeFalse();
+    expect(Hash::check('87654321', $root->refresh()->password))->toBeTrue();
 });
 
 test('a common user can change the password to 8 digits in settings', function () {
@@ -85,7 +85,7 @@ test('a common user can change the password to 8 digits in settings', function (
     expect(Hash::check('11223344', $user->refresh()->password))->toBeTrue();
 });
 
-test('a root admin cannot change the password to a weak one in settings', function () {
+test('a root admin can change the password to 8 digits in settings', function () {
     $root = User::factory()->rootAdmin()->create();
 
     $this->actingAs($root)
@@ -94,17 +94,23 @@ test('a root admin cannot change the password to a weak one in settings', functi
             'current_password' => 'password',
             'password' => '11223344',
             'password_confirmation' => '11223344',
-        ])->assertSessionHasErrors('password');
+        ])->assertSessionHasNoErrors();
+
+    expect(Hash::check('11223344', $root->refresh()->password))->toBeTrue();
+});
+
+test('a password shorter than 8 characters is rejected in settings for a root admin', function () {
+    $root = User::factory()->rootAdmin()->create();
 
     $this->actingAs($root)
         ->from(route('security.edit'))
         ->put(route('user-password.update'), [
             'current_password' => 'password',
-            'password' => 'Raiz-Forte-2026!',
-            'password_confirmation' => 'Raiz-Forte-2026!',
-        ])->assertSessionHasNoErrors();
+            'password' => '1234567',
+            'password_confirmation' => '1234567',
+        ])->assertSessionHasErrors('password');
 
-    expect(Hash::check('Raiz-Forte-2026!', $root->refresh()->password))->toBeTrue();
+    expect(Hash::check('1234567', $root->refresh()->password))->toBeFalse();
 });
 
 test('the registration screen hints the simple password rule to the browser', function () {

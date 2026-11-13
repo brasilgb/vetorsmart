@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Hash;
 
 test('the command provisions a root admin with a hidden password', function () {
     $this->artisan('platform:root-admin', ['email' => 'root@abrasil.test', '--name' => 'Root Admin'])
-        ->expectsQuestion('Senha (mínimo 12 caracteres)', 'senha-muito-segura-123')
+        ->expectsQuestion('Senha (mínimo 8 caracteres)', 'senha-muito-segura-123')
         ->expectsOutput('RootAdmin criado.')
         ->assertSuccessful();
 
@@ -21,7 +21,7 @@ test('the command provisions a root admin with a hidden password', function () {
 
 test('the command never writes the password to the audit log', function () {
     $this->artisan('platform:root-admin', ['email' => 'root2@abrasil.test', '--name' => 'Root'])
-        ->expectsQuestion('Senha (mínimo 12 caracteres)', 'senha-muito-segura-123')
+        ->expectsQuestion('Senha (mínimo 8 caracteres)', 'senha-muito-segura-123')
         ->assertSuccessful();
 
     expect(json_encode(AuditLog::query()->get()->toArray()))->not->toContain('senha-muito-segura-123');
@@ -41,8 +41,8 @@ test('the command promotes an existing user without changing the password', func
 
 test('the command rejects a weak password', function () {
     $this->artisan('platform:root-admin', ['email' => 'fraco@abrasil.test', '--name' => 'Fraco'])
-        ->expectsQuestion('Senha (mínimo 12 caracteres)', 'curta')
-        ->expectsOutput('Nome ou senha inválidos. Informe um nome e uma senha de ao menos 12 caracteres.')
+        ->expectsQuestion('Senha (mínimo 8 caracteres)', 'curta')
+        ->expectsOutput('Nome ou senha inválidos. Informe um nome e uma senha de ao menos 8 caracteres.')
         ->assertFailed();
 
     expect(User::query()->where('email', 'fraco@abrasil.test')->exists())->toBeFalse();

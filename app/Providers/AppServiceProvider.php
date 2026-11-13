@@ -67,9 +67,8 @@ class AppServiceProvider extends ServiceProvider
             app()->isProduction(),
         );
 
-        // Simple policy for common users: at least 8 characters of any kind (digits only is accepted),
-        // no upper bound below the framework limits. Global administrators keep a strict policy,
-        // see App\Services\PasswordPolicy.
+        // Simple policy for every account: at least 8 characters of any kind (digits only is accepted),
+        // no upper bound below the framework limits. See App\Services\PasswordPolicy.
         Password::defaults(fn (): Password => Password::min(8));
     }
 

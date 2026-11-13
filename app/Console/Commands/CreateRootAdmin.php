@@ -66,11 +66,11 @@ class CreateRootAdmin extends Command
 
             $passwordErrors = Validator::make(
                 ['name' => $name, 'password' => $password],
-                ['name' => ['required', 'string', 'max:255'], 'password' => ['required', 'string', Password::min(12)]],
+                ['name' => ['required', 'string', 'max:255'], 'password' => ['required', 'string', Password::min(8)]],
             )->errors();
 
             if ($passwordErrors->isNotEmpty()) {
-                $this->error('Nome ou senha inválidos. Informe um nome e uma senha de ao menos 12 caracteres.');
+                $this->error('Nome ou senha inválidos. Informe um nome e uma senha de ao menos 8 caracteres.');
 
                 return self::FAILURE;
             }
@@ -122,7 +122,7 @@ class CreateRootAdmin extends Command
         }
 
         if ($this->input->isInteractive()) {
-            return $this->secret('Senha (mínimo 12 caracteres)');
+            return $this->secret('Senha (mínimo 8 caracteres)');
         }
 
         $this->error('Sem terminal interativo: informe --password-env=NOME ou --password-stdin.');
