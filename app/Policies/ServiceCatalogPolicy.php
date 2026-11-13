@@ -3,9 +3,6 @@
 namespace App\Policies;
 
 use App\Enums\TenantRole;
-use App\Models\Professional;
-use App\Models\Service;
-use App\Models\ServiceCategory;
 use App\Models\User;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Database\Eloquent\Model;
@@ -45,9 +42,6 @@ abstract class ServiceCatalogPolicy
         return $this->update($user, $record);
     }
 
-    /**
-     * @return bool
-     */
     protected function canManage(): bool
     {
         return $this->context->hasRoleIn([TenantRole::Owner, TenantRole::Admin]);

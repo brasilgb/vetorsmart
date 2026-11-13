@@ -22,7 +22,7 @@ class CreateRootAdmin extends Command
      * @var string
      */
     protected $signature = 'platform:root-admin
-        {email : E-mail do administrador da plataforma}
+        {email? : E-mail do administrador da plataforma (solicitado se omitido em terminal interativo)}
         {--name= : Nome completo, ao criar uma conta nova}
         {--password-env= : Nome da variável de ambiente que contém a senha (modo sem terminal)}
         {--password-stdin : Lê a senha da entrada padrão (modo sem terminal)}';
@@ -39,7 +39,11 @@ class CreateRootAdmin extends Command
      */
     public function handle(AuditLogger $auditLogger): int
     {
-        $email = Str::lower((string) $this->argument('email'));
+        $email = $this->resolveEmail();
+
+        if ($email === null) {
+            return self::FAILURE;
+        }
 
         $emailErrors = Validator::make(['email' => $email], ['email' => ['required', 'email']])->errors();
 
@@ -94,6 +98,27 @@ class CreateRootAdmin extends Command
         $this->info($created ? 'RootAdmin criado.' : 'Usuário promovido a RootAdmin.');
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Obtain the e-mail from the argument or, in an interactive terminal, from a prompt.
+     * Returns null when no e-mail is available.
+     */
+    private function resolveEmail(): ?string
+    {
+        $email = trim((string) $this->argument('email'));
+
+        if ($email === '' && $this->input->isInteractive()) {
+            $email = trim((string) $this->ask('E-mail do administrador da plataforma'));
+        }
+
+        if ($email === '') {
+            $this->error('Informe o e-mail: php artisan platform:root-admin {email}');
+
+            return null;
+        }
+
+        return Str::lower($email);
     }
 
     /**

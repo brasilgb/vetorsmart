@@ -81,7 +81,8 @@ test('sensitive values are never stored in audit metadata', function () {
 
     $stored = AuditLog::query()->findOrFail($logged->id)->metadata;
 
-    expect($stored)->toBe(['nested' => ['visible' => 'ok'], 'fields' => ['name']])
+    // MySQL JSON columns do not preserve key order, so compare the content regardless of order.
+    expect($stored)->toEqualCanonicalizing(['nested' => ['visible' => 'ok'], 'fields' => ['name']])
         ->and(json_encode($stored))->not->toContain('segredo-123')
         ->and(json_encode($stored))->not->toContain('token-xyz');
 });

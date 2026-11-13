@@ -10,6 +10,7 @@ use App\Http\Resources\Api\V1\CustomerResource;
 use App\Models\Customer;
 use App\Services\CustomerService;
 use App\Services\Tenancy\TenantContext;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class CustomerController extends Controller
@@ -78,7 +79,7 @@ class CustomerController extends Controller
     /**
      * Deactivate a customer. The record is kept for history.
      */
-    public function destroy(\Illuminate\Http\Request $request, TenantContext $context, CustomerService $customers, int $customer): CustomerResource
+    public function destroy(Request $request, TenantContext $context, CustomerService $customers, int $customer): CustomerResource
     {
         $record = $this->findCustomer($context, $customer);
 
