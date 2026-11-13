@@ -109,3 +109,19 @@ test('a password shorter than the minimum is refused in non-interactive mode', f
 
     expect(User::query()->where('email', 'curta@abrasil.test')->exists())->toBeFalse();
 });
+
+test('the command asks for the e-mail when it is omitted in an interactive terminal', function () {
+    $this->artisan('platform:root-admin', ['--name' => 'Root Prompt'])
+        ->expectsQuestion('E-mail do administrador da plataforma', 'prompt@abrasil.test')
+        ->expectsQuestion('Senha (mínimo 8 caracteres)', 'senha-muito-segura-789')
+        ->expectsOutput('RootAdmin criado.')
+        ->assertSuccessful();
+
+    expect(User::query()->where('email', 'prompt@abrasil.test')->value('is_root_admin'))->toBeTrue();
+});
+
+test('the command fails without an e-mail when there is no interactive terminal', function () {
+    $this->artisan('platform:root-admin', ['--no-interaction' => true])
+        ->expectsOutput('Informe o e-mail: php artisan platform:root-admin {email}')
+        ->assertFailed();
+});
