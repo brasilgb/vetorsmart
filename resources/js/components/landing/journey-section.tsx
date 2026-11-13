@@ -1,38 +1,35 @@
-import { CalendarCheck, Globe, MousePointerClick, Repeat, type LucideIcon } from 'lucide-react';
+import { Globe, MousePointerClick, Sparkles, BadgeCheck, type LucideIcon } from 'lucide-react';
 import { landingCard } from './landing-layout';
 import { SectionShell } from './section-shell';
 
-type Step = { name: string; text: string; footnote: string; icon: LucideIcon };
-
-/** The flow in four stages, as in the Stitch landing. Each stage describes what the product does today. */
-const steps: Step[] = [
+const steps: { title: string; text: string; footer: string; icon: LucideIcon }[] = [
     {
-        name: 'Presença digital',
-        text: 'Seu negócio ganha um site moderno com os serviços detalhados e os contatos prontos para quem procura.',
-        footnote: 'Google e redes sociais',
+        title: 'Presença digital imediata',
+        text: 'Seu negócio ganha um site moderno e rápido, com seus serviços detalhados e contatos prontos.',
+        footer: 'Google e redes sociais',
         icon: Globe,
     },
     {
-        name: 'Cliente solicita o serviço',
-        text: 'O visitante encontra seus serviços no site e entra em contato a qualquer hora do dia.',
-        footnote: 'Site disponível 24 horas',
+        title: 'Cliente solicita o serviço',
+        text: 'Visitantes acessam seu site ou WhatsApp e enviam pedidos estruturados de orçamento e agendamento a qualquer hora.',
+        footer: 'Captação ativa 24h',
         icon: MousePointerClick,
     },
     {
-        name: 'Organização da agenda',
-        text: 'Serviços, profissionais e horários de trabalho ficam reunidos para encaixar cada atendimento.',
-        footnote: 'Um cadastro para tudo',
-        icon: CalendarCheck,
+        title: 'Organização com inteligência',
+        text: 'A IA reúne os detalhes essenciais, qualifica o chamado e encaixa a visita no horário ideal da sua agenda.',
+        footer: 'Sem perda de tempo',
+        icon: Sparkles,
     },
     {
-        name: 'Execução e fidelização',
-        text: 'O histórico do cliente fica à mão para o próximo atendimento, e você acompanha a evolução do negócio.',
-        footnote: 'Histórico do cliente',
-        icon: Repeat,
+        title: 'Execução e crescimento',
+        text: 'Você executa o trabalho com tranquilidade, encanta o cliente e acompanha seus indicadores de faturamento subirem.',
+        footer: 'Fidelização',
+        icon: BadgeCheck,
     },
 ];
 
-/** "Como funciona": four numbered cards. Desktop shows them on one line; tablets use two columns. */
+/** "Como funciona": four steps in Stitch cards, one per stage of the client journey. */
 export function JourneySection() {
     return (
         <SectionShell
@@ -40,25 +37,25 @@ export function JourneySection() {
             tone="tint"
             eyebrow="Jornada fluida"
             title="Do primeiro contato ao serviço concluído."
-            lead="Um fluxo simples e direto para sua empresa rodar com eficiência."
+            lead="Um fluxo simples e direto para sua empresa rodar com máxima eficiência."
         >
             <ol className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
                 {steps.map((step, index) => {
                     const Icon = step.icon;
 
                     return (
-                        <li key={step.name} className={`${landingCard} flex flex-col p-6`}>
-                            <div className="flex items-center justify-between">
-                                <span className="flex size-9 items-center justify-center rounded-full bg-vs-blue-hover text-sm font-bold tabular-nums text-white shadow-sm">
-                                    {String(index + 1).padStart(2, '0')}
-                                </span>
-                                <Icon aria-hidden="true" className="size-5 text-slate-500" strokeWidth={1.75} />
+                        <li key={step.title} className={`${landingCard} flex flex-col justify-between p-6 transition-shadow duration-200 hover:shadow-md motion-reduce:transition-none`}>
+                            <div>
+                                <div className="mb-5 flex items-center justify-between">
+                                    <span aria-hidden="true" className="flex size-9 items-center justify-center rounded-full bg-vs-blue-hover font-display text-sm font-bold text-white shadow-sm">
+                                        {String(index + 1).padStart(2, '0')}
+                                    </span>
+                                    <Icon aria-hidden="true" className="size-5 text-vs-muted" />
+                                </div>
+                                <h3 className="vs-title-card text-vs-text">{step.title}</h3>
+                                <p className="mt-2 text-sm leading-relaxed text-vs-muted">{step.text}</p>
                             </div>
-                            <h3 className="vs-title-card mt-4 text-vs-text">{step.name}</h3>
-                            <p className="mt-2 text-sm leading-relaxed text-vs-muted">{step.text}</p>
-                            <p className="mt-auto pt-4">
-                                <span className="block border-t border-slate-100 pt-2 text-xs font-semibold text-vs-blue-hover">{step.footnote}</span>
-                            </p>
+                            <p className="mt-5 border-t border-vs-line pt-3 text-xs font-semibold text-vs-blue-hover">{step.footer}</p>
                         </li>
                     );
                 })}
