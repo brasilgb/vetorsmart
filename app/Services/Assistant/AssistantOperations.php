@@ -2,7 +2,9 @@
 
 namespace App\Services\Assistant;
 
+use App\Enums\ConversationStatus;
 use App\Enums\RequestOrigin;
+use App\Enums\RequestStatus;
 use App\Models\Appointment;
 use App\Models\AssistantConversation;
 use App\Models\AssistantOperation;
@@ -11,7 +13,9 @@ use App\Models\Professional;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use App\Models\Tenant;
+use App\Models\User;
 use App\Services\AppointmentScheduler;
+use App\Services\AuditLogger;
 use App\Services\CustomerService;
 use App\Services\ServiceRequestService;
 use Carbon\CarbonImmutable;
@@ -30,6 +34,8 @@ class AssistantOperations
         private AppointmentScheduler $scheduler,
         private ServiceRequestService $requests,
         private CustomerService $customers,
+        private AssistantConversations $conversations,
+        private AuditLogger $auditLogger,
     ) {}
 
     /**
@@ -121,29 +127,75 @@ class AssistantOperations
     }
 
     /**
-     * The open request of the conversation, created once and then triaged to the service chosen.
-     * Triage is the "encaminhar para triagem" step: the request enters the same queue as the panel's.
+     * Register the visitor's request in the company's triage queue, with origin "Site / IA" and the conversation summary.
+     * Called when the attendance finishes. The conversation holds one open request: a repeated call updates its
+     * summary and returns the same request, never a second one. The request is triaged to the service when known.
      */
-    public function ensureServiceRequest(Tenant $tenant, AssistantConversation $conversation, Customer $customer, Service $service): ServiceRequest
+    public function registerRequest(Tenant $tenant, AssistantConversation $conversation, string $summary): ServiceRequest
     {
-        if ($conversation->service_request_id !== null) {
-            $existing = ServiceRequest::query()->forTenant($tenant)->whereKey($conversation->service_request_id)->first();
+        return DB::transaction(function () use ($tenant, $conversation, $summary): ServiceRequest {
+            $locked = AssistantConversation::query()->whereKey($conversation->getKey())->lockForUpdate()->firstOrFail();
 
-            if ($existing !== null && $existing->status->isOpen()) {
-                return $existing;
+            $request = $locked->service_request_id === null
+                ? null
+                : ServiceRequest::query()->forTenant($tenant)->whereKey($locked->service_request_id)->lockForUpdate()->first();
+
+            if ($request === null || ! $request->status->isOpen()) {
+                $request = $this->requests->create($tenant, [
+                    'customer_id' => $locked->customer_id,
+                    'description' => $summary,
+                ], null, RequestOrigin::Ai);
+            } else {
+                $request->forceFill(['description' => $summary])->save();
             }
-        }
 
-        $request = $this->requests->create($tenant, [
-            'customer_id' => $customer->getKey(),
-            'description' => 'Solicitação registrada pelo atendimento virtual: '.$service->name.'.',
-        ], null, RequestOrigin::Ai);
+            if ($locked->service_id !== null && $request->status === RequestStatus::Requested) {
+                try {
+                    $request = $this->requests->triage($request, ['service_id' => $locked->service_id], null);
+                } catch (ValidationException) {
+                    // The service was deactivated after the choice: the request stays in the queue, not triaged.
+                }
+            }
 
-        $request = $this->requests->triage($request, ['service_id' => $service->getKey()], null);
+            $locked->forceFill(['service_request_id' => $request->getKey()])->save();
+            $conversation->forceFill(['service_request_id' => $request->getKey()]);
 
-        $conversation->forceFill(['service_request_id' => $request->getKey(), 'customer_id' => $customer->getKey()])->save();
+            return $request;
+        });
+    }
 
-        return $request;
+    /**
+     * The team identifies the visitor of a conversation that is waiting for a human and turns it into a request in the triage queue.
+     * The messages stay in the conversation. Repeating it updates the same request (see registerRequest).
+     *
+     * @throws ValidationException when the conversation is already closed
+     */
+    public function identifyConversation(Tenant $tenant, AssistantConversation $conversation, string $name, string $phone, ?Service $service, User $actor): ServiceRequest
+    {
+        return DB::transaction(function () use ($tenant, $conversation, $name, $phone, $service, $actor): ServiceRequest {
+            $locked = AssistantConversation::query()->whereKey($conversation->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->status === ConversationStatus::Closed) {
+                throw ValidationException::withMessages(['status' => ['Esta conversa já foi encerrada.']]);
+            }
+
+            $customer = $this->findOrCreateCustomer($tenant, $name, $phone);
+
+            $locked->forceFill([
+                'customer_id' => $customer->getKey(),
+                'service_id' => $service?->getKey() ?? $locked->service_id,
+            ])->save();
+
+            $request = $this->registerRequest(
+                $tenant,
+                $locked,
+                $this->conversations->summarize($locked, 'Cliente identificado pela equipe; solicitação encaminhada à triagem.'),
+            );
+
+            $this->auditLogger->record('assistant.conversation_identified', $tenant, $locked, ['service_request_id' => $request->getKey()], $actor);
+
+            return $request;
+        });
     }
 
     /**

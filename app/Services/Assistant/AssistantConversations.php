@@ -7,6 +7,7 @@ use App\Enums\AssistantState;
 use App\Enums\ConversationStatus;
 use App\Models\AssistantConversation;
 use App\Models\AssistantMessage;
+use App\Models\AssistantOperation;
 use App\Models\AssistantSetting;
 use App\Models\Tenant;
 use App\Models\User;
@@ -77,6 +78,36 @@ class AssistantConversations
             ->first();
     }
 
+    /**
+     * Process one visitor message at most once per client id. A resend of the same message (the first response was lost)
+     * finds the id already recorded and does nothing. The conversation row is locked, so simultaneous sends are ordered.
+     *
+     * @param  \Closure(AssistantConversation): void  $process
+     */
+    public function receiveOnce(AssistantConversation $conversation, ?string $clientId, \Closure $process): void
+    {
+        DB::transaction(function () use ($conversation, $clientId, $process): void {
+            $locked = AssistantConversation::query()->whereKey($conversation->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($clientId !== null) {
+                $key = hash('sha256', implode('|', [$locked->getKey(), 'visitor_message', $clientId]));
+
+                if (AssistantOperation::query()->where('tenant_id', $locked->tenant_id)->where('idempotency_key', $key)->exists()) {
+                    return;
+                }
+
+                AssistantOperation::create([
+                    'tenant_id' => $locked->tenant_id,
+                    'assistant_conversation_id' => $locked->getKey(),
+                    'operation' => 'visitor_message',
+                    'idempotency_key' => $key,
+                ]);
+            }
+
+            $process($locked);
+        });
+    }
+
     public function appendMessage(AssistantConversation $conversation, AssistantMessageRole $role, string $body, ?User $user = null): AssistantMessage
     {
         return AssistantMessage::create([
@@ -118,7 +149,7 @@ class AssistantConversations
             'status' => ConversationStatus::AwaitingHuman,
             'state' => AssistantState::Human,
             'handoff_reason' => Str::limit($reason, 250, ''),
-            'collected' => [...($conversation->collected ?? []), 'summary' => $this->summary($conversation, $reason)],
+            'collected' => [...($conversation->collected ?? []), 'summary' => $this->summarize($conversation, $reason)],
         ])->save();
     }
 
@@ -207,19 +238,38 @@ class AssistantConversations
         };
     }
 
-    private function summary(AssistantConversation $conversation, string $reason): string
+    /**
+     * Summary of the conversation for the team: reason, service, customer, preferred time, appointment and the last messages.
+     */
+    public function summarize(AssistantConversation $conversation, ?string $reason = null): string
     {
-        $service = $conversation->service?->name ?? 'não informado';
-        $customer = $conversation->customer?->name ?? 'não identificado';
-        $lastVisitorMessages = $conversation->messages()
-            ->where('role', AssistantMessageRole::Visitor->value)
-            ->latest('id')
-            ->limit(3)
-            ->pluck('body')
-            ->reverse()
-            ->implode(' | ');
+        $lines = [];
 
-        return 'Motivo: '.$reason.' Serviço: '.$service.'. Cliente: '.$customer.'. Últimas mensagens: '.$lastVisitorMessages;
+        if ($reason !== null) {
+            $lines[] = 'Motivo: '.$reason;
+        }
+
+        $lines[] = 'Serviço: '.($conversation->service?->name ?? 'não informado').'.';
+        $lines[] = 'Cliente: '.($conversation->customer?->name ?? 'não identificado').'.';
+
+        if (filled($conversation->collected['preferred_time'] ?? null)) {
+            $lines[] = 'Horário preferido pelo cliente: '.$conversation->collected['preferred_time'].'.';
+        }
+
+        if ($conversation->appointment_id !== null) {
+            $lines[] = 'Agendamento registrado na agenda.';
+        }
+
+        $dialogue = $conversation->messages()
+            ->whereIn('role', [AssistantMessageRole::Visitor->value, AssistantMessageRole::Assistant->value, AssistantMessageRole::Operator->value])
+            ->latest('id')
+            ->limit(12)
+            ->get()
+            ->reverse()
+            ->map(fn (AssistantMessage $message): string => AssistantMessageRole::from($message->role)->label().': '.$message->body)
+            ->implode("\n");
+
+        return implode(' ', $lines)."\nConversa:\n".$dialogue;
     }
 
     private function hash(string $token): string

@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\AppointmentStatus;
+use App\Enums\AssistantState;
 use App\Enums\ConversationStatus;
 use App\Enums\PriceType;
 use App\Enums\RequestOrigin;
@@ -26,7 +27,9 @@ use App\Services\Assistant\AssistantOperations;
 use App\Services\Assistant\AssistantProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Cookie\CookieValuePrefix;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Testing\TestResponse;
 
@@ -42,9 +45,8 @@ function visitAssistant(string $method, string $path, array $data = [], string $
     $url = 'http://'.$host.$path;
     $client = test();
 
-    if (assistantToken() !== null) {
-        $client->withCookie((string) config('assistant.session_cookie'), assistantToken());
-    }
+    // Always send the current visitor's cookie, empty when there is none, so a token from an earlier visitor never reaches this one.
+    $client->withCookie((string) config('assistant.session_cookie'), assistantToken() ?? '');
 
     $response = $method === 'GET'
         ? $client->get($url, ['Accept' => 'application/json'])
@@ -288,7 +290,7 @@ test('availability lists only real free slots of enabled professionals', functio
     expect(AssistantConversation::query()->sole()->collected['options'])->not->toBeEmpty();
 });
 
-test('a slot that became unavailable before confirmation is refused and new options are offered', function () {
+test('a slot that became unavailable before confirmation is not booked nor replaced: up to three free alternatives wait for a new choice and confirmation', function () {
     startAssistant();
     sayToAssistant('limpeza');
     sayToAssistant('Maria Souza 11 98765-4321');
@@ -304,10 +306,47 @@ test('a slot that became unavailable before confirmation is refused and new opti
         'reason' => 'Almoço',
     ]);
 
-    $reply = allAssistantText(sayToAssistant('sim'));
+    $reply = lastAssistantText(sayToAssistant('sim'));
 
-    expect($reply)->toContain('Não consegui confirmar esse horário')->toContain('1) 09:00')
+    expect($reply)->toContain('Este horário não foi reservado')->toContain('outra data')->toContain('atendente')
+        ->not->toContain('Agendamento confirmado')->not->toContain('08:00')
+        ->and(Appointment::query()->count())->toBe(0)
+        ->and(ServiceRequest::query()->count())->toBe(0)
+        ->and(AssistantConversation::query()->sole()->status)->toBe(ConversationStatus::Active)
+        ->and(AssistantConversation::query()->sole()->state)->toBe(AssistantState::Slots)
+        ->and(AssistantConversation::query()->sole()->collected['options'])->toHaveCount(3);
+
+    expect(lastAssistantText(sayToAssistant('1')))->toContain('Confirma Limpeza de ar-condicionado')
         ->and(Appointment::query()->count())->toBe(0);
+
+    expect(lastAssistantText(sayToAssistant('sim')))->toContain('Agendamento confirmado')
+        ->and($this->tenant->toLocal(Appointment::query()->sole()->starts_at)->format('H:i'))->not->toBe('08:00');
+});
+
+test('a visitor who asks for the slot taken by another visitor is not booked for it and gets the free alternatives', function () {
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Carlos Lima 11 91234-5678');
+    sayToAssistant('amanhã');
+    $visitorB = assistantToken();
+
+    assistantToken(null, true);
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Maria Souza 11 98765-4321');
+    sayToAssistant('amanhã');
+    sayToAssistant('1');
+    sayToAssistant('sim');
+
+    assistantToken($visitorB);
+    expect(lastAssistantText(sayToAssistant('1')))->toContain('Confirma Limpeza de ar-condicionado com Carlos Técnico');
+
+    expect(lastAssistantText(sayToAssistant('sim')))->toContain('Este horário não foi reservado')->not->toContain('Agendamento confirmado')
+        ->and(Appointment::query()->count())->toBe(1)
+        ->and($this->tenant->toLocal(Appointment::query()->sole()->starts_at)->format('H:i'))->toBe('08:00')
+        ->and(Appointment::query()->sole()->origin)->toBe('ai')
+        ->and(AssistantConversation::query()->where('state', AssistantState::Slots)->count())->toBe(1)
+        ->and(AssistantConversation::query()->where('state', AssistantState::Done)->count())->toBe(1);
 });
 
 test('an appointment that conflicts with an existing one is refused and never recorded as confirmed', function () {
@@ -336,8 +375,12 @@ test('an appointment that conflicts with an existing one is refused and never re
 
     $reply = allAssistantText(sayToAssistant('sim'));
 
-    expect($reply)->not->toContain('Agendamento confirmado')->toContain('Não consegui confirmar esse horário')
-        ->and(Appointment::query()->where('origin', 'ai')->count())->toBe(0);
+    expect($reply)->not->toContain('Agendamento confirmado')->toContain('Este horário não foi reservado')
+        ->and(Appointment::query()->where('origin', 'ai')->count())->toBe(0)
+        ->and(Appointment::query()->where('origin', 'panel')->count())->toBe(1)
+        ->and(AssistantConversation::query()->sole()->status)->toBe(ConversationStatus::Active)
+        ->and(AssistantConversation::query()->sole()->appointment_id)->toBeNull()
+        ->and(ServiceRequest::query()->where('origin', RequestOrigin::Ai)->count())->toBe(0);
 });
 
 test('a request for a human is transferred with a summary and the assistant stops answering', function () {
@@ -350,7 +393,8 @@ test('a request for a human is transferred with a summary and the assistant stop
     $conversation = AssistantConversation::query()->sole();
     expect($conversation->status)->toBe(ConversationStatus::AwaitingHuman)
         ->and($conversation->handoff_reason)->toBe('Cliente pediu atendimento humano.')
-        ->and($conversation->collected['summary'])->toContain('Limpeza de ar-condicionado');
+        ->and($conversation->collected['summary'])->toContain('Limpeza de ar-condicionado')
+        ->and(ServiceRequest::query()->count())->toBe(0);
 
     $before = $conversation->messages()->where('role', 'assistant')->count();
     sayToAssistant('alguém aí?');
@@ -525,6 +569,143 @@ test('a conversation of another company is not reachable from this company', fun
         ->assertNotFound();
 });
 
+test('the greeting lists each active service with the description the company stored', function () {
+    $this->service->update(['description' => 'Limpeza completa com higienização do filtro']);
+
+    $start = startAssistant();
+
+    expect(lastAssistantText($start->json('messages')))
+        ->toContain('Limpeza de ar-condicionado (Limpeza completa com higienização do filtro)')
+        ->not->toContain('Manutenção de geladeira');
+});
+
+test('the privacy notice is written before the visitor is asked for name and phone', function () {
+    startAssistant();
+
+    $reply = lastAssistantText(sayToAssistant('quero limpeza de ar-condicionado'));
+
+    expect($reply)->toContain('Aviso de privacidade')->toContain('nome e telefone')->toContain('nome e o telefone com DDD')
+        ->and(AssistantConversation::query()->sole()->customer_id)->toBeNull();
+});
+
+test('a day without free slots offers another date or a human instead of a dead end', function () {
+    ProfessionalAvailability::query()
+        ->where('professional_id', $this->professional->id)
+        ->where('weekday', CarbonImmutable::parse($this->tomorrowIso)->dayOfWeek)
+        ->delete();
+
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Maria Souza 11 98765-4321');
+
+    expect(lastAssistantText(sayToAssistant($this->tomorrow)))
+        ->toContain('Não há horários livres')->toContain('outra data')->toContain('"atendente"')
+        ->and(ServiceRequest::query()->count())->toBe(0)
+        ->and(Appointment::query()->count())->toBe(0);
+});
+
+test('a resent visitor message with the same client id is processed only once', function () {
+    startAssistant();
+    $payload = ['body' => 'quero limpeza de ar-condicionado', 'after' => 0, 'client_id' => 'envio-unico-1'];
+
+    visitAssistant('POST', '/atendimento/mensagens', $payload)->assertOk();
+    visitAssistant('POST', '/atendimento/mensagens', $payload)->assertOk();
+
+    $conversation = AssistantConversation::query()->sole();
+
+    expect($conversation->messages()->where('role', 'visitor')->count())->toBe(1)
+        ->and($conversation->messages()->where('role', 'assistant')->count())->toBe(2)
+        ->and($conversation->state)->toBe(AssistantState::Customer);
+});
+
+test('every public assistant route is behind the per-minute limit of 30 requests per company host and IP', function () {
+    $limit = RateLimiter::limiter('assistant-public')(Request::create('http://'.ASSISTANT_HOST.'/atendimento/mensagens', 'GET'));
+
+    expect($limit->maxAttempts)->toBe(30)
+        ->and($limit->key)->toBe('127.0.0.1|'.ASSISTANT_HOST);
+
+    foreach (['site.assistant.start', 'site.assistant.messages', 'site.assistant.send'] as $name) {
+        expect(app('router')->getRoutes()->getByName($name)->gatherMiddleware())->toContain('throttle:assistant-public');
+    }
+});
+
+test('the team identifies a waiting visitor and the conversation goes to triage with its history', function () {
+    startAssistant();
+    sayToAssistant('quero falar com um atendente');
+    $conversation = AssistantConversation::query()->sole();
+    $messagesBefore = $conversation->messages()->count();
+
+    $this->actingAs($this->operator)
+        ->get(route('tenant.assistant.index'))
+        ->assertInertia(fn ($page) => $page->has('pendingIdentification', 1)->has('conversations', 0));
+
+    $this->actingAs($this->operator)
+        ->post(route('tenant.assistant.identify', $conversation), [
+            'name' => 'Maria Souza',
+            'phone' => '11 98765-4321',
+            'service_id' => $this->service->id,
+        ])
+        ->assertRedirect();
+
+    $request = ServiceRequest::query()->sole();
+    $conversation->refresh();
+
+    expect($request->origin)->toBe(RequestOrigin::Ai)
+        ->and($request->status)->toBe(RequestStatus::Triaged)
+        ->and($request->service_id)->toBe($this->service->id)
+        ->and($request->description)->toContain('Maria Souza')->toContain('Cliente identificado pela equipe')
+        ->and($conversation->service_request_id)->toBe($request->id)
+        ->and($conversation->customer_id)->not->toBeNull()
+        ->and($conversation->status)->toBe(ConversationStatus::AwaitingHuman)
+        ->and($conversation->messages()->count())->toBe($messagesBefore);
+
+    $this->actingAs($this->operator)
+        ->post(route('tenant.assistant.identify', $conversation), ['name' => 'Maria Souza', 'phone' => '11 98765-4321'])
+        ->assertRedirect();
+
+    expect(ServiceRequest::query()->count())->toBe(1);
+
+    $this->actingAs($this->operator)
+        ->get(route('tenant.assistant.index'))
+        ->assertInertia(fn ($page) => $page->has('pendingIdentification', 0)->has('conversations', 1));
+});
+
+test('identifying a visitor requires name and phone, and a closed conversation cannot be identified', function () {
+    startAssistant();
+    sayToAssistant('quero falar com um atendente');
+    $conversation = AssistantConversation::query()->sole();
+
+    $this->actingAs($this->operator)
+        ->post(route('tenant.assistant.identify', $conversation), ['name' => '', 'phone' => ''])
+        ->assertSessionHasErrors(['name', 'phone']);
+
+    $this->actingAs($this->owner)->post(route('tenant.assistant.close', $conversation))->assertRedirect();
+
+    $this->actingAs($this->owner)
+        ->post(route('tenant.assistant.identify', $conversation), ['name' => 'Maria Souza', 'phone' => '11 98765-4321'])
+        ->assertSessionHasErrors('status');
+
+    expect(ServiceRequest::query()->count())->toBe(0);
+});
+
+test('a conversation of another company cannot be identified from this company', function () {
+    $other = Tenant::factory()->create();
+    $otherConversation = AssistantConversation::query()->create([
+        'tenant_id' => $other->id,
+        'channel' => 'site',
+        'session_hash' => hash('sha256', 'identificacao-outra-empresa'),
+        'state' => 'service',
+        'status' => ConversationStatus::AwaitingHuman,
+        'collected' => [],
+    ]);
+
+    $this->actingAs($this->owner)
+        ->post(route('tenant.assistant.identify', $otherConversation), ['name' => 'Maria Souza', 'phone' => '11 98765-4321'])
+        ->assertNotFound();
+
+    expect(Customer::query()->count())->toBe(0)->and(ServiceRequest::query()->count())->toBe(0);
+});
+
 test('operators read the assistant screen but cannot change its configuration', function () {
     $this->actingAs($this->operator)->get(route('tenant.assistant.index'))->assertOk();
 
@@ -577,4 +758,86 @@ test('expired conversations are purged and active ones are kept', function () {
 
     expect(AssistantConversation::query()->count())->toBe(1)
         ->and(AssistantConversation::query()->sole()->status)->toBe(ConversationStatus::Active);
+});
+
+test('a finished booking registers one triage request from the site with a summary, and repeating the registration returns the same request', function () {
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Maria Souza 11 98765-4321');
+    sayToAssistant('amanhã');
+    sayToAssistant('1');
+    sayToAssistant('sim');
+
+    $request = ServiceRequest::query()->sole();
+    $conversation = AssistantConversation::query()->sole();
+
+    expect($request->origin)->toBe(RequestOrigin::Ai)
+        ->and($request->origin->label())->toBe('Site / IA')
+        ->and($request->status)->toBe(RequestStatus::Scheduled)
+        ->and($request->service_id)->toBe($this->service->id)
+        ->and($request->description)->toContain('Maria Souza')->toContain('Limpeza de ar-condicionado')->toContain('Agendamento registrado na agenda')
+        ->and($conversation->service_request_id)->toBe($request->id);
+
+    $again = app(AssistantOperations::class)->registerRequest($this->tenant, $conversation, 'Resumo atualizado.');
+
+    expect($again->id)->toBe($request->id)
+        ->and($again->fresh()->description)->toBe('Resumo atualizado.')
+        ->and(ServiceRequest::query()->count())->toBe(1);
+
+    sayToAssistant('sim');
+
+    expect(ServiceRequest::query()->count())->toBe(1)
+        ->and(Appointment::query()->count())->toBe(1);
+});
+
+test('a visitor identified before a human request leaves the request in triage with the summary', function () {
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Maria Souza 11 98765-4321');
+
+    expect(lastAssistantText(sayToAssistant('quero falar com um atendente')))->toContain('transferir você para um atendente');
+
+    $request = ServiceRequest::query()->sole();
+
+    expect($request->origin)->toBe(RequestOrigin::Ai)
+        ->and($request->status)->toBe(RequestStatus::Triaged)
+        ->and($request->service_id)->toBe($this->service->id)
+        ->and($request->description)->toContain('Cliente pediu atendimento humano.')->toContain('Maria Souza')
+        ->and(AssistantConversation::query()->sole()->service_request_id)->toBe($request->id)
+        ->and(Appointment::query()->count())->toBe(0);
+});
+
+test('a time the visitor asks for is only a preference: the nearest free slots come first and nothing is booked before a choice is confirmed', function () {
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Maria Souza 11 98765-4321');
+
+    $slots = lastAssistantText(sayToAssistant('amanhã às 14h'));
+
+    expect($slots)->toContain('os mais próximos de 14:00')->toContain('1) 14:00 — Carlos Técnico')->not->toContain('1) 08:00')
+        ->and(Appointment::query()->count())->toBe(0)
+        ->and(AssistantConversation::query()->sole()->collected['preferred_time'])->toBe('14:00');
+});
+
+test('the team completes the site request from the panel, and another company cannot reach it', function () {
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Maria Souza 11 98765-4321');
+    sayToAssistant('amanhã');
+    sayToAssistant('1');
+    sayToAssistant('sim');
+
+    $request = ServiceRequest::query()->sole();
+
+    $outsider = User::factory()->create();
+    TenantUser::factory()->owner()->create(['tenant_id' => Tenant::factory()->create()->id, 'user_id' => $outsider->id]);
+
+    $this->actingAs($outsider)->get(route('tenant.requests.show', $request))->assertNotFound();
+    $this->actingAs($outsider)->post(route('tenant.requests.start', $request))->assertNotFound();
+
+    $this->actingAs($this->owner)->post(route('tenant.requests.start', $request))->assertRedirect();
+    $this->actingAs($this->owner)->post(route('tenant.requests.complete', $request))->assertRedirect();
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Completed)
+        ->and(Appointment::query()->sole()->status)->toBe(AppointmentStatus::Completed);
 });

@@ -197,16 +197,29 @@
         setState('Indisponível', false);
     });
 
+    // A resend of the same text (after a lost response) reuses its id, so the server answers it only once.
+    var pendingSend = null;
+
+    function newClientId() {
+        if (window.crypto && typeof window.crypto.randomUUID === 'function') { return window.crypto.randomUUID(); }
+        return Date.now().toString(36) + Math.random().toString(36).slice(2);
+    }
+
     form.addEventListener('submit', function (event) {
         event.preventDefault();
         var body = input.value.trim();
 
         if (body === '') { return; }
 
+        if (pendingSend === null || pendingSend.body !== body) {
+            pendingSend = { body: body, clientId: newClientId() };
+        }
+
         enable(false);
         showError('');
 
-        request('POST', '/atendimento/mensagens', { body: body, after: lastId }).then(function (data) {
+        request('POST', '/atendimento/mensagens', { body: body, after: lastId, client_id: pendingSend.clientId }).then(function (data) {
+            pendingSend = null;
             input.value = '';
             render(data.messages || []);
             applyStatus(data);

@@ -19,6 +19,7 @@ class SendAssistantMessageRequest extends FormRequest
         return [
             'body' => ['required', 'string', 'max:'.(int) config('assistant.max_visitor_message_chars', 500)],
             'after' => ['sometimes', 'integer', 'min:0'],
+            'client_id' => ['sometimes', 'nullable', 'string', 'max:64'],
         ];
     }
 

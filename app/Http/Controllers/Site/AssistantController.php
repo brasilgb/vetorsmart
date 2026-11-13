@@ -100,7 +100,13 @@ class AssistantController extends Controller
             return response()->json(['message' => 'Conversa não encontrada. Atualize a página para iniciar um novo atendimento.'], 409);
         }
 
-        $flow->receive($tenant, $setting, $conversation, (string) $request->validated('body'));
+        $body = (string) $request->validated('body');
+
+        $conversations->receiveOnce(
+            $conversation,
+            $request->validated('client_id'),
+            fn (AssistantConversation $locked) => $flow->receive($tenant, $setting, $locked, $body),
+        );
 
         return response()->json($this->payload($conversations, $conversation->refresh(), (int) $request->integer('after')));
     }

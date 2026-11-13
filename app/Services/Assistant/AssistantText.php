@@ -72,6 +72,18 @@ class AssistantText
     }
 
     /**
+     * A time of day the visitor asks for, such as "14h", "14h30" or "14:00", as HH:MM. Null when the text has none.
+     */
+    public function time(string $text): ?string
+    {
+        if (preg_match('/(?<!\d)([01]?\d|2[0-3])\s*(?::|h)\s*([0-5]\d)?(?!\d)/', $this->normalize($text), $match) !== 1) {
+            return null;
+        }
+
+        return sprintf('%02d:%02d', (int) $match[1], isset($match[2]) && $match[2] !== '' ? (int) $match[2] : 0);
+    }
+
+    /**
      * A Brazilian phone number as digits (DDD + number, optionally with country code 55).
      */
     public function phone(string $text): ?string

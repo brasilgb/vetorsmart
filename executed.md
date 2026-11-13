@@ -1,107 +1,97 @@
-# Execução: VETORSMART-AUTH-UX-01 (Padronização da autenticação)
+# Execução: VETORSMART-BACKEND-05.2 — Homologação e consolidação do atendimento
 
-Data: 12/11/2026. Local: `gateway/vetorsmart/`. Detalhes completos em `docs/VETORSMART-AUTH-UX-01.md`.
+Data: 13/11/2026. Local: `gateway/vetorsmart/`.
 
-## Instrução
+## Análise do correio
 
-`correio.md` difere da instrução anterior (VETORSMART-SERVICES-01.2). A nova instrução é VETORSMART-AUTH-UX-01: legibilidade, imagem de fundo, política de senhas e favicon das telas de autenticação.
+`correio.md` difere do commit anterior (`VETORSMART-AUTH-UX-01`, padronização da autenticação). A nova instrução foi executada. A execução anterior deste arquivo (integração do atendimento ao painel) foi substituída.
 
-## Resultado
+## Resultado geral
 
-**IMPLEMENTAÇÃO E TESTES AUTOMATIZADOS:** aprovados.
+- Atendimento (`tests/Feature/Assistant`): **38 de 38 aprovados.**
+- Suíte completa: **360 testes, 355 aprovados, 5 pulados (2FA), 0 falhas.**
+- Concorrência com MySQL (`MysqlConcurrencyTest`, banco `vetorsmart_test`, `VETORSMART_CONCURRENCY=1`): **5 de 5 aprovados.**
+- `npx tsc --noEmit`: sem erros. `vendor/bin/pint`: aplicado nos arquivos PHP alterados.
+- Homologação no navegador (desktop 1440 px e mobile 390 px): **não realizada.**
+- Implantação na VPS: **não realizada.** Commit: **não realizado.**
 
-**EVIDÊNCIAS VISUAIS DESKTOP E MOBILE:** pendentes.
+## Funcionalidades implementadas ou ajustadas
 
-**IMPLANTAÇÃO NA VPS:** não realizada.
+1. **Horário indisponível na confirmação (seção 2 do correio).** Antes, o assistente encaminhava a conversa à equipe. Agora:
+   - a solicitação e o agendamento são gravados numa mesma transação; se a agenda recusar o horário, a transação é desfeita e nada fica registrado;
+   - o visitante é informado de que o horário não foi reservado;
+   - a disponibilidade do mesmo dia é consultada de novo pelo `AppointmentScheduler` e até **três** horários livres, os mais próximos do pedido, são oferecidos;
+   - nada é trocado automaticamente: o visitante escolhe um número e responde "sim" de novo;
+   - se não houver horário no dia, a conversa volta à escolha de data; "outra data" e "atendente" continuam disponíveis.
+   - Arquivo: `app/Services/Assistant/AssistantFlow.php` (`book`, `offerAlternatives`, `offerSlots`).
+   - Ajuste correlato: a conversa guarda somente as opções exibidas, para que o número escolhido sempre corresponda a uma opção vista pelo visitante (antes eram até 40 opções guardadas, com 8 exibidas).
+2. **Atendimento humano sem identificação (seção 1).** A fila de pendentes de identificação já não depende de solicitação nem de cliente. Ajuste: a fila exibe "Não identificado" no lugar de "visitante não identificado". Arquivo: `resources/js/pages/tenant/assistant/index.tsx`.
+3. **Testes do atendimento.** O helper de testes enviava o cookie do primeiro visitante em todas as requisições seguintes, o que fazia um segundo visitante cair na conversa do primeiro. Corrigido para enviar sempre o cookie do visitante atual (vazio quando não há). Arquivo: `tests/Feature/Assistant/AssistantTest.php`.
+4. **Documentação.** `docs/VETORSMART-BACKEND-05-ATENDIMENTO-IA.md`: seção 5 corrigida e seção 16 atualizada com horário indisponível, testes desta etapa e pendências.
 
-## Arquivos modificados
+## Itens já existentes, verificados sem alteração
 
-- Backend:
-  - `app/Services/PasswordPolicy.php` (novo)
-  - `app/Concerns/PasswordValidationRules.php`
-  - `app/Providers/AppServiceProvider.php`
-  - `app/Actions/Fortify/ResetUserPassword.php`
-  - `app/Http/Requests/Settings/PasswordUpdateRequest.php`
-  - `app/Http/Controllers/Settings/SecurityController.php`
-- Frontend:
-  - `resources/css/app.css`
-  - `resources/js/app.tsx`
-  - `resources/js/layouts/auth-layout.tsx`
-  - `resources/js/components/vetor-smart/auth-shell.tsx`
-  - `resources/js/components/password-input.tsx`
-  - `resources/js/pages/auth/` (confirm-password, forgot-password, register, reset-password, two-factor-challenge)
-  - `resources/views/app.blade.php`
-- Ícones:
-  - `public/favicon.ico` e `public/apple-touch-icon.png` (substituídos)
-  - `public/images/vetor-smart-favicon-32.png` e `public/images/vetor-smart-favicon-192.png` (novos)
-  - `public/favicon.svg` (removido; era o logotipo do Laravel)
-- Testes: `tests/Feature/Auth/PasswordPolicyTest.php` (novo)
-- Documentação: `docs/VETORSMART-AUTH-UX-01.md` (novo)
-
-## Correções visuais
-
-- **Causa do texto invisível:** em tema escuro, os inputs herdavam texto quase branco (`#E2E8F0`) sobre o cartão branco. A classe `.vs-auth` agora fixa os tokens claros nas telas de autenticação e desativa o variant `dark:` dentro delas.
-- **Contraste (WCAG AA):**
-  - texto 18:1
-  - labels e dicas 7,6:1
-  - placeholder 4,8:1
-  - erros 4,8:1
-- **Estados e ícones:** foco azul com anel de 3 px. Autofill tratado no Chrome, Safari e Firefox. O ícone mostrar/ocultar usa `#475569` e tem rótulos em pt-BR.
-- **Mesma identidade nas 6 telas** (login, cadastro, recuperação, redefinição, confirmação e 2FA):
-  - imagem oficial `auth-background.svg` mantida, em `cover`
-  - película reduzida para 0,55
-  - cartão branco sólido
-- **Telas corrigidas:** a dupla moldura da 2FA foi removida, e recuperação e redefinição foram traduzidas para pt-BR.
-
-## Política de senhas implementada
-
-- **Usuários comuns:** mínimo de 8 caracteres de qualquer tipo, incluindo só números. Sem máximo de 8 caracteres e sem exigência de maiúsculas ou símbolos.
-- **Onde vale:** cadastro, redefinição e alteração de senha.
-- **Frontend:** dica de senha no cadastro e na redefinição, e `passwordrules` vindo do backend.
-- **RootAdmin:** política rigorosa preservada (12 caracteres, maiúsculas e minúsculas, números, símbolos e `uncompromised` em produção). MFA obrigatório inalterado.
-- **Mantido sem alteração:** hash, rate limit de login, senhas existentes e sessões.
-
-## Favicon utilizado
-
-Símbolo "V" oficial do VetorSmart, sem texto, gerado de `public/images/vetor-smart-logo-transparent.png`:
-
-- ICO com 16, 32 e 48 px
-- PNG de 32 e 192 px
-- apple-touch-icon de 180 px com fundo branco
-
-As referências estão em `app.blade.php` com `?v=2` para invalidar o cache, e valem para as rotas públicas e privadas.
+- Aviso de privacidade antes de pedir nome e telefone.
+- Widget `/atendimento`: envio duplicado bloqueado durante o envio, `client_id` para reenvio idempotente, estados de carregamento e erro, rótulos e foco acessíveis, layout com largura máxima de 720 px e quebra em telas de 420 px ou menos.
+- Continuidade da conversa após recarregar a página, pelo cookie httpOnly.
+- Conversão posterior da conversa em solicitação, com identificação pelo painel.
+- Isolamento entre empresas em leitura, início, conclusão e identificação (404).
+- Um profissional não recebe dois agendamentos conflitantes (trava no `AppointmentScheduler`).
 
 ## Testes executados
 
-Banco isolado `vetorsmart_test`; o banco operacional não foi usado.
-
-| Verificação | Resultado |
+| Conjunto | Resultado |
 |---|---|
-| `php artisan test --compact tests/Feature/Auth/PasswordPolicyTest.php` | 9 aprovados |
-| `php artisan test --compact` | 346 testes: 341 aprovados, 0 falhas, 5 pulados (concorrência MySQL, pulados por padrão) |
-| `vendor/bin/pint --dirty` | aprovado |
-| `npx tsc --noEmit` | 0 erros |
-| `npm run build` | aprovado |
+| `tests/Feature/Assistant` | 38 aprovados, 0 falhas |
+| Suíte completa | 360 testes: 355 aprovados, 5 pulados (2FA), 0 falhas |
+| `MysqlConcurrencyTest` com `VETORSMART_CONCURRENCY=1` | 5 aprovados |
+| `npx tsc --noEmit` | sem erros |
 
-Casos cobertos:
-- senha de 7 caracteres recusada com a mensagem em pt-BR
-- senhas aceitas: 8 dígitos, só letras e frase longa com símbolos
-- usuário comum redefine e altera a senha para 8 dígitos
-- RootAdmin com senha fraca é recusado e com senha forte é aceito
-- os testes já existentes de login, cadastro, redefinição e MFA continuam aprovados
+Novos cenários: horário retirado antes do "sim" (alternativas oferecidas, sem reserva, nova confirmação exigida); dois visitantes disputando o mesmo horário (um agendamento só, o segundo recebe alternativas).
 
-## Evidências desktop e mobile
+## Evidências de navegador
 
-Não coletadas. A inicialização do servidor local foi recusada nesta sessão, então não houve verificação em 1440 px e 390 px.
+**Não realizadas.** Para testar no navegador é preciso que o domínio verificado do tenant (`clima-total.vetorsmart.test` nos testes) resolva localmente e que exista um site publicado no banco de desenvolvimento. Nada disso foi configurado nesta etapa, e não há capturas nem registros de navegador. Os cenários exigidos (site → atendimento, atendimento → agendamento, atendimento → encaminhamento, painel → triagem, triagem → execução, execução → conclusão) foram cobertos apenas por teste HTTP e de serviço.
 
-## Status de implantação na VPS
+## Resultados dos testes de concorrência
 
-Não implantado. Nenhum commit, push, deploy ou alteração em containers.
+- `MysqlConcurrencyTest`: 5 de 5 aprovados no MySQL de testes local.
+- Dois visitantes disputando o mesmo horário: coberto em teste, em sequência. O segundo visitante não é agendado para o horário já reservado e recebe alternativas.
+- Reenvio de mensagens: coberto pelo `client_id` e pelo teste de reenvio.
+- Repetição de agendamento: coberta pela chave de idempotência.
+- Falhas durante persistência: **não coberta por teste dedicado.** O caminho de erro técnico do agendamento existe (transfere à equipe com mensagem ao visitante), mas nenhum teste força uma falha de gravação. Só foi testada a falha do provedor de IA, que é outro caminho.
+- **Não feito**: carga paralela real com vários processos simultâneos. Os testes rodam em sequência de sessões.
 
 ## Pendências
 
-1. Homologação visual em 1440 px e 390 px das 6 telas, incluindo autofill no Chrome e no Firefox, tema escuro do sistema e favicon (desktop e mobile).
-2. Implantação na VPS pelo procedimento controlado.
-3. A dica de senha na redefinição mostra a regra simples. Para um RootAdmin, a política rigorosa é aplicada e informada pelo backend.
-4. O comando `platform:root-admin` mantém a validação própria (mínimo de 12 caracteres).
-5. Os sites públicos dos tenants não foram alterados e usam o `/favicon.ico` padrão.
+1. Homologação no navegador em desktop e mobile (ver acima).
+2. Link para a política de privacidade do aviso. A plataforma não tem campo nem página de política; sem decisão de produto o link não foi criado.
+3. Limite de 429 das rotas públicas não verificado com requisições HTTP reais (ver seção 16.4 da documentação).
+4. Indicadores operacionais do painel: não criados.
+5. Provedor de IA real: não integrado (continua `none`), conforme a restrição do correio.
+
+## Riscos para produção
+
+- Todas as alterações do atendimento estão **sem commit**, junto com as alterações anteriores ainda não commitadas.
+- O comportamento de horário indisponível mudou: o visitante agora decide novamente em vez de ser encaminhado à equipe. Vale validar com a operação.
+- Widget não testado no navegador; o layout foi revisado por leitura do código.
+- Concorrência testada em sequência, sem carga paralela real.
+- Aviso de privacidade sem link para política.
+
+## Migrações
+
+**Nenhuma migração nova nesta etapa.**
+
+## Situação de commit e deploy
+
+- **Commit: não realizado** (restrição do correio).
+- **Deploy na VPS: não realizado** (restrição do correio).
+- Nenhuma alteração em infraestrutura Docker compartilhada, nenhuma alteração destrutiva no banco e nenhuma alteração de regras comerciais.
+
+## Arquivos modificados nesta etapa
+
+- `app/Services/Assistant/AssistantFlow.php`
+- `tests/Feature/Assistant/AssistantTest.php`
+- `resources/js/pages/tenant/assistant/index.tsx`
+- `docs/VETORSMART-BACKEND-05-ATENDIMENTO-IA.md`
+- `executed.md`

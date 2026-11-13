@@ -18,7 +18,7 @@ enum RequestOrigin: string
         return match ($this) {
             self::Panel => 'Painel',
             self::PublicSite => 'Site público',
-            self::Ai => 'IA',
+            self::Ai => 'Site / IA',
             self::Api => 'API',
         };
     }

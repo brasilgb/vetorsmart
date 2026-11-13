@@ -1,147 +1,159 @@
-# VETORSMART-AUTH-UX-01 — Padronização da autenticação
+# VETORSMART-BACKEND-05.2 — Homologação e consolidação do atendimento
 
 **Projeto:** VetorSmart  
-**Diretório:** `gateway/vetorsmart/`  
-**Ambiente:** VPS de produção  
-**Prioridade:** Alta
+**Diretório oficial:** `gateway/vetorsmart/`  
+**Tecnologia:** Laravel + MySQL  
+**Data:** 13/11/2026
 
-## 1. Objetivo
+## Objetivo
 
-Corrigir o contraste e a legibilidade das telas de autenticação, padronizar a imagem de fundo, simplificar os requisitos de senha e corrigir o favicon do VetorSmart.
+Consolidar a integração entre atendimento público, triagem, agenda e painel operacional, corrigindo pendências da BACKEND-05.1 sem reconstruir funcionalidades existentes.
 
-Não alterar as regras de autenticação administrativa ou MFA.
+Priorizar simplicidade, confiabilidade, segurança e usabilidade mobile.
 
-## 2. Imagem de fundo
+## 1. Atendimento humano sem identificação
 
-Revisar todas as telas:
+Atualmente, visitantes que solicitam um atendente antes de informar nome e telefone não geram solicitação.
 
-- Login
-- Cadastro
-- Recuperação de senha
-- Redefinição de senha
-- Confirmação de senha
-- Autenticação em dois fatores
+Implementar:
 
-Aplicar a mesma identidade visual.
+- Fila de conversas aguardando atendimento humano, mesmo sem cliente cadastrado.
+- Identificação do visitante como "Não identificado".
+- Possibilidade de o operador assumir a conversa e solicitar os dados necessários.
+- Conversão posterior da conversa em solicitação de serviço.
+- Preservação integral do histórico.
+- Proibição de criar clientes fictícios.
 
-Requisitos:
+A fila de conversas não deve depender da criação prévia de uma solicitação formal.
 
-- Reutilizar a imagem oficial de autenticação já existente no projeto, se disponível.
-- Imagem responsiva, cobrindo toda a área de fundo.
-- Evitar distorção e cortes inadequados.
-- Garantir boa visualização em desktop e mobile.
-- Utilizar uma superfície sólida ou semitransparente no formulário para separar os campos da imagem.
-- Evitar gradientes excessivos sobre a imagem.
-- Preservar o padrão visual e a paleta oficial do VetorSmart.
+## 2. Horários indisponíveis
 
-Não substituir a imagem por outra sem necessidade.
+Alterar o comportamento atual.
 
-## 3. Correção da legibilidade
+Quando o horário desejado não estiver disponível:
 
-O texto digitado nos campos de login está praticamente invisível.
+1. Informar claramente que o horário não foi reservado.
+2. Consultar alternativas reais usando o AppointmentScheduler.
+3. Apresentar até três horários disponíveis próximos da preferência.
+4. Permitir escolher outra data.
+5. Oferecer encaminhamento humano.
 
-Corrigir:
+Se a indisponibilidade ocorrer durante a confirmação, não confirmar nem substituir automaticamente o horário escolhido. Oferecer alternativas somente após nova consulta e exigir nova confirmação do visitante.
 
-- Contraste entre texto e fundo dos inputs.
-- Cor dos placeholders.
-- Cor dos labels.
-- Estados de foco.
-- Mensagens de validação.
-- Campos preenchidos automaticamente pelo navegador.
-- Cor dos ícones de mostrar/ocultar senha.
+Preservar idempotência, transações e isolamento por tenant.
 
-Utilizar contraste acessível, preferencialmente WCAG AA.
+## 3. Atendimento e experiência mobile
 
-O texto digitado deve permanecer visível em todos os estados, inclusive com autofill do Chrome e Firefox.
+Revisar o widget `/atendimento`:
 
-Não utilizar texto branco em input branco nem cores de baixo contraste.
+- Interface responsiva.
+- Campos e botões legíveis.
+- Mensagens objetivas.
+- Indicador de processamento.
+- Tratamento de falhas de conexão.
+- Prevenção de envios duplicados.
+- Continuidade da conversa após atualização da página, conforme a política de sessão.
+- Navegação acessível por teclado.
+- Estados de carregamento e erro compreensíveis.
 
-## 4. Política de senhas
+Não transformar o atendimento em formulário longo.
 
-Simplificar a criação de senhas dos usuários comuns.
+## 4. Privacidade e segurança
 
-Requisitos:
+- Exibir aviso de privacidade antes da coleta de dados pessoais.
+- Informar finalidade do uso de nome, telefone e informações do serviço.
+- Disponibilizar link para a política de privacidade da empresa.
+- Registrar apenas dados necessários.
+- Verificar autenticação, autorização e segregação entre tenants.
+- Aplicar limites contra abuso.
+- Preservar proteção contra instruções maliciosas fornecidas pelo visitante.
+- Não expor detalhes internos da aplicação nas mensagens públicas.
 
-- Mínimo de 8 caracteres.
-- Permitir senhas contendo somente números.
-- Permitir letras, números e caracteres especiais.
-- Não exigir obrigatoriamente letras maiúsculas, símbolos ou combinações complexas.
-- Não estabelecer máximo de 8 caracteres.
-- Aplicar as mesmas regras no cadastro, redefinição e alteração de senha.
-- Manter armazenamento seguro por hash e proteção contra tentativas excessivas de login.
+## 5. Integração com o painel
 
-**Exceção:** preservar as políticas mais rigorosas e o MFA obrigatório dos administradores globais.
+Garantir que o operador consiga:
 
-Revisar validações de frontend e backend para evitar divergências.
+- Visualizar atendimentos aguardando interação humana.
+- Identificar origem "Site / IA".
+- Consultar resumo e histórico.
+- Assumir e devolver atendimento.
+- Identificar o visitante.
+- Converter atendimento em solicitação quando aplicável.
+- Consultar agendamento associado.
+- Iniciar, acompanhar e concluir o serviço.
 
-Não modificar senhas existentes nem invalidar sessões sem necessidade.
+Evitar duplicação de registros e telas administrativas desnecessárias.
 
-## 5. Favicon
+## 6. Concorrência e testes
 
-Verificar o favicon atual e corrigir sua apresentação.
+Executar testes automatizados e homologação com MySQL.
 
-Requisitos:
+Validar:
 
-- Utilizar a identidade visual oficial do VetorSmart.
-- Preferir o símbolo da marca, sem textos pequenos ilegíveis.
-- Conferir arquivos SVG, PNG e ICO disponíveis.
-- Corrigir referências no layout principal e nas páginas de autenticação.
-- Garantir funcionamento nas rotas públicas e privadas.
-- Corrigir cache e versionamento de assets quando necessário.
-- Verificar visualização em navegadores desktop e mobile.
+- Dois visitantes disputando o mesmo horário.
+- Confirmações simultâneas.
+- Reenvio de mensagens.
+- Falhas durante persistência.
+- Repetição de requisições após timeout.
+- Conversas retomadas.
+- Acesso entre tenants.
+- Encaminhamento humano sem identificação.
+- Conversão posterior em solicitação.
 
-Não utilizar o favicon padrão do Laravel, Vite ou de outro produto.
+Um mesmo profissional não pode receber dois agendamentos conflitantes.
 
-## 6. Responsividade
+Nenhuma confirmação pode ser exibida antes da persistência bem-sucedida.
 
-Homologar em:
+## 7. Homologação em navegador
 
-- Desktop de 1440 px.
-- Mobile de 390 px.
+Executar testes reais em desktop e mobile, utilizando ambiente disponível e seguro.
 
-As telas devem manter:
+Cobrir:
 
-- Imagem de fundo adequada.
-- Formulário centralizado.
-- Campos legíveis.
-- Botões acessíveis.
-- Login sem rolagem desnecessária.
-- Cadastro organizado, evitando rolagem sempre que possível sem cortar conteúdo.
+- Site público → atendimento.
+- Atendimento → agendamento.
+- Atendimento → encaminhamento humano.
+- Painel → triagem.
+- Triagem → execução.
+- Execução → conclusão.
 
-## 7. Validação
+Registrar evidências de cada cenário.
 
-Executar testes relacionados à autenticação, cadastro, redefinição de senha e MFA.
+Se o navegador ou ambiente necessário não estiver disponível, registrar a impossibilidade. Não substituir a homologação por testes simulados e não declarar aprovação sem evidências.
 
-Verificar que as novas regras não prejudicam a segurança.
+## 8. Documentação
 
-Testar campos vazios, senhas numéricas de 8 caracteres, senhas maiores, mensagens de erro e autenticação válida.
+Atualizar:
 
-Executar as verificações técnicas em ambiente isolado, sem utilizar o banco operacional para testes automatizados.
+`docs/VETORSMART-BACKEND-05-ATENDIMENTO-IA.md`
 
-## 8. Implantação
+Documentar o comportamento implementado, fluxo de atendimento humano, agendamento, regras de confirmação, limitações e cenários de testes.
 
-Preparar alterações e verificar o impacto antes da publicação.
+## 9. Restrições
 
-Não alterar diretamente containers operacionais sem procedimento de implantação controlado.
+- Não integrar provedor pago de IA nesta execução.
+- Preservar fluxo determinístico funcional.
+- Não alterar infraestrutura Docker compartilhada.
+- Não implantar na VPS sem autorização.
+- Não alterar regras comerciais.
+- Não executar alterações destrutivas no banco.
+- Não fazer commit sem autorização.
+- Não modificar módulos não relacionados.
 
-Não modificar cobrança, regras de negócio, dados dos tenants ou permissões administrativas.
+## 10. Relatório final obrigatório
 
-## 9. Entrega
+Informar:
 
-Criar:
+1. Arquivos modificados.
+2. Funcionalidades implementadas.
+3. Testes executados, aprovados, falhados e pulados.
+4. Evidências de navegador.
+5. Resultados dos testes de concorrência.
+6. Pendências identificadas.
+7. Riscos para produção.
+8. Necessidade de migrações.
+9. Situação de commit e deploy.
 
-`docs/VETORSMART-AUTH-UX-01.md`
+**Critério de aceite:** atendimento público e painel operando de ponta a ponta, com agendamentos seguros, encaminhamento humano funcional e experiência adequada no celular.
 
-Atualizar `executed.md` com:
-
-- Arquivos modificados.
-- Correções visuais realizadas.
-- Política de senhas implementada.
-- Favicon utilizado.
-- Testes executados.
-- Evidências desktop e mobile.
-- Status de implantação na VPS.
-- Pendências existentes.
-
-**Critério de aceite:** todas as telas de autenticação devem apresentar identidade visual consistente, campos claramente legíveis, favicon correto e política de senhas simplificada, sem regressões de segurança.
-
+Não considerar concluída a homologação sem testes reais de navegador e concorrência.

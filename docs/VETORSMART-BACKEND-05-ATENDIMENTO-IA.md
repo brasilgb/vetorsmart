@@ -91,10 +91,10 @@ Cada operação recebe o tenant explicitamente e nunca um `tenant_id` vindo do t
 - **Saudação**: nome comercial, saudação configurada e lista dos serviços ativos. Sem serviço ativo, encaminha a humano.
 - **Serviço**: correspondência por palavras do nome. Ambiguidade ou ausência não gera escolha inventada. Três tentativas sem avanço encaminham a humano.
 - **Cliente**: pede somente o que falta (nome e telefone com DDD). Se o cliente já foi identificado na conversa, não pergunta de novo.
-- **Solicitação**: criada e triada ao identificar o cliente, mesmo se a conversa for abandonada depois.
+- **Solicitação**: registrada somente na finalização (agendamento confirmado) ou no encaminhamento à equipe com cliente identificado. Uma conversa tem no máximo uma solicitação aberta (ver seção 16).
 - **Data**: hoje, amanhã ou dd/mm (até 60 dias à frente).
 - **Horário**: lista até 8 opções reais, em hora local do tenant.
-- **Confirmação**: só com "sim". A mensagem de sucesso é escrita apenas após o agendamento ser persistido. Conflito ou horário tomado gera mensagem de recusa e nova lista.
+- **Confirmação**: só com "sim". A mensagem de sucesso é escrita apenas após o agendamento ser persistido. Horário que não pode mais ser gravado não é reservado nem trocado automaticamente: o visitante recebe até três alternativas reais e precisa escolher e confirmar de novo (ver seção 16.5).
 - **Informações**: preço, duração, horário comercial e região vêm somente do cadastro. Se não houver dado, o assistente diz que não tem a informação e oferece um atendente.
 - **Pedido de humano** em qualquer etapa: transfere com resumo (motivo, serviço, cliente, últimas mensagens).
 
@@ -180,3 +180,61 @@ Cobertura dos 15 testes obrigatórios: 1 conversa completa, 2 serviço existente
 - Nenhuma integração real com provedor de IA.
 - Nenhuma alteração em `homolog:purge`, em horários históricos ou na landing.
 - Nenhuma homologação no navegador.
+
+---
+
+## 16. Homologação e refinamento do atendimento (VETORSMART-BACKEND-05.2)
+
+Esta seção atualiza e substitui as regras das seções 5 e 14 nos pontos abaixo.
+
+### 16.1 Encaminhamento humano
+
+- O visitante pode pedir atendente antes de se identificar. A conversa vai para a fila de **pendentes de identificação** do painel, separada da lista de conversas e das solicitações.
+- Conversa pendente = sem cliente identificado e com status `awaiting_human` ou `human_assumed`. Ao identificar o cliente, ela sai dessa fila e passa à lista comum. Sem cliente, a fila mostra "Não identificado". Nenhum cliente fictício é criado para isso.
+- A fila não depende de solicitação: a conversa aparece mesmo sem nenhum registro na triagem.
+- **Converter em solicitação**: a equipe informa nome e telefone (e serviço, opcional) na conversa. O sistema busca o cliente pelo telefone ou cria um, vincula à conversa e registra a solicitação na triagem com origem "Site / IA" e o resumo. As mensagens são preservadas.
+- Repetir a identificação atualiza o resumo da mesma solicitação (não cria outra). A ação recusa conversa encerrada e conversa de outra empresa (404).
+- Endpoint: `POST /atendimento-ia/conversas/{conversation}/identificar` (`tenant.assistant.identify`). Permissão: proprietário, administrador e operador.
+
+### 16.2 Experiência do visitante
+
+- A saudação lista cada serviço ativo com a descrição cadastrada (resumida a 80 caracteres). Serviços inativos não aparecem.
+- Antes de pedir nome e telefone, a recepcionista escreve um **aviso de privacidade**: os dados são usados somente para o atendimento e o agendamento.
+- Sem horário livre em uma data, a resposta oferece outra data **ou** o atendente (palavra "atendente").
+- Horário pedido continua sendo preferência: nada é reservado sem a escolha e o "sim".
+
+### 16.3 Reenvios e concorrência
+
+- O widget envia um `client_id` por mensagem. Reenviar o mesmo texto após uma resposta perdida reutiliza o identificador.
+- O servidor registra o identificador em `assistant_operations` (chave única por empresa), dentro de uma transação com a conversa bloqueada (`lockForUpdate`). Um reenvio com o mesmo identificador não é processado de novo: não há mensagem duplicada nem resposta duplicada.
+- Mensagens sem `client_id` (clientes antigos) continuam aceitas, sem essa proteção.
+
+### 16.4 Limite de requisições
+
+- As rotas públicas usam `throttle:assistant-public`: 30 requisições por minuto por IP e host. Um teste confere a configuração (limite de 30 e middleware nas três rotas).
+- **Não verificado**: o 429 em requisições HTTP reais. Em teste, a requisição com o contador cheio não foi bloqueada pelo middleware; a causa não foi investigada.
+
+### 16.5 Horário indisponível na confirmação
+
+- O horário escolhido só é reservado após "sim". Se a agenda recusar o horário nesse momento (ocupado, bloqueado, fora da jornada, profissional inativo), a transação da solicitação e do agendamento é desfeita: não há solicitação, agendamento nem confirmação gravados.
+- O visitante é informado de que o horário não foi reservado. A disponibilidade do mesmo dia é consultada de novo no `AppointmentScheduler` e até **três** horários livres, os mais próximos do pedido, são oferecidos.
+- Nada é trocado automaticamente: o visitante escolhe um número e responde "sim" de novo. Ele também pode dizer "outra data" ou "atendente".
+- Se não houver nenhum horário livre no dia, a conversa volta à escolha de data.
+- Dois visitantes disputando o mesmo horário: quem confirma por último não é agendado para ele e recebe as alternativas. A proteção é a trava do profissional no `AppointmentScheduler` e a chave de idempotência por conversa, profissional e instante.
+
+### 16.6 Testes desta etapa
+
+- Suíte completa: **360 testes, 355 aprovados, 5 pulados (2FA), 0 falhas.**
+- Atendimento (`tests/Feature/Assistant`): **38 de 38 aprovados.**
+- Concorrência com MySQL (`tests/Feature/Operations/MysqlConcurrencyTest.php`, banco `vetorsmart_test`): **5 de 5 aprovados** com `VETORSMART_CONCURRENCY=1`.
+- Cenários cobertos novos: horário retirado antes do "sim" (alternativas oferecidas, sem reserva, nova confirmação); dois visitantes disputando o mesmo horário (um agendamento só, o segundo recebe alternativas).
+- `npx tsc --noEmit`: sem erros. `vendor/bin/pint`: aplicado.
+
+### 16.7 Pendências desta etapa
+
+- **Homologação no navegador** (desktop 1440 px e mobile 390 px): **não realizada.** Para testar, é preciso o domínio verificado do tenant (`clima-total.vetorsmart.test` nos testes) resolvendo localmente e um site publicado no banco de desenvolvimento. Nada disso foi configurado nesta etapa, e não há evidência de navegador.
+- **Link para política de privacidade**: o aviso existe, mas a plataforma não tem campo nem página de política de privacidade. Sem decisão de produto e sem URL cadastrada, o link não foi criado.
+- **Indicadores operacionais**: o painel não tem contadores de atendimento; nada foi criado para isso.
+- **Concorrência**: os testes de MySQL rodam no banco de testes local, em sequência de sessões. Não houve carga paralela com vários processos simultâneos.
+- Provedor de IA: continua `none`. Nenhum provedor pago integrado.
+- Nenhum commit, deploy ou alteração de infraestrutura compartilhada.

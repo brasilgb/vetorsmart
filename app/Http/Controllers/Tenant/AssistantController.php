@@ -6,13 +6,16 @@ use App\Enums\AssistantMessageRole;
 use App\Enums\ConversationStatus;
 use App\Enums\DomainStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Assistant\IdentifyAssistantConversationRequest;
 use App\Http\Requests\Tenant\Assistant\OperatorReplyRequest;
 use App\Http\Requests\Tenant\Assistant\UpdateAssistantSettingsRequest;
 use App\Models\AssistantConversation;
 use App\Models\AssistantSetting;
+use App\Models\Service;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Services\Assistant\AssistantConversations;
+use App\Services\Assistant\AssistantOperations;
 use App\Services\Assistant\AssistantSettingsService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -34,13 +37,37 @@ class AssistantController extends Controller
 
         $setting = AssistantSetting::query()->forTenant($tenant)->first();
 
+        $waiting = [ConversationStatus::AwaitingHuman->value, ConversationStatus::HumanAssumed->value];
+
+        $pendingIdentification = AssistantConversation::query()
+            ->forTenant($tenant)
+            ->whereNull('customer_id')
+            ->whereIn('status', $waiting)
+            ->with(['service:id,name', 'handledBy:id,name'])
+            ->orderByDesc('last_activity_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (AssistantConversation $conversation): array => $this->row($tenant, $conversation))
+            ->values()
+            ->all();
+
         $conversations = AssistantConversation::query()
             ->forTenant($tenant)
+            ->where(fn ($query) => $query->whereNotNull('customer_id')->orWhereNotIn('status', $waiting))
             ->with(['customer:id,name', 'service:id,name', 'handledBy:id,name'])
             ->orderByDesc('last_activity_at')
             ->limit(50)
             ->get()
             ->map(fn (AssistantConversation $conversation): array => $this->row($tenant, $conversation))
+            ->values()
+            ->all();
+
+        $services = Service::query()
+            ->forTenant($tenant)
+            ->where('active', true)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn (Service $service): array => ['id' => $service->getKey(), 'name' => $service->name])
             ->values()
             ->all();
 
@@ -70,7 +97,9 @@ class AssistantController extends Controller
             'settings' => $this->settingsPayload($setting),
             'canManage' => Gate::allows('manageAssistant', $tenant),
             'publicUrl' => $this->publicUrl($tenant),
+            'pendingIdentification' => $pendingIdentification,
             'conversations' => $conversations,
+            'services' => $services,
             'selected' => $selected,
             'filters' => ['conversation' => $request->integer('conversation') ?: null],
         ]);
@@ -113,6 +142,30 @@ class AssistantController extends Controller
         return to_route('tenant.assistant.index', ['conversation' => $conversation->getKey()]);
     }
 
+    /**
+     * Identify the visitor (name and phone) and send the conversation to the triage queue as one request, keeping its messages.
+     */
+    public function identify(IdentifyAssistantConversationRequest $request, TenantContext $context, AssistantOperations $operations, AssistantConversation $conversation): RedirectResponse
+    {
+        $tenant = $this->authorizeHandling($context, $conversation);
+        $service = $request->filled('service_id')
+            ? Service::query()->forTenant($tenant)->whereKey($request->integer('service_id'))->firstOrFail()
+            : null;
+
+        $serviceRequest = $operations->identifyConversation(
+            $tenant,
+            $conversation,
+            (string) $request->validated('name'),
+            (string) $request->validated('phone'),
+            $service,
+            $this->actor($request),
+        );
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Cliente identificado. Solicitação #'.$serviceRequest->getKey().' enviada à triagem.']);
+
+        return to_route('tenant.assistant.index', ['conversation' => $conversation->getKey()]);
+    }
+
     public function reply(OperatorReplyRequest $request, TenantContext $context, AssistantConversations $conversations, AssistantConversation $conversation): RedirectResponse
     {
         $this->authorizeHandling($context, $conversation);
@@ -149,6 +202,8 @@ class AssistantController extends Controller
             'handled_by' => $conversation->handledBy?->name,
             'handled_by_me' => $conversation->handled_by_user_id !== null && $conversation->handled_by_user_id === request()->user()?->getKey(),
             'handoff_reason' => $conversation->handoff_reason,
+            'identified' => $conversation->customer_id !== null,
+            'request_id' => $conversation->service_request_id,
             'summary' => $conversation->status === ConversationStatus::Active ? null : ($conversation->collected['summary'] ?? null),
             'last_activity' => $conversation->last_activity_at === null ? '' : $tenant->toLocal($conversation->last_activity_at)->format('d/m/Y H:i'),
         ];

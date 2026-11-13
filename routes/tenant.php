@@ -89,5 +89,6 @@ Route::middleware(['auth', 'tenant.resolve'])->group(function () {
     Route::post('atendimento-ia/conversas/{conversation}/assumir', [AssistantController::class, 'assume'])->whereNumber('conversation')->name('tenant.assistant.assume');
     Route::post('atendimento-ia/conversas/{conversation}/devolver', [AssistantController::class, 'returnToAi'])->whereNumber('conversation')->name('tenant.assistant.return');
     Route::post('atendimento-ia/conversas/{conversation}/encerrar', [AssistantController::class, 'close'])->whereNumber('conversation')->name('tenant.assistant.close');
+    Route::post('atendimento-ia/conversas/{conversation}/identificar', [AssistantController::class, 'identify'])->whereNumber('conversation')->name('tenant.assistant.identify');
     Route::post('atendimento-ia/conversas/{conversation}/responder', [AssistantController::class, 'reply'])->whereNumber('conversation')->name('tenant.assistant.reply');
 });
