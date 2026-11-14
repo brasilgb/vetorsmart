@@ -219,3 +219,126 @@ test('two sessions cannot reschedule the same appointment at the same time', fun
 
     expect($appointment->fresh()->starts_at->format('Y-m-d H:i'))->toBe($this->startsAt->format('Y-m-d H:i'));
 });
+
+/**
+ * Schedules one appointment for the fixture professional at $startsAt, committed through session B.
+ */
+function committedAppointment(CarbonImmutable $startsAt): Appointment
+{
+    return asSessionB(fn () => test()->scheduler->schedule(triagedRequest(), test()->professional, $startsAt, test()->actor));
+}
+
+test('a new booking and a reschedule of the same slot never both succeed', function () {
+    $existing = committedAppointment($this->startsAt);
+    $newRequest = triagedRequest();
+    $target = $this->startsAt->addHour();
+
+    asSessionA(function () use ($existing, $target) {
+        // Session A moves the existing appointment to 10:00 and keeps the professional lock until it commits.
+        $this->scheduler->reschedule($existing, $target, $this->actor);
+
+        // Session B cannot book 10:00 while A holds the lock.
+        expect(fn () => asSessionB(fn () => $this->scheduler->schedule(triagedRequest(), test()->professional, $target, test()->actor)))
+            ->toThrow(QueryException::class, 'Lock wait timeout');
+    });
+
+    // A committed: 10:00 is taken by the moved appointment, so the booking is refused and nothing is duplicated.
+    expect(fn () => asSessionB(fn () => $this->scheduler->schedule($newRequest, $this->professional, $target, $this->actor)))
+        ->toThrow(ValidationException::class);
+
+    expect(Appointment::query()->where('professional_id', $this->professional->id)->count())->toBe(1)
+        ->and($existing->fresh()->starts_at->format('H:i'))->toBe($target->format('H:i'))
+        ->and($newRequest->fresh()->status)->toBe(RequestStatus::Triaged);
+});
+
+test('two operators rescheduling the same professional cannot double-book a slot', function () {
+    $first = committedAppointment($this->startsAt);
+    $second = committedAppointment($this->startsAt->addHours(2));
+    $target = $this->startsAt->addHour();
+
+    asSessionA(function () use ($first, $second, $target) {
+        $this->scheduler->reschedule($first, $target, $this->actor);
+
+        // The second operator waits for the lock and times out while the first move is open.
+        expect(fn () => asSessionB(fn () => $this->scheduler->reschedule(freshAppointment($second), $target, test()->actor)))
+            ->toThrow(QueryException::class, 'Lock wait timeout');
+    });
+
+    // After the first move commits, the second move to the same instant is refused.
+    expect(fn () => asSessionB(fn () => $this->scheduler->reschedule(freshAppointment($second), $target, $this->actor)))
+        ->toThrow(ValidationException::class);
+
+    $startsOnTarget = Appointment::query()->where('professional_id', $this->professional->id)->where('starts_at', $target->utc()->format('Y-m-d H:i:s'))->count();
+    expect($startsOnTarget)->toBe(1)
+        ->and($second->fresh()->starts_at->format('H:i'))->toBe($this->startsAt->addHours(2)->format('H:i'));
+});
+
+test('a repeated reschedule sent during an open move keeps a single appointment at the new time', function () {
+    $appointment = committedAppointment($this->startsAt);
+    $target = $this->startsAt->addHour();
+
+    asSessionA(function () use ($appointment, $target) {
+        $this->scheduler->reschedule($appointment, $target, $this->actor);
+
+        // The duplicate submission waits for the lock instead of creating a second booking.
+        expect(fn () => asSessionB(fn () => $this->scheduler->reschedule(freshAppointment($appointment), $target, test()->actor)))
+            ->toThrow(QueryException::class, 'Lock wait timeout');
+    });
+
+    // Retry after the commit: moving to the same time is idempotent and never creates a second appointment.
+    asSessionB(fn () => $this->scheduler->reschedule(freshAppointment($appointment), $target, $this->actor));
+
+    expect(Appointment::query()->where('professional_id', $this->professional->id)->count())->toBe(1)
+        ->and($appointment->fresh()->starts_at->format('H:i'))->toBe($target->format('H:i'));
+});
+
+test('a connection lost inside the booking transaction leaves no appointment, no history and no partial state', function () {
+    $request = triagedRequest();
+    $killed = false;
+    $killedConnectionId = null;
+
+    // Once the status history of the request is written inside the booking transaction, the connection
+    // that runs it is killed from another session. The server rolls back the uncommitted transaction.
+    DB::listen(function ($query) use (&$killed, &$killedConnectionId) {
+        if ($killed || $query->connectionName !== 'mysql_second' || ! str_contains($query->sql, 'service_request_events')) {
+            return;
+        }
+
+        $killed = true;
+        $killedConnectionId = (int) DB::connection('mysql_second')->selectOne('select connection_id() as id')->id;
+        DB::connection('mysql_first')->statement('KILL CONNECTION '.$killedConnectionId);
+    });
+
+    $failure = null;
+
+    try {
+        asSessionB(fn () => $this->scheduler->schedule($request, $this->professional, $this->startsAt, $this->actor));
+    } catch (Throwable $exception) {
+        $failure = $exception;
+    }
+
+    expect($killed)->toBeTrue()
+        ->and($failure)->not->toBeNull();
+
+    // Fresh session: nothing of the failed booking was stored.
+    asSessionA(function () use ($request) {
+        expect(Appointment::query()->where('professional_id', $this->professional->id)->count())->toBe(0)
+            ->and(ServiceRequest::query()->whereKey($request->id)->value('status'))->toBe(RequestStatus::Triaged)
+            ->and(DB::table('service_request_events')->where('service_request_id', $request->id)->where('to_status', RequestStatus::Scheduled->value)->count())->toBe(0);
+    });
+
+    // Recovery: the same request books normally on a new connection.
+    DB::purge('mysql_second');
+    asSessionB(fn () => $this->scheduler->schedule($request, $this->professional, $this->startsAt, $this->actor));
+
+    expect(Appointment::query()->where('professional_id', $this->professional->id)->count())->toBe(1)
+        ->and($request->fresh()->status)->toBe(RequestStatus::Scheduled);
+});
+
+/**
+ * The appointment as stored right now, read through the current default connection.
+ */
+function freshAppointment(Appointment $appointment): Appointment
+{
+    return Appointment::query()->whereKey($appointment->getKey())->firstOrFail();
+}

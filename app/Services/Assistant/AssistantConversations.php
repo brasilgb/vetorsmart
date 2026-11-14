@@ -40,6 +40,7 @@ class AssistantConversations
                 ->forTenant($tenant)
                 ->where('session_hash', $this->hash($token))
                 ->where('status', '!=', ConversationStatus::Closed->value)
+                ->where('retention_until', '>', now())
                 ->first();
 
             if ($existing !== null) {
@@ -72,9 +73,11 @@ class AssistantConversations
             return null;
         }
 
+        // A conversation past its retention period is no longer reachable, even before the purge command removes it.
         return AssistantConversation::query()
             ->forTenant($tenant)
             ->where('session_hash', $this->hash($token))
+            ->where('retention_until', '>', now())
             ->first();
     }
 

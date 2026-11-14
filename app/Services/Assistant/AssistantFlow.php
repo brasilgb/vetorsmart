@@ -342,8 +342,15 @@ class AssistantFlow
 
             return;
         } catch (\Throwable $exception) {
-            Log::error('assistant.booking_failed', ['tenant_id' => $tenant->getKey(), 'error' => $exception::class]);
-            $this->transfer($tenant, $conversation, 'Falha técnica ao concluir o agendamento.');
+            // The reference links the operator's handoff to this log entry. Neither carries the SQL or the data.
+            $reference = strtoupper(Str::random(8));
+            Log::error('assistant.booking_failed', [
+                'tenant_id' => $tenant->getKey(),
+                'conversation_id' => $conversation->getKey(),
+                'reference' => $reference,
+                'error' => $exception::class,
+            ]);
+            $this->transfer($tenant, $conversation, "Falha técnica ao concluir o agendamento (ref. {$reference}). A solicitação foi preservada na triagem; nenhum horário foi reservado.");
             $this->say($conversation, 'Não consegui concluir o agendamento agora. Vou transferir você para um atendente, que continua o atendimento sem você repetir os dados.');
 
             return;

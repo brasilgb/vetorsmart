@@ -55,7 +55,7 @@ class AssistantController extends Controller
             return response()->json(['available' => false, 'message' => 'O atendimento virtual não está disponível agora. Use os contatos da empresa.'], 503);
         }
 
-        $started = $conversations->start($tenant, $setting, $request->cookie($this->cookieName()));
+        $started = $conversations->start($tenant, $setting, $this->visitorToken($request));
 
         if ($started['created']) {
             $flow->greet($tenant, $setting, $started['conversation']);
@@ -95,7 +95,7 @@ class AssistantController extends Controller
             return response()->json(['available' => false, 'message' => 'O atendimento virtual não está disponível agora.'], 503);
         }
 
-        $conversation = $conversations->findByToken($tenant, $request->cookie($this->cookieName()));
+        $conversation = $conversations->findByToken($tenant, $this->visitorToken($request));
 
         if ($conversation === null || $conversation->status === ConversationStatus::Closed) {
             return response()->json(['message' => 'Conversa não encontrada. Atualize a página para iniciar um novo atendimento.'], 409);
@@ -119,11 +119,21 @@ class AssistantController extends Controller
         return $site === null ? null : $site['domain']->tenant;
     }
 
+    /**
+     * The visitor's token from the cookie. Only a plain string counts: a crafted cookie sent as an array is ignored.
+     */
+    private function visitorToken(Request $request): ?string
+    {
+        $token = $request->cookie($this->cookieName());
+
+        return is_string($token) ? $token : null;
+    }
+
     private function conversationFor(Request $request, WebsiteResolver $resolver, AssistantConversations $conversations): ?AssistantConversation
     {
         $tenant = $this->tenantFor($request, $resolver);
 
-        return $tenant === null ? null : $conversations->findByToken($tenant, $request->cookie($this->cookieName()));
+        return $tenant === null ? null : $conversations->findByToken($tenant, $this->visitorToken($request));
     }
 
     private function available(?AssistantSetting $setting): bool

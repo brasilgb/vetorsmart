@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\AppointmentStatus;
 use App\Enums\RequestStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Operations\ReasonRequest;
@@ -20,6 +21,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -39,27 +41,39 @@ class AgendaController extends Controller
 
         // Every status is listed so that completed, not performed and cancelled visits keep their history on the calendar.
         // Only a scheduled appointment can still be rescheduled or cancelled (see can_change).
-        $appointments = Appointment::query()
-            ->forTenant($tenant)
-            ->where('starts_at', '<', $to->utc())
-            ->where('ends_at', '>', $from->utc())
-            ->with(['professional:id,name', 'serviceRequest.customer:id,name', 'serviceRequest.service:id,name'])
-            ->orderBy('starts_at')
-            ->get()
-            ->map(fn (Appointment $appointment): array => [
-                'id' => $appointment->id,
-                'request_id' => $appointment->service_request_id,
-                'date' => $tenant->toLocal($appointment->starts_at)->format('Y-m-d'),
-                'time' => $tenant->toLocal($appointment->starts_at)->format('H:i'),
-                'ends' => $tenant->toLocal($appointment->ends_at)->format('H:i'),
-                'professional' => $appointment->professional?->name,
-                'customer' => $appointment->serviceRequest?->customer?->name,
-                'service' => $appointment->serviceRequest?->service?->name,
-                'status' => $appointment->status->value,
-                'status_label' => $appointment->status->label(),
-                'can_change' => $appointment->status->isActive(),
-                'starts_at' => $tenant->toLocal($appointment->starts_at)->format('Y-m-d H:i'),
-            ])
+        // A read-only list: one joined query returns the names shown, instead of hydrating a model and two relations per row.
+        // The company is stated in the query itself, because this read does not go through the model scope.
+        $appointments = DB::table('appointments as a')
+            ->join('service_requests as r', 'r.id', '=', 'a.service_request_id')
+            ->leftJoin('professionals as p', 'p.id', '=', 'a.professional_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'r.customer_id')
+            ->leftJoin('services as sv', 'sv.id', '=', 'r.service_id')
+            ->where('a.tenant_id', $tenant->getKey())
+            ->where('a.starts_at', '<', $to->utc())
+            ->where('a.ends_at', '>', $from->utc())
+            ->orderBy('a.starts_at')
+            ->get(['a.id', 'a.service_request_id', 'a.starts_at', 'a.ends_at', 'a.status', 'p.name as professional', 'c.name as customer', 'sv.name as service'])
+            ->map(function (object $row) use ($tenant): array {
+                $status = AppointmentStatus::from($row->status);
+                // The local instants are converted once per row, not once per field.
+                $startsLocal = $tenant->toLocal(CarbonImmutable::parse($row->starts_at, 'UTC'));
+                $endsLocal = $tenant->toLocal(CarbonImmutable::parse($row->ends_at, 'UTC'));
+
+                return [
+                    'id' => $row->id,
+                    'request_id' => $row->service_request_id,
+                    'date' => $startsLocal->format('Y-m-d'),
+                    'time' => $startsLocal->format('H:i'),
+                    'ends' => $endsLocal->format('H:i'),
+                    'professional' => $row->professional,
+                    'customer' => $row->customer,
+                    'service' => $row->service,
+                    'status' => $status->value,
+                    'status_label' => $status->label(),
+                    'can_change' => $status->isActive(),
+                    'starts_at' => $startsLocal->format('Y-m-d H:i'),
+                ];
+            })
             ->values()
             ->all();
 
@@ -98,7 +112,7 @@ class AgendaController extends Controller
                 ->get()
                 ->map(fn (ServiceRequest $serviceRequest): array => [
                     'id' => $serviceRequest->id,
-                    'label' => '#'.$serviceRequest->id.' · '.($serviceRequest->customer?->name ?? '—').' · '.($serviceRequest->service?->name ?? '—'),
+                    'label' => '#'.$serviceRequest->id.' · '.($serviceRequest->customer->name ?? '—').' · '.($serviceRequest->service->name ?? '—'),
                     'service_id' => $serviceRequest->service_id,
                 ])
                 ->values()

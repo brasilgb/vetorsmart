@@ -921,11 +921,17 @@ test('a failure while writing the appointment rolls back the request and transfe
     expect($reply)->toContain('transferir você para um atendente')
         ->not->toContain('Agendamento confirmado')
         ->not->toContain('SQLSTATE')
-        ->not->toContain('appointments')
-        ->and(ServiceRequest::query()->count())->toBe(0)
+        ->not->toContain('appointments');
+
+    // The booking request written inside the failed transaction is rolled back. The only request left is the
+    // triage handoff the team receives (identified customer), complete and not scheduled: no partial rows.
+    $handoff = ServiceRequest::query()->sole();
+    expect($handoff->status)->toBe(RequestStatus::Triaged)
+        ->and($handoff->origin)->toBe(RequestOrigin::Ai)
         ->and(Appointment::query()->count())->toBe(0);
 
     $conversation = AssistantConversation::query()->sole();
     expect($conversation->appointment_id)->toBeNull()
+        ->and($conversation->service_request_id)->toBe($handoff->getKey())
         ->and($conversation->state)->not->toBe(AssistantState::Done);
 });

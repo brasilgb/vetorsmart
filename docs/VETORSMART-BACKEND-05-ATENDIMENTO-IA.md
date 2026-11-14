@@ -187,6 +187,8 @@ Cobertura dos 15 testes obrigatórios: 1 conversa completa, 2 serviço existente
 
 Esta seção atualiza e substitui as regras das seções 5 e 14 nos pontos abaixo.
 
+> **Atualização (VETORSMART-BACKEND-05.3, seção 17):** os itens 16.4 (429 "não verificado"), 16.6 (contagens de testes) e 16.7 (homologação, concorrência e link de privacidade) estão superados pela seção 17.
+
 ### 16.1 Encaminhamento humano
 
 - O visitante pode pedir atendente antes de se identificar. A conversa vai para a fila de **pendentes de identificação** do painel, separada da lista de conversas e das solicitações.
@@ -238,3 +240,70 @@ Esta seção atualiza e substitui as regras das seções 5 e 14 nos pontos abaix
 - **Concorrência**: os testes de MySQL rodam no banco de testes local, em sequência de sessões. Não houve carga paralela com vários processos simultâneos.
 - Provedor de IA: continua `none`. Nenhum provedor pago integrado.
 - Nenhum commit, deploy ou alteração de infraestrutura compartilhada.
+
+## 17. Homologação final do atendimento (VETORSMART-BACKEND-05.3)
+
+**Escopo:** o correio `correio.md` (BACKEND-05.3) pede homologação real no navegador, concorrência com processos simultâneos, falhas controladas, privacidade, limites HTTP 429 e atualização da documentação. Nada foi commitado nem implantado na VPS.
+
+### 17.1 Defeito corrigido: dupla reserva sob concorrência real
+
+- **Sintoma (achado pela concorrência com processos separados):** seis processos PHP reservando o mesmo profissional no mesmo horário gravaram **seis** agendamentos.
+- **Causa:** no MySQL (InnoDB, REPEATABLE READ), a transação de `AppointmentScheduler::schedule` fazia uma leitura comum antes de travar o profissional. Essa leitura fixa o snapshot da transação. Quando a trava era obtida, a verificação de conflito lia o snapshot antigo e não enxergava o agendamento que outro processo acabara de gravar.
+- **Correção:** `appointmentOverlaps` e a checagem de bloqueios passam a usar leitura atual (`lockForUpdate`) quando chamadas dentro da transação com trava (`ensureBookable`, em agendar e remarcar, e `block`). A disponibilidade, que é só leitura, continua sem trava.
+- **Por que os testes anteriores não pegavam:** as sessões eram sequenciais. Uma sessão só enxergava a outra depois do commit, então o snapshot não era problema.
+
+### 17.2 Concorrência real (processos separados)
+
+- `tests/Concurrency/parallel_booking.php` (driver) e `tests/Concurrency/worker.php` (uma tentativa por processo, com sua própria conexão MySQL).
+- Recusa rodar fora de banco cujo nome termine em `_test`. Dados marcados `[CONCORRENCIA]`, removidos ao final.
+- Cenário A: 6 solicitações diferentes disputando o mesmo profissional e horário. Esperado: 1 agendamento e 5 recusas limpas.
+- Cenário B: a mesma solicitação enviada 6 vezes (envio duplicado). Esperado: 1 agendamento e 1 solicitação.
+- Comando: `DB_CONNECTION=mysql DB_DATABASE=vetorsmart_test php tests/Concurrency/parallel_booking.php`
+- Resultado: **3 de 3 execuções aprovadas** após a correção (antes da correção, cenário A falhava com 6 agendamentos).
+- Suíte Pest de concorrência (`MysqlConcurrencyTest`, com `VETORSMART_CONCURRENCY=1`): **5 de 5 aprovados**.
+
+### 17.3 Falhas controladas
+
+- Teste `a failure while writing the appointment rolls back...`: uma exceção de banco na gravação do agendamento. Verificado: nenhum agendamento, nenhuma confirmação ao visitante, sem SQL exposto ao visitante, conversa transferida.
+- Ajuste da expectativa do teste: a transação com a solicitação é desfeita, mas a **solicitação de encaminhamento à equipe** (cliente identificado, serviço escolhido, origem IA, status triada) é gravada de propósito pelo fluxo de transferência (seção 5). Ela é um registro completo, não parcial. O teste agora afirma exatamente isso, em vez de exigir zero solicitações.
+- Não coberto: queda real do MySQL no meio de uma transação. A falha foi simulada na camada de agendamento.
+
+### 17.4 Homologação no navegador (Chromium real)
+
+- Ambiente: banco de testes (`vetorsmart_test`, MySQL 8.4.11 em container isolado, porta somente em `127.0.0.1`), servidor local na porta 8010, empresa semeada com site publicado, um serviço, um profissional com jornada de 08:00 às 18:00 e assistente ativado. Domínio resolvido localmente pelo navegador.
+- Viewports: desktop 1440x900 e mobile 390x844.
+- **33 de 33 verificações aprovadas** nos dois viewports, cobrindo: página pública e widget; aviso de privacidade antes de pedir dados; sem política publicada, texto sem link inventado; separação das responsabilidades da plataforma e da empresa; sem rolagem horizontal; campo e botão visíveis; reconhecimento do serviço; horários reais; confirmação após "sim"; continuidade após recarregar; disputa de horário entre dois visitantes (o segundo não é confirmado e recebe alternativas reais); encaminhamento humano sem pedir identificação; nenhum erro de página ou de console.
+- Limite 429: na 30ª requisição do minuto a rota responde 429 (verificado no navegador).
+- Capturas e relatório JSON ficaram fora do repositório (pasta de rascunho da sessão). Não há capturas versionadas.
+- **Fora da homologação de navegador:** as etapas do painel (identificação posterior pelo operador, triagem, execução e conclusão). Elas estão cobertas por testes de HTTP e de serviço, não por navegador.
+
+### 17.5 Privacidade
+
+- O widget exibe o aviso antes de pedir nome e telefone e informa que a empresa é responsável pelo tratamento dos dados e que a plataforma fornece só a ferramenta.
+- Cada empresa cadastra a URL da política (`privacy_policy_url`, somente https, validada). Com URL, o link abre em nova aba. Sem URL, o texto diz que a empresa ainda não publicou política e não exibe nenhum link.
+- O texto não se apresenta como garantia de conformidade com a LGPD.
+- Correção desta seção: o campo de política **existe** (ver seção 7 e a tela de configurações). A seção 16.7 dizia o contrário.
+
+### 17.6 Limites e segurança
+
+- Rotas públicas: `throttle:assistant-public`, 30 requisições por minuto por IP e host. Testes confirmam o 429, a recuperação após a janela e a independência entre empresas (outro host não é bloqueado).
+- Proteções existentes preservadas.
+
+### 17.7 Testes desta etapa
+
+- Suíte completa com concorrência habilitada (`VETORSMART_CONCURRENCY=1`): **367 de 367 aprovados**, 0 falhas.
+- Atendimento e operações: 156 aprovados, 5 pulados (concorrência, sem a variável).
+- Linha de base antes desta etapa: 40 aprovados e 3 falhas (duas por falta do build do Vite, uma por expectativa errada do rollback).
+- Build do front (`npm run build`) gerado para os testes de tela. `public/build` é ignorado pelo git.
+- `vendor/bin/pint --test`: aprovado nos arquivos alterados. PHPStan: sem erros em `AppointmentScheduler` e `tests/Concurrency`.
+
+### 17.8 Pendências e riscos restantes
+
+- **Migração:** nenhuma migração nova nesta etapa.
+- **Commit e deploy:** não realizados (restrição do correio). As alterações estão sem commit, junto com `composer.lock`, que já vinha modificado antes desta etapa.
+- **Queda real de MySQL** no meio da transação: não simulada.
+- **Carga:** 6 processos simultâneos foram testados. Não há teste de carga de produção.
+- **Painel no navegador:** triagem, execução e conclusão precisam de homologação com login real.
+- **Produto:** a política de privacidade é responsabilidade de cada empresa; a plataforma não redige texto jurídico.
+- **Provedor de IA:** continua `none`. Nenhum provedor pago foi integrado.
+- **Ambiente:** o container `vetorsmart-test-mysql` e o servidor de teste na porta 8010 foram usados só para esta homologação e devem ser parados ao final.

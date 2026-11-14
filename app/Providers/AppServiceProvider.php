@@ -8,15 +8,19 @@ use App\Services\Assistant\Providers\NullAssistantProvider;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Websites\DnsDomainVerifier;
 use App\Services\Websites\DomainVerifier;
+use App\Support\DatabaseGuard;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -42,6 +46,50 @@ class AppServiceProvider extends ServiceProvider
         $this->configureGates();
         $this->configureTrustedProxies();
         $this->configureRateLimiters();
+        $this->guardDatabaseSafety();
+    }
+
+    /**
+     * Automated tests and destructive console commands may only touch a database that passes App\Support\DatabaseGuard:
+     * local host, a name ending in _test, and an explicit confirmation of that same name in configuration.
+     */
+    protected function guardDatabaseSafety(): void
+    {
+        $connection = (string) config('database.default');
+        $settings = (array) config("database.connections.{$connection}", []);
+        $environment = $this->app->environment();
+        $database = isset($settings['database']) ? (string) $settings['database'] : null;
+
+        $refusal = DatabaseGuard::refusal(
+            environment: $environment,
+            runningTests: $this->app->runningUnitTests(),
+            driver: (string) ($settings['driver'] ?? ''),
+            host: isset($settings['host']) ? (string) $settings['host'] : null,
+            database: $database,
+            explicitTestDatabase: config('platform.test_database'),
+            explicitDestructiveDatabase: config('platform.destructive_database'),
+        );
+
+        if ($refusal !== null) {
+            throw new RuntimeException($refusal);
+        }
+
+        Event::listen(CommandStarting::class, function (CommandStarting $event) use ($environment, $settings, $database): void {
+            $refusal = DatabaseGuard::refusal(
+                environment: $environment,
+                runningTests: false,
+                driver: (string) ($settings['driver'] ?? ''),
+                host: isset($settings['host']) ? (string) $settings['host'] : null,
+                database: $database,
+                explicitTestDatabase: null,
+                explicitDestructiveDatabase: config('platform.destructive_database'),
+                command: $event->command,
+            );
+
+            if ($refusal !== null) {
+                throw new RuntimeException($refusal);
+            }
+        });
     }
 
     /**

@@ -72,7 +72,7 @@ class AppointmentScheduler
 
             $request->professional_id = $professional->getKey();
             $request->save();
-            $request->transitionTo(RequestStatus::Scheduled, $actor, 'Agendado para '.$startsAt->format('d/m/Y H:i').'.');
+            $request->transitionTo(RequestStatus::Scheduled, $actor, 'Agendado para '.$startsAt->setTimezone($tenant->timezone)->format('d/m/Y H:i').'.');
 
             $this->auditLogger->record('appointment.created', $request->tenant, $appointment, [
                 'service_request_id' => $request->getKey(),
@@ -156,7 +156,7 @@ class AppointmentScheduler
         return DB::transaction(function () use ($tenant, $professional, $startsAt, $endsAt, $reason, $actor): ProfessionalBlock {
             $professional = Professional::query()->forTenant($tenant)->whereKey($professional->getKey())->lockForUpdate()->firstOrFail();
 
-            if ($this->appointmentOverlaps($professional, $startsAt, $endsAt, null)) {
+            if ($this->appointmentOverlaps($professional, $startsAt, $endsAt, null, current: true)) {
                 throw ValidationException::withMessages(['starts_at' => ['Há agendamentos ativos nesse período.']]);
             }
 
@@ -241,7 +241,7 @@ class AppointmentScheduler
             throw ValidationException::withMessages(['starts_at' => ['Horário fora da jornada do profissional.']]);
         }
 
-        if ($this->hasConflict($professional, $startsAt, $endsAt, $ignoreAppointmentId)) {
+        if ($this->hasConflict($professional, $startsAt, $endsAt, $ignoreAppointmentId, current: true)) {
             throw ValidationException::withMessages(['starts_at' => ['Este horário já está ocupado para o profissional.']]);
         }
     }
@@ -270,17 +270,23 @@ class AppointmentScheduler
             ->exists();
     }
 
-    private function hasConflict(Professional $professional, CarbonImmutable $startsAt, CarbonImmutable $endsAt, ?int $ignoreAppointmentId): bool
+    /**
+     * $current must be true inside a transaction that holds the professional lock. Under REPEATABLE READ a plain
+     * SELECT reads the snapshot taken when the transaction first read, which can predate a booking committed by
+     * another session while this one was waiting for the lock. A locking read sees the latest committed rows.
+     */
+    private function hasConflict(Professional $professional, CarbonImmutable $startsAt, CarbonImmutable $endsAt, ?int $ignoreAppointmentId, bool $current = false): bool
     {
-        return $this->appointmentOverlaps($professional, $startsAt, $endsAt, $ignoreAppointmentId)
+        return $this->appointmentOverlaps($professional, $startsAt, $endsAt, $ignoreAppointmentId, $current)
             || ProfessionalBlock::query()
                 ->where('professional_id', $professional->getKey())
                 ->where('starts_at', '<', $endsAt)
                 ->where('ends_at', '>', $startsAt)
+                ->when($current, fn ($query) => $query->lockForUpdate())
                 ->exists();
     }
 
-    private function appointmentOverlaps(Professional $professional, CarbonImmutable $startsAt, CarbonImmutable $endsAt, ?int $ignoreAppointmentId): bool
+    private function appointmentOverlaps(Professional $professional, CarbonImmutable $startsAt, CarbonImmutable $endsAt, ?int $ignoreAppointmentId, bool $current = false): bool
     {
         return Appointment::query()
             ->where('professional_id', $professional->getKey())
@@ -288,6 +294,7 @@ class AppointmentScheduler
             ->when($ignoreAppointmentId, fn ($query, int $id) => $query->whereKeyNot($id))
             ->where('starts_at', '<', $endsAt)
             ->where('ends_at', '>', $startsAt)
+            ->when($current, fn ($query) => $query->lockForUpdate())
             ->exists();
     }
 }

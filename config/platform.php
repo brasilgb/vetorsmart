@@ -18,6 +18,13 @@ return [
     'tenant_base_domain' => env('PLATFORM_TENANT_BASE_DOMAIN', 'vetorsmart.test'),
 
     /*
+    | Explicit confirmation of the database used by automated tests and by destructive commands. Both must repeat the
+    | exact database name; the name alone is never enough (see App\Support\DatabaseGuard).
+    */
+    'test_database' => env('VETORSMART_TEST_DATABASE'),
+    'destructive_database' => env('VETORSMART_DESTRUCTIVE_DATABASE'),
+
+    /*
     | Scheme used in public site addresses. Use https in production.
     */
     'public_scheme' => env('PLATFORM_PUBLIC_SCHEME', 'https'),
