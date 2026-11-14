@@ -18,6 +18,7 @@ type Settings = {
     commercial_info: string;
     guidance: string;
     handoff_conditions: string;
+    privacy_policy_url: string;
     retention_days: number;
 };
 
@@ -186,6 +187,10 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
 
                         <Field id="handoff_conditions" label="Condições para encaminhar a um humano" error={form.errors.handoff_conditions}>
                             <textarea id="handoff_conditions" rows={2} value={form.data.handoff_conditions} disabled={disabled} onChange={(e) => form.setData('handoff_conditions', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                        </Field>
+
+                        <Field id="privacy_policy_url" label="Link da política de privacidade (https)" error={form.errors.privacy_policy_url}>
+                            <Input id="privacy_policy_url" type="url" placeholder="https://www.suaempresa.com.br/privacidade" value={form.data.privacy_policy_url} disabled={disabled} onChange={(e) => form.setData('privacy_policy_url', e.target.value)} className="h-10" />
                         </Field>
 
                         {canManage && (

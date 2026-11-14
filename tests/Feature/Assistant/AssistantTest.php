@@ -22,16 +22,20 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\AppointmentScheduler;
 use App\Services\Assistant\AssistantConversations;
 use App\Services\Assistant\AssistantOperations;
 use App\Services\Assistant\AssistantProvider;
 use Carbon\CarbonImmutable;
 use Illuminate\Cookie\CookieValuePrefix;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Testing\TestResponse;
+use Mockery;
+use PDOException;
 
 const ASSISTANT_HOST = 'clima-total.vetorsmart.test';
 
@@ -840,4 +844,88 @@ test('the team completes the site request from the panel, and another company ca
 
     expect($request->fresh()->status)->toBe(RequestStatus::Completed)
         ->and(Appointment::query()->sole()->status)->toBe(AppointmentStatus::Completed);
+});
+
+test('the visitor page links the company privacy policy when it is set, and says so when it is not', function () {
+    $this->actingAs($this->owner)
+        ->patch(route('tenant.assistant.update'), [
+            'enabled' => true,
+            'retention_days' => 30,
+            'privacy_policy_url' => 'https://clima-total.com.br/privacidade',
+        ])
+        ->assertRedirect();
+
+    visitAssistant('GET', '/atendimento')->assertOk()
+        ->assertSee('href="https://clima-total.com.br/privacidade"', false)
+        ->assertSee('Política de privacidade de Clima Total', false);
+
+    $this->actingAs($this->owner)
+        ->patch(route('tenant.assistant.update'), ['enabled' => true, 'retention_days' => 30, 'privacy_policy_url' => ''])
+        ->assertRedirect();
+
+    visitAssistant('GET', '/atendimento')->assertOk()
+        ->assertSee('ainda não publicou uma política de privacidade', false)
+        ->assertDontSee('Política de privacidade de Clima Total', false);
+});
+
+test('the privacy policy link must be an https address', function () {
+    foreach (['http://clima-total.com.br/privacidade', 'javascript:alert(1)'] as $url) {
+        $this->actingAs($this->owner)
+            ->patch(route('tenant.assistant.update'), ['enabled' => true, 'retention_days' => 30, 'privacy_policy_url' => $url])
+            ->assertSessionHasErrors('privacy_policy_url');
+    }
+
+    expect($this->setting->fresh()->privacy_policy_url)->toBeNull();
+});
+
+test('the public assistant answers 429 after 30 requests per minute from one visitor and recovers after the window', function () {
+    for ($attempt = 1; $attempt <= 30; $attempt++) {
+        expect(visitAssistant('GET', '/atendimento/mensagens')->status())->not->toBe(429);
+    }
+
+    visitAssistant('GET', '/atendimento/mensagens')->assertStatus(429);
+
+    $this->travel(61)->seconds();
+
+    expect(visitAssistant('GET', '/atendimento/mensagens')->status())->not->toBe(429);
+});
+
+test('the limit of one company host does not block the visitors of another company', function () {
+    for ($attempt = 1; $attempt <= 30; $attempt++) {
+        visitAssistant('GET', '/atendimento/mensagens');
+    }
+
+    visitAssistant('GET', '/atendimento/mensagens')->assertStatus(429);
+
+    expect(visitAssistant('GET', '/atendimento/mensagens', [], 'outra-empresa.vetorsmart.test')->status())->not->toBe(429);
+});
+
+test('a failure while writing the appointment rolls back the request and transfers the visitor without technical details', function () {
+    startAssistant();
+    sayToAssistant('limpeza');
+    sayToAssistant('Maria Souza 11 98765-4321');
+    sayToAssistant('amanhã');
+    sayToAssistant('1');
+
+    $scheduler = Mockery::mock(AppointmentScheduler::class);
+    $scheduler->shouldReceive('schedule')->once()->andThrow(new QueryException(
+        'mysql',
+        'insert into `appointments` (`tenant_id`, `professional_id`) values (?, ?)',
+        [1, 2],
+        new PDOException('SQLSTATE[HY000]: General error: 2006 MySQL server has gone away'),
+    ));
+    app()->instance(AppointmentScheduler::class, $scheduler);
+
+    $reply = lastAssistantText(sayToAssistant('sim'));
+
+    expect($reply)->toContain('transferir você para um atendente')
+        ->not->toContain('Agendamento confirmado')
+        ->not->toContain('SQLSTATE')
+        ->not->toContain('appointments')
+        ->and(ServiceRequest::query()->count())->toBe(0)
+        ->and(Appointment::query()->count())->toBe(0);
+
+    $conversation = AssistantConversation::query()->sole();
+    expect($conversation->appointment_id)->toBeNull()
+        ->and($conversation->state)->not->toBe(AssistantState::Done);
 });

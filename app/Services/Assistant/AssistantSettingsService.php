@@ -17,7 +17,7 @@ class AssistantSettingsService
     /** @var list<string> */
     private const array EDITABLE = [
         'enabled', 'display_name', 'greeting', 'presentation', 'service_region',
-        'business_hours_text', 'commercial_info', 'guidance', 'handoff_conditions', 'retention_days',
+        'business_hours_text', 'commercial_info', 'guidance', 'handoff_conditions', 'privacy_policy_url', 'retention_days',
     ];
 
     public function __construct(private AuditLogger $auditLogger) {}

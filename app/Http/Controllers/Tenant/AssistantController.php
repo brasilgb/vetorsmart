@@ -224,6 +224,7 @@ class AssistantController extends Controller
             'commercial_info' => $setting?->commercial_info ?? '',
             'guidance' => $setting?->guidance ?? '',
             'handoff_conditions' => $setting?->handoff_conditions ?? '',
+            'privacy_policy_url' => $setting?->privacy_policy_url ?? '',
             'retention_days' => $setting?->retention_days ?? (int) config('assistant.default_retention_days'),
         ];
     }

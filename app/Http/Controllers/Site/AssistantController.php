@@ -37,6 +37,7 @@ class AssistantController extends Controller
             'companyName' => $setting?->display_name ?: $tenant->name,
             'available' => $this->available($setting),
             'contact' => $content['contact'] ?? [],
+            'privacyPolicyUrl' => $setting?->privacy_policy_url,
             'accent' => in_array($content['accent_color'] ?? '', ['#0F172A', '#1E3A5F', '#2563EB', '#06B6D4'], true) ? $content['accent_color'] : '#2563EB',
             'siteUrl' => config('platform.public_scheme', 'https').'://'.$site['domain']->hostname.'/',
         ]);

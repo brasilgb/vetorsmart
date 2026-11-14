@@ -48,6 +48,9 @@
         .contacts { display: flex; flex-wrap: wrap; gap: 8px; }
         .contacts a { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); color: var(--text); text-decoration: none; }
         .loading { color: var(--muted); font-size: .9rem; }
+        .privacy { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: .85rem; color: var(--muted); }
+        .privacy p { margin: 4px 0 0; }
+        .privacy a { color: var(--accent); }
         @media (max-width: 420px) { .msg { max-width: 92%; } }
     </style>
 </head>
@@ -65,6 +68,16 @@
     </header>
 
     @if ($available)
+        <section class="privacy" aria-labelledby="privacy-title">
+            <p id="privacy-title"><strong>Seus dados</strong></p>
+            <p>Nome e telefone informados aqui são usados por {{ $companyName }} somente para este atendimento e para o agendamento.</p>
+            @if (filled($privacyPolicyUrl))
+                <p><a href="{{ $privacyPolicyUrl }}" target="_blank" rel="noopener noreferrer">Política de privacidade de {{ $companyName }}</a></p>
+            @else
+                <p>{{ $companyName }} ainda não publicou uma política de privacidade neste site. Para saber como seus dados são tratados, fale com a empresa pelos seus contatos.</p>
+            @endif
+            <p>A VetorSmart fornece apenas a ferramenta de atendimento. A empresa é responsável pelo tratamento dos seus dados.</p>
+        </section>
         <main id="messages" aria-live="polite" aria-label="Conversa">
             <p class="loading" id="loading">Iniciando atendimento…</p>
         </main>

@@ -26,6 +26,7 @@ class UpdateAssistantSettingsRequest extends FormRequest
             'commercial_info' => ['nullable', 'string', 'max:2000'],
             'guidance' => ['nullable', 'string', 'max:2000'],
             'handoff_conditions' => ['nullable', 'string', 'max:1000'],
+            'privacy_policy_url' => ['nullable', 'string', 'url:https', 'max:500'],
             'retention_days' => ['required', 'integer', 'min:1', 'max:365'],
         ];
     }
