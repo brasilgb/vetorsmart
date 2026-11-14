@@ -80,7 +80,7 @@ class AssistantText
             return null;
         }
 
-        return sprintf('%02d:%02d', (int) $match[1], isset($match[2]) && $match[2] !== '' ? (int) $match[2] : 0);
+        return sprintf('%02d:%02d', (int) $match[1], isset($match[2]) ? (int) $match[2] : 0);
     }
 
     /**
@@ -152,7 +152,7 @@ class AssistantText
             return null;
         }
 
-        $year = isset($match[3]) && $match[3] !== '' ? (int) $match[3] : (int) $today->year;
+        $year = isset($match[3]) ? (int) $match[3] : (int) $today->year;
         $month = (int) $match[2];
         $day = (int) $match[1];
 

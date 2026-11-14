@@ -82,7 +82,7 @@ class ServiceRequestController extends Controller
                 'description' => $record->description,
                 'origin' => $record->origin->label(),
                 'closing_reason' => $record->closing_reason,
-                'customer_phone' => $record->customer?->whatsapp ?? $record->customer?->phone,
+                'customer_phone' => $record->customer->whatsapp ?? $record->customer->phone,
                 'service_id' => $record->service_id,
                 'priority_value' => $record->priority->value,
                 'duration_minutes' => $record->service?->duration_minutes,
@@ -205,10 +205,10 @@ class ServiceRequestController extends Controller
      */
     private function statusOptions(): array
     {
-        return collect(RequestStatus::cases())
-            ->map(fn (RequestStatus $status): array => ['value' => $status->value, 'label' => $status->label()])
-            ->values()
-            ->all();
+        return array_map(
+            fn (RequestStatus $status): array => ['value' => $status->value, 'label' => $status->label()],
+            RequestStatus::cases(),
+        );
     }
 
     private function findRequest(TenantContext $context, int $serviceRequestId): ServiceRequest

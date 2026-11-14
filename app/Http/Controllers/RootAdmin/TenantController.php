@@ -112,13 +112,13 @@ class TenantController extends Controller
                     'name' => $website->name,
                     'status' => $website->status->value,
                 ],
-                'assistant_enabled' => (bool) ($assistant?->enabled ?? false),
+                'assistant_enabled' => (bool) ($assistant->enabled ?? false),
             ],
             'history' => $history->map(fn (AuditLog $entry): array => [
                 'id' => $entry->id,
                 'action' => $entry->action,
                 'user' => $entry->user?->name,
-                'created_at' => $entry->created_at?->format('d/m/Y H:i'),
+                'created_at' => $entry->created_at->format('d/m/Y H:i'),
             ]),
             'settings' => $tenant->settings === null ? null : [
                 'business_name' => $tenant->settings->business_name,

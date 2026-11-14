@@ -129,18 +129,18 @@ class AssistantConversations
      */
     public function messagesAfter(AssistantConversation $conversation, int $afterId = 0): array
     {
-        return $conversation->messages()
+        return array_values($conversation->messages()
             ->where('id', '>', $afterId)
             ->get()
             ->map(fn (AssistantMessage $message): array => [
-                'id' => $message->getKey(),
+                'id' => (int) $message->getKey(),
                 'role' => $message->role,
                 'role_label' => AssistantMessageRole::from($message->role)->label(),
                 'body' => $message->body,
                 'at' => $message->created_at?->format('H:i') ?? '',
             ])
             ->values()
-            ->all();
+            ->all());
     }
 
     /**
@@ -252,8 +252,8 @@ class AssistantConversations
             $lines[] = 'Motivo: '.$reason;
         }
 
-        $lines[] = 'Serviço: '.($conversation->service?->name ?? 'não informado').'.';
-        $lines[] = 'Cliente: '.($conversation->customer?->name ?? 'não identificado').'.';
+        $lines[] = 'Serviço: '.($conversation->service->name ?? 'não informado').'.';
+        $lines[] = 'Cliente: '.($conversation->customer->name ?? 'não identificado').'.';
 
         if (filled($conversation->collected['preferred_time'] ?? null)) {
             $lines[] = 'Horário preferido pelo cliente: '.$conversation->collected['preferred_time'].'.';

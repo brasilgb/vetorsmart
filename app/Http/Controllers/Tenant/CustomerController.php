@@ -82,7 +82,7 @@ class CustomerController extends Controller
      * Requests of this customer with their appointments, cancellations and last history note.
      * Read from the existing records (no copies), most recent activity first, 10 per page.
      *
-     * @return LengthAwarePaginator<int, array<string, mixed>>
+     * @return LengthAwarePaginator<int, array{id: int, service: string|null, priority: string, status: string, professional: string|null, created_at: string, closed_at: string|null, closing_reason: string|null, appointments: array<int, array{starts_at: string, professional: string|null, status: string, cancelling_reason: string|null, cancelled_by: string|null, cancelled_at: string|null}>, last_event: array{note: string|null, user: string|null, at: string}|null}>
      */
     private function history(Request $request, TenantContext $context, Customer $customer): LengthAwarePaginator
     {

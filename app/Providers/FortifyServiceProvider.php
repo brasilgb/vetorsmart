@@ -73,18 +73,20 @@ class FortifyServiceProvider extends ServiceProvider
 
         foreach ($changes as $event => $action) {
             Event::listen($event, function (object $payload) use ($action): void {
-                /** @var User $user */
-                $user = $payload->user;
+                $user = $payload->user ?? null;
+
+                if (! $user instanceof User) {
+                    return;
+                }
 
                 app(AuditLogger::class)->record($action, null, null, [], $user);
             });
         }
 
         Event::listen(TwoFactorAuthenticationFailed::class, function (object $payload): void {
-            /** @var User $user */
-            $user = $payload->user;
+            $user = $payload->user ?? null;
 
-            if ($user->is_root_admin) {
+            if ($user instanceof User && $user->is_root_admin) {
                 app(AuditLogger::class)->record('mfa.challenge_failed', null, null, [], $user);
             }
         });

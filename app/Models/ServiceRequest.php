@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -25,6 +26,7 @@ use Illuminate\Validation\ValidationException;
  * @property RequestPriority $priority
  * @property RequestStatus $status
  * @property string|null $closing_reason
+ * @property Carbon|null $closed_at
  * @property int|null $created_by_user_id
  */
 #[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at'])]

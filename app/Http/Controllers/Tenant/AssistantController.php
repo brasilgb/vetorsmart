@@ -215,17 +215,17 @@ class AssistantController extends Controller
     private function settingsPayload(?AssistantSetting $setting): array
     {
         return [
-            'enabled' => (bool) ($setting?->enabled ?? false),
-            'display_name' => $setting?->display_name ?? '',
-            'greeting' => $setting?->greeting ?? '',
-            'presentation' => $setting?->presentation ?? '',
-            'service_region' => $setting?->service_region ?? '',
-            'business_hours_text' => $setting?->business_hours_text ?? '',
-            'commercial_info' => $setting?->commercial_info ?? '',
-            'guidance' => $setting?->guidance ?? '',
-            'handoff_conditions' => $setting?->handoff_conditions ?? '',
-            'privacy_policy_url' => $setting?->privacy_policy_url ?? '',
-            'retention_days' => $setting?->retention_days ?? (int) config('assistant.default_retention_days'),
+            'enabled' => (bool) ($setting->enabled ?? false),
+            'display_name' => $setting->display_name ?? '',
+            'greeting' => $setting->greeting ?? '',
+            'presentation' => $setting->presentation ?? '',
+            'service_region' => $setting->service_region ?? '',
+            'business_hours_text' => $setting->business_hours_text ?? '',
+            'commercial_info' => $setting->commercial_info ?? '',
+            'guidance' => $setting->guidance ?? '',
+            'handoff_conditions' => $setting->handoff_conditions ?? '',
+            'privacy_policy_url' => $setting->privacy_policy_url ?? '',
+            'retention_days' => $setting->retention_days ?? (int) config('assistant.default_retention_days'),
         ];
     }
 

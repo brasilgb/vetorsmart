@@ -20,6 +20,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon $ends_at
  * @property AppointmentStatus $status
  * @property string|null $cancelling_reason
+ * @property Carbon|null $cancelled_at
  */
 #[Fillable(['tenant_id', 'service_request_id', 'professional_id', 'starts_at', 'ends_at', 'status', 'origin', 'cancelling_reason', 'cancelled_at', 'cancelled_by_user_id', 'created_by_user_id'])]
 class Appointment extends Model

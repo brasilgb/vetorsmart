@@ -1,6 +1,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Field, selectClass } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
+import { ConfirmAction } from '@/components/vetor-smart/confirm-action';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -185,10 +186,24 @@ export default function RequestShow({ request, events, appointments, services, p
                         </Field>
                         <div className="flex flex-wrap gap-3">
                             {request.can_close_unperformed && (
-                                <Button type="button" variant="outline" disabled={reasonForm.processing || reasonForm.data.reason === ''} onClick={() => reasonForm.post(notPerformed.url({ serviceRequest: request.id }))}>Registrar como não realizado</Button>
+                                <ConfirmAction
+                                    trigger={<Button type="button" variant="outline" disabled={reasonForm.processing || reasonForm.data.reason === ''}>Registrar como não realizado</Button>}
+                                    title="Registrar como não realizado?"
+                                    description="A solicitação será encerrada com o motivo informado."
+                                    confirmLabel="Registrar"
+                                    destructive
+                                    onConfirm={() => reasonForm.post(notPerformed.url({ serviceRequest: request.id }))}
+                                />
                             )}
                             {request.can_cancel && (
-                                <Button type="button" variant="outline" className="text-red-600" disabled={reasonForm.processing || reasonForm.data.reason === ''} onClick={() => reasonForm.post(cancel.url({ serviceRequest: request.id }))}>Cancelar solicitação</Button>
+                                <ConfirmAction
+                                    trigger={<Button type="button" variant="outline" className="text-red-600" disabled={reasonForm.processing || reasonForm.data.reason === ''}>Cancelar solicitação</Button>}
+                                    title="Cancelar solicitação?"
+                                    description="A solicitação será cancelada com o motivo informado. Agendamentos ativos dela também são afetados."
+                                    confirmLabel="Cancelar solicitação"
+                                    destructive
+                                    onConfirm={() => reasonForm.post(cancel.url({ serviceRequest: request.id }))}
+                                />
                             )}
                         </div>
                     </Card>

@@ -1,5 +1,6 @@
 import type { FormEvent } from 'react';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { ConfirmAction } from '@/components/vetor-smart/confirm-action';
 import { EmptyState } from '@/components/vetor-smart/empty-state';
 import { Field, selectClass } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
@@ -117,7 +118,14 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
                             <Button type="button" variant="outline" onClick={() => act(returnMethod.url({ conversation: item.id }))} className="h-8">Devolver à IA</Button>
                         )}
                         {item.status !== 'closed' && (item.handled_by_me || item.status === 'awaiting_human') && (
-                            <Button type="button" variant="outline" onClick={() => act(close.url({ conversation: item.id }))} className="h-8">Encerrar</Button>
+                            <ConfirmAction
+                                trigger={<Button type="button" variant="outline" className="h-8">Encerrar</Button>}
+                                title="Encerrar esta conversa?"
+                                description="O visitante deixa de receber respostas nesta conversa. O histórico é mantido."
+                                confirmLabel="Encerrar"
+                                destructive
+                                onConfirm={() => act(close.url({ conversation: item.id }))}
+                            />
                         )}
                     </div>
                 </li>

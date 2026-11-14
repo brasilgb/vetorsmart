@@ -9,18 +9,21 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 /**
  * A visitor conversation. The session is identified by a hash of a random token; the token itself is never stored.
+ *
+ * @property AssistantState $state
+ * @property ConversationStatus $status
+ * @property array<string, mixed>|null $collected
+ * @property Carbon|null $last_activity_at
  */
 #[Fillable(['tenant_id', 'channel', 'session_hash', 'customer_id', 'state', 'status', 'service_id', 'service_request_id', 'appointment_id', 'handled_by_user_id', 'collected', 'handoff_reason', 'invalid_attempts', 'last_activity_at', 'retention_until'])]
 class AssistantConversation extends Model
 {
     use BelongsToTenant;
 
-    /**
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [

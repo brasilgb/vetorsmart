@@ -517,6 +517,9 @@ class AssistantFlow
     /**
      * Ask the provider to pick a service from the text match that failed. Its answer is accepted only as an index of the listed services.
      */
+    /**
+     * @param  Collection<int, Service>  $services
+     */
     private function classifyWithProvider(Tenant $tenant, AssistantConversation $conversation, string $body, Collection $services): ?Service
     {
         if ($this->provider->name() === 'none' || ! $this->budget->providerAllowed($tenant)) {
@@ -524,7 +527,7 @@ class AssistantFlow
         }
 
         $context = [
-            'services' => $services->values()->map(fn (Service $service, int $index): array => ['index' => $index + 1, 'name' => $service->name])->all(),
+            'services' => array_values($services->values()->map(fn (Service $service, int $index): array => ['index' => $index + 1, 'name' => $service->name])->all()),
             'state' => $conversation->state->value,
             'max_tokens' => (int) config('assistant.max_provider_tokens_per_call'),
         ];
