@@ -11,20 +11,20 @@ const steps: { title: string; text: string; footer: string; icon: LucideIcon }[]
     },
     {
         title: 'Cliente solicita o serviço',
-        text: 'Visitantes acessam seu site ou WhatsApp e enviam pedidos estruturados de orçamento e agendamento a qualquer hora.',
+        text: 'Visitantes acessam seu site e pedem o serviço pelo chat de atendimento, a qualquer hora.',
         footer: 'Captação ativa 24h',
         icon: MousePointerClick,
     },
     {
-        title: 'Organização com inteligência',
-        text: 'A IA reúne os detalhes essenciais, qualifica o chamado e encaixa a visita no horário ideal da sua agenda.',
+        title: 'Organização automática',
+        text: 'O atendimento virtual identifica o serviço, registra o contato e reserva um horário livre na sua agenda.',
         footer: 'Sem perda de tempo',
         icon: Sparkles,
     },
     {
         title: 'Execução e crescimento',
-        text: 'Você executa o trabalho com tranquilidade, encanta o cliente e acompanha seus indicadores de faturamento subirem.',
-        footer: 'Fidelização',
+        text: 'Você executa o trabalho com tranquilidade e acompanha no painel as solicitações, os serviços concluídos e a taxa de conversão.',
+        footer: 'Indicadores reais',
         icon: BadgeCheck,
     },
 ];

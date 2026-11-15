@@ -8,7 +8,7 @@ const promises = ['Ser encontrado', 'Atender melhor', 'Crescer mais'];
 const kpis = [
     { label: 'Oportunidades', value: '28', delta: '+18%', tone: 'text-vs-text', hint: 'Este mês' },
     { label: 'Em andamento', value: '12', delta: 'ordens', tone: 'text-vs-blue-hover', hint: '4 equipes' },
-    { label: 'Agendados hoje', value: '6', delta: '100% ok', tone: 'text-vs-text', hint: 'Rotas otimizadas' },
+    { label: 'Agendados hoje', value: '6', delta: '100% ok', tone: 'text-vs-text', hint: '3 profissionais' },
 ];
 
 const agenda = [
@@ -43,7 +43,7 @@ export function HeroSection() {
                     </h1>
 
                     <p className="mt-4 max-w-2xl text-base leading-relaxed text-vs-muted sm:text-lg">
-                        Tenha um site profissional, atendimento com inteligência artificial, agenda e gestão de serviços em uma única plataforma. Simplifique sua rotina e tenha mais oportunidades para crescer.
+                        Tenha um site profissional, atendimento virtual 24 horas, agenda e gestão de serviços em uma única plataforma. Simplifique sua rotina e tenha mais oportunidades para crescer.
                     </p>
 
                     <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:justify-center sm:gap-4">
@@ -144,7 +144,7 @@ export function HeroSection() {
                                                 <Sparkles aria-hidden="true" className="size-4" />
                                             </span>
                                             <div>
-                                                <h4 className="text-sm font-bold text-vs-text">VetorSmart AI</h4>
+                                                <h4 className="text-sm font-bold text-vs-text">Atendimento VetorSmart</h4>
                                                 <p className="text-xs font-medium text-emerald-600">Recepcionista virtual ativa • 24/7</p>
                                             </div>
                                         </div>
@@ -153,16 +153,16 @@ export function HeroSection() {
 
                                     <div className="mt-3 flex flex-col gap-2.5 text-xs">
                                         <p className="max-w-[85%] self-end rounded-xl rounded-tr-none bg-vs-blue-hover px-3 py-2 text-white">
-                                            Olá! Preciso de manutenção preventiva em 2 aparelhos de ar-condicionado na minha empresa.
+                                            Olá! Preciso de manutenção preventiva no ar-condicionado.
                                         </p>
                                         <p className="max-w-[88%] self-start rounded-xl rounded-tl-none bg-vs-canvas-blue px-3 py-2 leading-relaxed text-vs-text">
-                                            Olá! Perfeito. Qual a marca e capacidade dos aparelhos, e qual o melhor período para nossa equipe técnica fazer a visita?
+                                            Certo: Manutenção preventiva. Para qual dia você quer agendar?
                                         </p>
                                         <p className="max-w-[85%] self-end rounded-xl rounded-tr-none bg-vs-blue-hover px-3 py-2 text-white">
-                                            São 2 Daikin de 12.000 BTUs. Preferência na quinta-feira pela manhã.
+                                            Quinta-feira, de manhã se possível.
                                         </p>
                                         <p className="max-w-[88%] self-start rounded-xl rounded-tl-none bg-vs-canvas-blue px-3 py-2 leading-relaxed text-vs-text">
-                                            Anotado! Já pré-agendei na quinta às 09:30 com o técnico Lucas. Confirmando seu WhatsApp para envio do link da OS?
+                                            Agendamento confirmado: Manutenção preventiva com Lucas, quinta às 09:30.
                                         </p>
                                     </div>
                                 </div>
@@ -171,15 +171,16 @@ export function HeroSection() {
                                     <div className="flex items-center gap-2">
                                         <CheckCircle2 aria-hidden="true" className="size-5 text-emerald-600" />
                                         <div>
-                                            <span className="block text-xs font-bold text-emerald-900">Novo lead qualificado</span>
+                                            <span className="block text-xs font-bold text-emerald-900">Nova solicitação agendada</span>
                                             <span className="block text-[11px] text-emerald-700">Adicionado à agenda automaticamente</span>
                                         </div>
                                     </div>
-                                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">OS #1042</span>
+                                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">Solicitação #1042</span>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    <p className="mt-4 text-center text-xs leading-relaxed text-vs-muted">Exemplo ilustrativo com empresa e números fictícios.</p>
                 </div>
             </div>
         </section>

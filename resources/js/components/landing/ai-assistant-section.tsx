@@ -4,7 +4,8 @@ import { StatusBadge } from './section-shell';
 
 const benefits = [
     { title: 'Atendimento imediato, a qualquer hora', text: 'Mesmo à noite ou no fim de semana, o cliente é acolhido e orientado na hora.' },
-    { title: 'Triagem antes de chegar até você', text: 'Coleta o tipo de serviço, o endereço e a disponibilidade do cliente antes de passar o contato adiante.' },
+    { title: 'Agendamento direto na sua agenda', text: 'Identifica o serviço, registra nome e telefone e reserva um horário livre, conferindo a disponibilidade dos profissionais.' },
+    { title: 'Você assume quando quiser', text: 'O cliente pode pedir um atendente, e a sua equipe continua a mesma conversa pelo painel, com o resumo do que já foi informado.' },
     { title: 'Os contatos são do seu negócio', text: 'Cada conversa fica registrada na sua carteira de clientes, sem intermediários.' },
 ];
 
@@ -12,15 +13,18 @@ type Message = { from: 'visitor' | 'assistant'; text: string; time: string };
 
 /** Fictional conversation for the illustration. The company name is invented and labelled as an example. */
 const conversation: Message[] = [
-    { from: 'visitor', text: 'Olá! Preciso de manutenção preventiva em 2 aparelhos de ar-condicionado na minha empresa.', time: '10:14' },
-    { from: 'assistant', text: 'Olá! Podemos ajudar, sim. Qual a marca e a capacidade dos aparelhos, e qual o melhor dia para a visita da equipe técnica?', time: '10:14' },
-    { from: 'visitor', text: 'São 2 aparelhos de 12.000 BTUs. Prefiro quinta-feira pela manhã.', time: '10:15' },
-    { from: 'assistant', text: 'Anotado! Vou registrar seu pedido para quinta-feira de manhã e o responsável confirma o horário com você.', time: '10:15' },
+    { from: 'visitor', text: 'Olá! Preciso de manutenção preventiva no ar-condicionado.', time: '10:14' },
+    { from: 'assistant', text: 'Certo: Manutenção preventiva. Para qual dia você quer agendar? Responda hoje, amanhã ou uma data como 25/11.', time: '10:14' },
+    { from: 'visitor', text: 'Amanhã.', time: '10:15' },
+    { from: 'assistant', text: 'Horários livres amanhã: 1) 09:30 com Lucas, 2) 14:00 com Gabriel. Responda com o número do horário.', time: '10:15' },
+    { from: 'visitor', text: '1', time: '10:16' },
+    { from: 'assistant', text: 'Agendamento confirmado: Manutenção preventiva com Lucas, amanhã às 09:30.', time: '10:16' },
 ];
 
 /**
- * Highlight of the virtual receptionist, from the Stitch landing. The capability is still in
- * development, so the section carries that status and the chat is captioned as an illustration.
+ * Highlight of the virtual receptionist, from the Stitch landing. The guided flow on the published
+ * site is delivered; language-model interpretation is not, and the caption says so. The chat is
+ * captioned as an illustration.
  */
 export function AiAssistantSection() {
     return (
@@ -30,16 +34,16 @@ export function AiAssistantSection() {
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold text-vs-ink-cyan">
                             <Zap aria-hidden="true" className="size-3.5" />
-                            Atendimento com Inteligência Artificial
+                            Atendimento virtual 24 horas
                         </span>
-                        <StatusBadge status="development" />
+                        <StatusBadge status="available" />
                     </div>
 
                     <h2 id="atendimento-ia-title" className="vs-title-section text-balance text-vs-text">
                         Uma recepcionista que não dorme e não deixa nenhum cliente sem resposta.
                     </h2>
                     <p className="text-lg leading-relaxed text-vs-muted">
-                        Quantos orçamentos já se perderam porque você estava em cima de uma escada ou atendendo outro cliente? A recepcionista virtual do VetorSmart responde com base nos serviços e horários que você cadastrou.
+                        Quantos orçamentos já se perderam porque você estava em cima de uma escada ou atendendo outro cliente? A recepcionista virtual do VetorSmart atende no seu site e responde com base nos serviços, valores e horários que você cadastrou.
                     </p>
 
                     <ul className="mt-2 grid gap-4">
@@ -99,7 +103,7 @@ export function AiAssistantSection() {
                                     <CheckCheck className="size-4" />
                                 </span>
                                 <span>
-                                    <span className="block text-xs font-bold text-emerald-900">Pedido registrado</span>
+                                    <span className="block text-xs font-bold text-emerald-900">Horário reservado na agenda</span>
                                     <span className="block text-xs text-emerald-700">O contato entra na sua lista de clientes</span>
                                 </span>
                             </div>
@@ -114,7 +118,7 @@ export function AiAssistantSection() {
                         </div>
                     </div>
                     <figcaption className="mt-4 text-center text-xs leading-relaxed text-vs-muted">
-                        Exemplo ilustrativo com empresa fictícia. O atendimento com IA está em desenvolvimento.
+                        Exemplo ilustrativo com empresa fictícia. A conversa segue um roteiro guiado; a interpretação por modelo de IA está em desenvolvimento.
                     </figcaption>
                 </figure>
             </div>

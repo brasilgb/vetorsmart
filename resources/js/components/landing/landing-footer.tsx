@@ -7,7 +7,7 @@ import { landingContainer, landingFocusRing } from './landing-layout';
 const productLinks = [
     { label: 'Funcionalidades', href: '#funcionalidades' },
     { label: 'Como funciona', href: '#como-funciona' },
-    { label: 'IA no atendimento', href: '#atendimento-ia' },
+    { label: 'Atendimento virtual', href: '#atendimento-ia' },
     { label: 'Segmentos', href: '#segmentos' },
     { label: 'Preços', href: '#planos' },
 ];

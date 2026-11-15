@@ -14,10 +14,12 @@ const plan = {
     items: [
         { label: 'Site profissional com seu domínio', status: 'available' },
         { label: 'Clientes, serviços e profissionais', status: 'available' },
-        { label: 'Agenda com reserva de horário', status: 'development' },
-        { label: 'Assistente de IA para atendimento 24/7', status: 'development' },
-        { label: 'Controle de ordens de serviço (OS) e solicitações', status: 'development' },
+        { label: 'Agenda com reserva de horário', status: 'available' },
+        { label: 'Atendimento virtual no site, 24 horas, com agendamento', status: 'available' },
+        { label: 'Solicitações de serviço, da triagem à conclusão', status: 'available' },
+        { label: 'Indicadores operacionais no painel', status: 'available' },
         { label: 'Acesso responsivo no celular, tablet e computador', status: 'available' },
+        { label: 'Interpretação por modelo de IA e painel Meu Crescimento', status: 'development' },
         { label: 'Aplicativo e PWA', status: 'soon' },
     ] satisfies PlanItem[],
 };
