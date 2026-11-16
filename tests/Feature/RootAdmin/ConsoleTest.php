@@ -54,6 +54,23 @@ test('the console dashboard reports real totals and distribution', function () {
             ->has('distribution'));
 });
 
+test('homologation companies and their users stay out of the console indicators', function () {
+    $homolog = Tenant::factory()->create(['name' => '[HOMOLOG] Empresa de Teste', 'segment_id' => $this->segment->id]);
+    $operator = User::factory()->create(['email' => 'homolog.operador@example.test']);
+    TenantUser::factory()->owner()->create(['tenant_id' => $homolog->id, 'user_id' => $operator->id]);
+    AssistantUsage::query()->create(['tenant_id' => $homolog->id, 'usage_date' => now()->toDateString(), 'messages' => 9, 'provider_calls' => 0, 'provider_failures' => 0, 'tokens' => 0]);
+
+    $this->actingAs($this->root)
+        ->get('/rootadmin')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('totals.tenants', 2)
+            ->where('totals.active', 1)
+            ->where('totals.users', 2)
+            ->where('ai.messages', 0)
+            ->where('distribution', fn ($rows) => collect($rows)->sum('total') === 2)
+            ->has('recent', 3));
+});
+
 test('the company list filters by status and name', function () {
     $this->actingAs($this->root)
         ->get('/rootadmin/tenants?status=suspended')

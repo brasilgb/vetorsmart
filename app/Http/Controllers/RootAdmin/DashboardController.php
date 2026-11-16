@@ -10,6 +10,7 @@ use App\Models\AssistantUsage;
 use App\Models\Tenant;
 use App\Models\TenantWebsite;
 use App\Models\User;
+use App\Services\HomologPurgeService;
 use App\Support\PlatformTime;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -22,16 +23,23 @@ class DashboardController extends Controller
      *
      * Indicators that depend on modules not implemented yet are returned as `pending`, so the
      * console states they are unavailable instead of showing invented numbers.
+     *
+     * Homologation companies (name starting with "[HOMOLOG]") and their users stay out of every indicator, so test
+     * activity never inflates the commercial numbers. They remain visible in the company list, under their own name.
      */
     public function __invoke(): Response
     {
+        $homologIds = Tenant::query()->where('name', 'like', HomologPurgeService::NAME_PREFIX.'%')->pluck('id')->all();
+
         $byStatus = Tenant::query()
+            ->whereKeyNot($homologIds)
             ->selectRaw('status, COUNT(*) as total')
             ->groupBy('status')
             ->pluck('total', 'status');
 
         $distribution = DB::table('tenants')
             ->leftJoin('segments', 'segments.id', '=', 'tenants.segment_id')
+            ->whereNotIn('tenants.id', $homologIds)
             ->selectRaw("COALESCE(segments.name, 'Sem segmento') as segment_name, COUNT(tenants.id) as total")
             ->groupBy('segment_name')
             ->orderByDesc('total')
@@ -54,6 +62,7 @@ class DashboardController extends Controller
 
         $aiUsage = AssistantUsage::query()
             ->where('usage_date', '>=', $monthStart)
+            ->whereNotIn('tenant_id', $homologIds)
             ->selectRaw('COALESCE(SUM(messages), 0) as messages, COALESCE(SUM(provider_calls), 0) as provider_calls, COALESCE(SUM(provider_failures), 0) as provider_failures, COALESCE(SUM(tokens), 0) as tokens')
             ->first();
 
@@ -62,18 +71,20 @@ class DashboardController extends Controller
                 'tenants' => (int) $byStatus->sum(),
                 'active' => (int) ($byStatus['active'] ?? 0),
                 'suspended' => (int) ($byStatus['suspended'] ?? 0),
-                'users' => User::query()->count(),
+                'users' => User::query()->where('email', 'not like', HomologPurgeService::EMAIL_PATTERN)->count(),
             ],
             'sites' => [
                 'published' => TenantWebsite::query()
                     ->where('status', WebsiteStatus::Published)
                     ->whereNotNull('published_version_id')
+                    ->whereNotIn('tenant_id', $homologIds)
                     ->count(),
             ],
             'appointments' => [
                 'upcoming' => Appointment::query()
                     ->where('status', AppointmentStatus::Scheduled)
                     ->where('starts_at', '>=', now())
+                    ->whereNotIn('tenant_id', $homologIds)
                     ->count(),
             ],
             'ai' => [
