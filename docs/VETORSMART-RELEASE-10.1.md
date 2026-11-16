@@ -2,7 +2,7 @@
 
 **Data:** 16/11/2026, 19:26 a 20:06 UTC
 **Ambiente:** VPS de produção `srv1990862`, `gateway/vetorsmart/`
-**Branch:** `main`. HEAD inicial `fd7fa5f`; as alterações desta release foram registradas em commits locais após a homologação, sem push (seção 2)
+**Branch:** `main`. HEAD inicial `fd7fa5f`; as alterações desta release foram registradas em commits após a homologação e enviadas ao remoto, a pedido (seção 2)
 
 ## Resultado final
 
@@ -12,7 +12,7 @@ Sites públicos e atendimento funcionam em produção, com isolamento entre empr
 
 Restrições:
 
-1. **Os commits desta release existem só nesta VPS.** Foram feitos depois da homologação, a pedido, e não foram enviados ao remoto (seção 2).
+1. **O healthcheck do VetorSmart na infraestrutura está na branch `feat/vetorsales-infra`, não na `main`.** Era a branch ativa no repositório da infraestrutura; a alteração só chega à `main` quando essa branch for mesclada (seção 2).
 2. **Navegador único.** A homologação visual usou Chromium headless em perfil desktop (1366 px), tablet (768 px) e iPhone 13 (390 px). Safari e Firefox reais não foram usados.
 3. **Console RootAdmin não aberto em navegador.** Não há credencial de administrador disponível para a homologação, e ela não foi criada nem redefinida. Os indicadores foram conferidos por teste automatizado e por leitura direta em produção.
 4. **Duas empresas de teste permanecem em produção**, com o site de uma delas publicado e indexável (seção 5).
@@ -48,9 +48,9 @@ No repositório da infraestrutura (alteração feita na sessão anterior): `dock
 
 ### Commits
 
-Feitos às 20:05 UTC, depois do deploy e da homologação, sem push. As imagens em produção foram construídas antes, do mesmo conteúdo que está em `c7b8477`; os commits seguintes só trazem documentação.
+Feitos às 20:05 UTC, depois do deploy e da homologação, e enviados ao remoto em seguida, a pedido. As imagens em produção foram construídas antes, do mesmo conteúdo que está em `c7b8477`; os commits seguintes só trazem documentação.
 
-Aplicação, branch `main`, 8 commits à frente de `origin/main`: os sete abaixo e um oitavo, só de documentação, com a atualização deste relatório e do `executed.md`.
+Aplicação (`brasilgb/vetorsmart`), branch `main`: os sete commits abaixo e `5661539`, só de documentação, enviados juntos (`fd7fa5f..5661539`). O registro do push neste relatório e no `executed.md` entrou num commit de documentação posterior, também enviado.
 
 | Commit | Conteúdo |
 |---|---|
@@ -62,7 +62,7 @@ Aplicação, branch `main`, 8 commits à frente de `origin/main`: os sete abaixo
 | `89ec6da` | `docs(release)`: relatórios da RELEASE-10 e da RELEASE-10.1 |
 | `6bb89aa` | `chore(controle)`: `correio.md` e `executed.md` |
 
-Infraestrutura, branch `feat/vetorsales-infra` (a que estava ativa), 2 commits à frente do remoto: o abaixo e um segundo, que só avança o submódulo `gateway/vetorsmart` para o commit de documentação.
+Infraestrutura (`brasilgb/infraabrasil`), branch `feat/vetorsales-infra` (a que estava ativa): o commit abaixo e `bedbacb`, que só avança o submódulo `gateway/vetorsmart` para `5661539`, enviados juntos (`e460ffa..bedbacb`). Um commit posterior avança o submódulo para o commit de documentação final.
 
 | Commit | Conteúdo |
 |---|---|
@@ -257,7 +257,7 @@ Backups em `/opt/infra-abrasil/backups`: 491 MB. Não tocados. Volumes: 8, todos
 
 ## 11. Pendências
 
-1. **Enviar os commits ao remoto** (`git push`) nos dois repositórios, quando autorizado. No da infraestrutura, o commit está em `feat/vetorsales-infra`; confirmar se é a branch certa para o healthcheck do VetorSmart.
+1. **Levar o healthcheck do VetorSmart à `main` da infraestrutura**, mesclando `feat/vetorsales-infra` ou movendo o commit. Os commits e o push dos dois repositórios estão feitos.
 2. Decidir o destino das empresas de teste: manter para futuras homologações ou remover com `homolog:purge`. Enquanto o site de teste estiver publicado, ele pode ser indexado.
 3. Conferir o console RootAdmin em navegador, com a conta de administrador.
 4. Repetir a conferência visual em Safari (iPhone real) e Firefox.
@@ -275,7 +275,7 @@ Backups em `/opt/infra-abrasil/backups`: 491 MB. Não tocados. Volumes: 8, todos
 - Sem alteração em dados da Clima Total.
 - Sem MFA.
 - Sem migrations.
-- Sem push. Commits locais feitos após a homologação, a pedido.
+- Sem push automático: commits e push feitos após a homologação, a pedido.
 - Sem remoção de volumes, backups ou imagens.
 - Sem `git reset --hard`, `docker system prune` ou `docker volume prune`.
 - Nenhuma credencial impressa.

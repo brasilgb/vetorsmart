@@ -14,7 +14,7 @@ Sites públicos e atendimento funcionam em produção, com isolamento entre empr
 
 Restrições:
 
-1. **Os commits desta release existem só nesta VPS**, sem push.
+1. **O healthcheck do VetorSmart na infraestrutura está na branch `feat/vetorsales-infra`**, não na `main`.
 2. **Navegador único:** Chromium headless em 1366, 768 e 390 px. Safari e Firefox reais não foram usados.
 3. **Console RootAdmin não aberto em navegador:** sem credencial de administrador disponível. Indicadores conferidos por teste e por leitura em produção.
 4. **Duas empresas de teste permanecem em produção**, uma com site publicado e indexável.
@@ -22,9 +22,9 @@ Restrições:
 
 ## 1. HEAD
 
-- Inicial: `fd7fa5f`. Depois dos commits: 8 à frente de `origin/main` (os sete abaixo e um de documentação, com esta atualização). Sem push.
+- Inicial: `fd7fa5f`. Commits feitos após a homologação e enviados ao remoto, a pedido: os sete abaixo e `5661539`, de documentação (`fd7fa5f..5661539`). O registro do push entrou num commit de documentação posterior, também enviado.
 - Commits da aplicação: `1fb41cb` (caches e healthcheck), `4976b2d` (fonte do site), `b07f0df` (horários), `1aa9edb` (indicadores do RootAdmin), `c7b8477` (cabeçalhos de segurança), `89ec6da` (relatórios), `6bb89aa` (correio e executed).
-- Infraestrutura: `33baf62` na branch `feat/vetorsales-infra`, com o healthcheck do `docker-compose.yml` e o submódulo `gateway/vetorsmart`; um segundo commit avança o submódulo para o commit de documentação. Sem push.
+- Infraestrutura: `33baf62` na branch `feat/vetorsales-infra`, com o healthcheck do `docker-compose.yml` e o submódulo `gateway/vetorsmart`; `bedbacb` avança o submódulo para `5661539`. Enviados ao remoto (`e460ffa..bedbacb`); um commit posterior avança o submódulo para o commit de documentação final.
 - Os commits foram feitos depois do deploy e da homologação. As imagens em produção têm o mesmo código de `c7b8477`.
 
 ## 2. Alterações aplicadas
@@ -90,7 +90,7 @@ docker run mysql:8.4 em 127.0.0.1:33111                  (banco da suíte, remov
 
 ## 9. Pendências
 
-1. Push dos commits nos dois repositórios, quando autorizado; confirmar a branch da infraestrutura.
+1. Levar o healthcheck do VetorSmart à `main` da infraestrutura (hoje em `feat/vetorsales-infra`).
 2. Destino das empresas de teste.
 3. RootAdmin em navegador; Safari e Firefox.
 4. 5 segundos de 502 na recriação.
@@ -105,6 +105,6 @@ Detalhes no relatório.
 ## Restrições cumpridas
 
 - Sem alteração em outros SaaS, Nginx, DNS ou certificados. Sem alteração em dados da Clima Total.
-- Sem MFA, sem migrations, sem push. Commits locais feitos após a homologação, a pedido.
+- Sem MFA, sem migrations, sem push automático: commits e push feitos após a homologação, a pedido.
 - Sem remoção de volumes, backups ou imagens.
 - Nenhuma credencial impressa.
