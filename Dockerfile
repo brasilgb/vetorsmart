@@ -20,7 +20,10 @@ RUN composer dump-autoload --no-dev --optimize --no-interaction \
  && rm -f /usr/local/bin/node /usr/local/bin/npm /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/npx \
  && rm -rf /usr/local/lib/node_modules \
  && chown -R www-data:www-data storage bootstrap/cache
+# Não anunciar a versão do PHP no cabeçalho X-Powered-By.
+RUN echo "expose_php=Off" > /usr/local/etc/php/conf.d/zz-hardening.ini
 COPY docker-entrypoint.sh /usr/local/bin/infra-entrypoint
+COPY docker-healthcheck.php /usr/local/bin/infra-healthcheck
 RUN chmod +x /usr/local/bin/infra-entrypoint
 ENTRYPOINT ["infra-entrypoint"]
 CMD ["php-fpm", "-F"]
