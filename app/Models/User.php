@@ -12,7 +12,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Carbon;
-use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
  * @property int $id
@@ -22,9 +21,6 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property string $password
  * @property UserStatus $status
  * @property bool $is_root_admin
- * @property string|null $two_factor_secret
- * @property string|null $two_factor_recovery_codes
- * @property Carbon|null $two_factor_confirmed_at
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -34,7 +30,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, TwoFactorAuthenticatable;
+    use HasFactory, Notifiable;
 
     /**
      * Determine whether the account may sign in and act.
@@ -52,14 +48,6 @@ class User extends Authenticatable
     public function isRootAdmin(): bool
     {
         return $this->is_root_admin && $this->isActive();
-    }
-
-    /**
-     * Global administration requires a validated second factor, not only the password.
-     */
-    public function hasConfirmedTwoFactor(): bool
-    {
-        return $this->two_factor_confirmed_at !== null && $this->two_factor_secret !== null;
     }
 
     /**
@@ -93,7 +81,6 @@ class User extends Authenticatable
             'password' => 'hashed',
             'status' => UserStatus::class,
             'is_root_admin' => 'boolean',
-            'two_factor_confirmed_at' => 'datetime',
         ];
     }
 }

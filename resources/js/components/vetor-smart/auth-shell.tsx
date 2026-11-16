@@ -9,7 +9,7 @@ type Props = {
 
 /**
  * Shared frame of every authentication screen (login, registration, password recovery,
- * reset, confirmation and two-factor): the service photograph of a technician with a tablet,
+ * reset and confirmation): the service photograph of a technician with a tablet,
  * under a navy film, and one solid white card. The logo leads back to the landing page. The
  * `vs-auth` class pins the light tokens, so fields stay legible even when the app runs in dark
  * mode. The page scrolls only when the viewport is too short for the card.

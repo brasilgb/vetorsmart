@@ -2,7 +2,6 @@ import { Form, Head } from '@inertiajs/react';
 import { useRef } from 'react';
 import SecurityController from '@/actions/App/Http/Controllers/Settings/SecurityController';
 import Heading from '@/components/heading';
-import TwoFactorSection from '@/components/two-factor-section';
 import InputError from '@/components/input-error';
 import PasswordInput from '@/components/password-input';
 import { Button } from '@/components/ui/button';
@@ -13,10 +12,6 @@ import { edit } from '@/routes/security';
 type Props = {
     passwordRules: string;
     status?: string | null;
-    canManageTwoFactor: boolean;
-    twoFactorEnabled?: boolean;
-    requiresConfirmation?: boolean;
-    twoFactor?: { confirmed: boolean; pending: boolean; required: boolean };
 };
 
 export default function Security(props: Props) {
@@ -34,14 +29,6 @@ export default function Security(props: Props) {
                     <p role="status" className="rounded-md bg-vs-surface px-3 py-2 text-sm text-vs-text">
                         {props.status}
                     </p>
-                )}
-
-                {props.canManageTwoFactor && props.twoFactor && (
-                    <TwoFactorSection
-                        confirmed={props.twoFactor.confirmed}
-                        pending={props.twoFactor.pending}
-                        required={props.twoFactor.required}
-                    />
                 )}
 
                 <Heading

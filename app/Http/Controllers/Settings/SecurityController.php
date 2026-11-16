@@ -4,41 +4,27 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\PasswordUpdateRequest;
-use App\Http\Requests\Settings\TwoFactorAuthenticationRequest;
 use App\Models\User;
 use App\Services\PasswordPolicy;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
-use Laravel\Fortify\Features;
 
 class SecurityController extends Controller
 {
     /**
      * Show the user's security settings page.
      */
-    public function edit(TwoFactorAuthenticationRequest $request): Response
+    public function edit(Request $request): Response
     {
         /** @var User $user */
         $user = $request->user();
 
-        $props = [
+        return Inertia::render('settings/security', [
             'passwordRules' => PasswordPolicy::for($user)->toPasswordRulesString(),
             'status' => $request->session()->get('status'),
-            'canManageTwoFactor' => Features::enabled(Features::twoFactorAuthentication()),
-        ];
-
-        if ($props['canManageTwoFactor']) {
-            $props['twoFactorEnabled'] = $user->hasConfirmedTwoFactor();
-            $props['requiresConfirmation'] = Features::optionEnabled(Features::twoFactorAuthentication(), 'confirm');
-            $props['twoFactor'] = [
-                'confirmed' => $user->hasConfirmedTwoFactor(),
-                'pending' => $user->two_factor_secret !== null && ! $user->hasConfirmedTwoFactor(),
-                'required' => $user->is_root_admin,
-            ];
-        }
-
-        return Inertia::render('settings/security', $props);
+        ]);
     }
 
     /**

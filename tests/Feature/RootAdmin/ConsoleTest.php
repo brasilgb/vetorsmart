@@ -13,7 +13,7 @@ use Inertia\Testing\AssertableInertia;
 beforeEach(function () {
     $this->seed(SegmentSeeder::class);
 
-    $this->root = User::factory()->rootAdmin()->withConfirmedTwoFactor()->create(['name' => 'Root ABrasil']);
+    $this->root = User::factory()->rootAdmin()->create(['name' => 'Root ABrasil']);
 
     $this->segment = Segment::query()->where('slug', 'limpeza')->firstOrFail();
     $this->active = Tenant::factory()->create(['name' => 'Empresa Ativa', 'segment_id' => $this->segment->id]);

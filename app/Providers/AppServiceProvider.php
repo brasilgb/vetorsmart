@@ -126,8 +126,7 @@ class AppServiceProvider extends ServiceProvider
     protected function configureGates(): void
     {
         // Platform authority, separate from tenant roles. It never grants access to tenant data.
-        // Requires a confirmed second factor as well, so a password alone never grants platform access.
-        Gate::define('platform-admin', fn (User $user): bool => $user->isRootAdmin() && $user->hasConfirmedTwoFactor());
+        Gate::define('platform-admin', fn (User $user): bool => $user->isRootAdmin());
     }
 
     /**

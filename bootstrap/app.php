@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Middleware\EnsureAccountIsActive;
-use App\Http\Middleware\EnsureRootAdminHasTwoFactor;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveTenant;
@@ -40,7 +39,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'tenant.resolve' => ResolveTenant::class,
-            'rootadmin.mfa' => EnsureRootAdminHasTwoFactor::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

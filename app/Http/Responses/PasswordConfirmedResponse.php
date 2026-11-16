@@ -11,8 +11,8 @@ use Laravel\Fortify\Contracts\PasswordConfirmedResponse as PasswordConfirmedResp
 /**
  * Returns the user to the area they were in after confirming the password.
  *
- * A global administrator returns to a settings page only when that page was the intended URL; otherwise to the console,
- * which applies the MFA rules. Other profiles keep the intended URL. A stale intended URL (for example the public landing)
+ * A global administrator returns to a settings page only when that page was the intended URL; otherwise to the console.
+ * Other profiles keep the intended URL. A stale intended URL (for example the public landing)
  * must not send an administrator to the wrong place.
  */
 class PasswordConfirmedResponse implements PasswordConfirmedResponseContract

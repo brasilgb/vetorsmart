@@ -7,7 +7,7 @@ use App\Models\Tenant;
 use App\Models\User;
 
 beforeEach(function () {
-    $this->root = User::factory()->rootAdmin()->withConfirmedTwoFactor()->create();
+    $this->root = User::factory()->rootAdmin()->create();
     $this->tenant = Tenant::factory()->create();
 });
 
