@@ -130,6 +130,17 @@ test('the official address is /{segment}/{company} on the main domain and needs 
     expect(TenantDomain::query()->where('tenant_id', $this->tenant->id)->exists())->toBeFalse();
 });
 
+test('the font stack reaches the browser as valid CSS, with no escaped quotes', function () {
+    publishWithHeadline('Bem-vindo à Clima Total');
+
+    $html = (string) visitSite()->assertOk()->getContent();
+
+    preg_match('/--site-font:([^;]+);/', $html, $match);
+
+    // An escaped quote inside <style> makes the browser drop the declaration and fall back to its default serif font.
+    expect($match[1] ?? '')->toContain('sans-serif')->not->toContain('&quot;')->not->toContain('"');
+});
+
 test('drafts are never visible to visitors until they are published', function () {
     $this->patch('/meu-site/rascunho', ['section' => 'content', 'headline' => 'Rascunho secreto', 'about' => 'Texto em rascunho'])
         ->assertRedirect('/meu-site');

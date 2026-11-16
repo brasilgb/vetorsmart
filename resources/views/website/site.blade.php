@@ -4,7 +4,8 @@
     $title = $seo['title'] ?: $business;
     $description = $seo['description'] ?: ($content['about'] ?: null);
     $accent = in_array($content['accent_color'] ?? '', ['#0F172A', '#1E3A5F', '#2563EB', '#06B6D4'], true) ? $content['accent_color'] : '#2563EB';
-    $fontStack = ($content['font'] ?? 'sans') === 'serif' ? 'Georgia, "Times New Roman", serif' : 'system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+    // Sem aspas: o valor é impresso com escape dentro de <style>, e um &quot; invalidaria a declaração inteira.
+    $fontStack = ($content['font'] ?? 'sans') === 'serif' ? 'Georgia, Times New Roman, serif' : 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
     $contact = $content['contact'] ?? [];
     $phoneDigits = preg_replace('/\D+/', '', (string) ($contact['phone'] ?? ''));
     $whatsDigits = preg_replace('/\D+/', '', (string) ($contact['whatsapp'] ?? ''));
