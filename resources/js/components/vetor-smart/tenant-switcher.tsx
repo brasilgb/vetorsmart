@@ -54,7 +54,7 @@ export function TenantSwitcher() {
                 id="tenant-switcher"
                 value={tenant.id}
                 onChange={(event) => choose(Number(event.target.value))}
-                className="h-9 max-w-[220px] truncate rounded-md border border-vs-border bg-white px-2 text-sm text-vs-text"
+                className="h-9 max-w-[220px] truncate rounded-md border border-input bg-card px-2 text-sm text-vs-text"
             >
                 {tenants.map((item) => (
                     <option key={item.id} value={item.id}>
@@ -62,7 +62,7 @@ export function TenantSwitcher() {
                     </option>
                 ))}
             </select>
-            {error && <span className="text-xs text-red-600">{error}</span>}
+            {error && <span className="text-xs text-vs-danger">{error}</span>}
         </div>
     );
 }

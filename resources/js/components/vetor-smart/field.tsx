@@ -16,4 +16,4 @@ export function Field({ id, label, error, children, hint }: { id: string; label:
     );
 }
 
-export const selectClass = 'h-10 w-full rounded-md border border-vs-border bg-white px-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none';
+export const selectClass = 'h-10 w-full rounded-md border border-input bg-card px-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none';

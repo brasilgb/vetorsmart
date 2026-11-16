@@ -44,7 +44,7 @@ export default function SegmentsIndex({ segments }: Props) {
                         <div className="grid gap-1.5">
                             <Label htmlFor="new-name" className="text-vs-text">Nome</Label>
                             <Input id="new-name" value={create.data.name} onChange={(event) => create.setData('name', event.target.value)} required className="h-10" />
-                            {create.errors.name && <p className="text-sm text-red-600">{create.errors.name}</p>}
+                            {create.errors.name && <p className="text-sm text-vs-danger">{create.errors.name}</p>}
                         </div>
                         <div className="grid gap-1.5">
                             <Label htmlFor="new-description" className="text-vs-text">Descrição</Label>
@@ -101,7 +101,7 @@ function SegmentRow({ segment }: { segment: Segment }) {
                 <div className="grid gap-1.5">
                     <Label htmlFor={`name-${segment.id}`} className="text-vs-text">Nome</Label>
                     <Input id={`name-${segment.id}`} value={form.data.name} onChange={(event) => form.setData('name', event.target.value)} required className="h-10" />
-                    {form.errors.name && <p className="text-sm text-red-600">{form.errors.name}</p>}
+                    {form.errors.name && <p className="text-sm text-vs-danger">{form.errors.name}</p>}
                 </div>
                 <div className="grid gap-1.5">
                     <Label htmlFor={`description-${segment.id}`} className="text-vs-text">Descrição</Label>

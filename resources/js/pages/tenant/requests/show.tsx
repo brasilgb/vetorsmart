@@ -65,7 +65,7 @@ export default function RequestShow({ request, events, appointments, services, p
                 <PageHeader
                     title={`Solicitação #${request.id}`}
                     description={`Situação: ${request.status_label}`}
-                    action={<Link href={requestsIndex.url()} className="text-sm font-medium text-vs-blue hover:underline">Voltar à lista</Link>}
+                    action={<Link href={requestsIndex.url()} className="text-sm font-medium text-vs-link hover:underline">Voltar à lista</Link>}
                 />
 
                 <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -101,7 +101,7 @@ export default function RequestShow({ request, events, appointments, services, p
                     <Card className="grid max-w-3xl gap-4 border-vs-border/70 p-5 shadow-sm">
                         <h2 className="text-base font-semibold text-vs-text">Triagem</h2>
                         {triageErrorsWithoutField.length > 0 && (
-                            <p role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                            <p role="alert" className="rounded-md border border-vs-danger/30 bg-vs-danger-soft px-3 py-2 text-sm text-vs-danger">
                                 A triagem não foi salva. {triageErrorsWithoutField.join(' ')}
                             </p>
                         )}
@@ -197,7 +197,7 @@ export default function RequestShow({ request, events, appointments, services, p
                             )}
                             {request.can_cancel && (
                                 <ConfirmAction
-                                    trigger={<Button type="button" variant="outline" className="text-red-600" disabled={reasonForm.processing || reasonForm.data.reason === ''}>Cancelar solicitação</Button>}
+                                    trigger={<Button type="button" variant="outline" className="text-vs-danger" disabled={reasonForm.processing || reasonForm.data.reason === ''}>Cancelar solicitação</Button>}
                                     title="Cancelar solicitação?"
                                     description="A solicitação será cancelada com o motivo informado. Agendamentos ativos dela também são afetados."
                                     confirmLabel="Cancelar solicitação"

@@ -79,10 +79,10 @@ export default function ProfessionalsIndex({ filters, professionals }: Props) {
                                             <td className="px-4 py-3 text-vs-muted">{professional.services}</td>
                                             <td className="px-4 py-3"><StatusBadge active={professional.active} /></td>
                                             <td className="space-x-3 px-4 py-3 text-right whitespace-nowrap">
-                                                <Link href={edit.url({ professional: professional.id })} className="font-medium text-vs-blue hover:underline">Editar</Link>
+                                                <Link href={edit.url({ professional: professional.id })} className="font-medium text-vs-link hover:underline">Editar</Link>
                                                 {professional.active ? (
                                                     <ConfirmAction
-                                                        trigger={<button type="button" className="font-medium text-red-600 hover:underline">Desativar</button>}
+                                                        trigger={<button type="button" className="font-medium text-vs-danger hover:underline">Desativar</button>}
                                                         title="Desativar profissional?"
                                                         description="Ele deixa de receber novos agendamentos. Vínculos e histórico são mantidos."
                                                         confirmLabel="Desativar"
@@ -90,7 +90,7 @@ export default function ProfessionalsIndex({ filters, professionals }: Props) {
                                                         onConfirm={() => router.delete(deactivate.url({ professional: professional.id }), { preserveScroll: true })}
                                                     />
                                                 ) : (
-                                                    <button type="button" onClick={() => router.post(activate.url({ professional: professional.id }), {}, { preserveScroll: true })} className="font-medium text-vs-blue hover:underline">
+                                                    <button type="button" onClick={() => router.post(activate.url({ professional: professional.id }), {}, { preserveScroll: true })} className="font-medium text-vs-link hover:underline">
                                                         Reativar
                                                     </button>
                                                 )}

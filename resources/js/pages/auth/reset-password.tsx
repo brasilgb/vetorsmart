@@ -14,7 +14,7 @@ type Props = {
     passwordRules: string;
 };
 
-const fieldClass = 'h-11 border-vs-border';
+const fieldClass = 'h-11 border-input';
 
 export default function ResetPassword({ token, email, passwordRules }: Props) {
     return (

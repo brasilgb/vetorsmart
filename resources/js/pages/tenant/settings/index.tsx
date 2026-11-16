@@ -127,7 +127,7 @@ export default function SettingsIndex({ settings, segments, canEdit }: Props) {
                         </Field>
                         <div className="md:col-span-2">
                             <Field id="description" label="Descrição da atividade" error={company.errors.description}>
-                                <textarea id="description" rows={2} value={company.data.description} disabled={disabled} onChange={(e) => company.setData('description', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                                <textarea id="description" rows={2} value={company.data.description} disabled={disabled} onChange={(e) => company.setData('description', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                             </Field>
                         </div>
                         <Field id="phone" label="Telefone de atendimento" error={company.errors.phone}>
@@ -182,7 +182,7 @@ export default function SettingsIndex({ settings, segments, canEdit }: Props) {
                                 <Input aria-label={`Fechamento ${name}`} type="time" value={days[weekday].to} disabled={disabled || !days[weekday].open} onChange={(e) => setDay(weekday, { to: e.target.value })} className="h-9" />
                             </div>
                         ))}
-                        {(hours.errors as Record<string, string | undefined>).business_hours && <p className="text-sm text-red-600">{hours.errors.business_hours}</p>}
+                        {(hours.errors as Record<string, string | undefined>).business_hours && <p className="text-sm text-vs-danger">{hours.errors.business_hours}</p>}
                         {canEdit && <div><Button type="submit" disabled={hours.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar horários</Button></div>}
                     </form>
                 </Card>
@@ -224,7 +224,7 @@ export default function SettingsIndex({ settings, segments, canEdit }: Props) {
                         </div>
                         <div className="md:col-span-2">
                             <Field id="welcome_message" label="Mensagem de boas-vindas" error={preferences.errors.welcome_message}>
-                                <textarea id="welcome_message" rows={2} value={preferences.data.welcome_message} disabled={disabled} onChange={(e) => preferences.setData('welcome_message', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                                <textarea id="welcome_message" rows={2} value={preferences.data.welcome_message} disabled={disabled} onChange={(e) => preferences.setData('welcome_message', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                             </Field>
                         </div>
                         {canEdit && <div className="md:col-span-2"><Button type="submit" disabled={preferences.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar preferências</Button></div>}

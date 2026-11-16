@@ -29,7 +29,7 @@ import { index as auditIndex } from '@/routes/rootadmin/audit';
 import type { NavItem } from '@/types';
 
 const tenantNavItems: NavItem[] = [
-    { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
+    { title: 'Painel', href: dashboard(), icon: LayoutGrid },
     { title: 'Clientes', href: tenantCustomers(), icon: Contact },
     { title: 'Solicitações', href: tenantRequests(), icon: ClipboardList },
     { title: 'Atendimento IA', href: tenantAssistant(), icon: MessageSquare },

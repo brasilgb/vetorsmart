@@ -97,7 +97,7 @@ export default function TeamIndex({ memberships, roles }: Props) {
                                                 value={member.role}
                                                 disabled={member.is_self}
                                                 onChange={(e) => router.patch(update.url({ membership: member.id }), { role: e.target.value }, { preserveScroll: true })}
-                                                className="h-9 rounded-md border border-vs-border bg-white px-2 text-sm text-vs-text disabled:opacity-60"
+                                                className="h-9 rounded-md border border-input bg-card px-2 text-sm text-vs-text disabled:opacity-60"
                                             >
                                                 {roles.map((role) => (
                                                     <option key={role.value} value={role.value}>{roleLabel[role.value] ?? role.label}</option>
@@ -108,7 +108,7 @@ export default function TeamIndex({ memberships, roles }: Props) {
                                         <td className="px-4 py-3 text-right whitespace-nowrap">
                                             {member.status === 'active' ? (
                                                 <ConfirmAction
-                                                    trigger={<button type="button" className="font-medium text-red-600 hover:underline" disabled={member.is_self}>Suspender acesso</button>}
+                                                    trigger={<button type="button" className="font-medium text-vs-danger hover:underline" disabled={member.is_self}>Suspender acesso</button>}
                                                     title="Suspender acesso?"
                                                     description="A pessoa deixa de acessar esta empresa até ser reativada. A conta dela não é apagada."
                                                     confirmLabel="Suspender"
@@ -116,7 +116,7 @@ export default function TeamIndex({ memberships, roles }: Props) {
                                                     onConfirm={() => router.delete(deactivate.url({ membership: member.id }), { preserveScroll: true })}
                                                 />
                                             ) : (
-                                                <button type="button" onClick={() => router.post(activate.url({ membership: member.id }), {}, { preserveScroll: true })} className="font-medium text-vs-blue hover:underline">
+                                                <button type="button" onClick={() => router.post(activate.url({ membership: member.id }), {}, { preserveScroll: true })} className="font-medium text-vs-link hover:underline">
                                                     Reativar acesso
                                                 </button>
                                             )}

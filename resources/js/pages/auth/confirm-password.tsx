@@ -24,7 +24,7 @@ export default function ConfirmPassword() {
                                 placeholder="Senha"
                                 autoComplete="current-password"
                                 autoFocus
-                                className="h-11 border-vs-border"
+                                className="h-11 border-input"
                             />
 
                             <InputError message={errors.password} />

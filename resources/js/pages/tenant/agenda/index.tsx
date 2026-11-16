@@ -40,15 +40,22 @@ type Props = {
 
 const viewLabels = { day: 'Dia', week: 'Semana', month: 'Mês' } as const;
 
+const dayFormatter = new Intl.DateTimeFormat('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+
+/** Calendar days travel as YYYY-MM-DD. They are read as UTC so the viewer's time zone never shifts the day. */
+function formatDay(date: string): string {
+    return dayFormatter.format(new Date(`${date}T00:00:00Z`));
+}
+
 function shiftDate(date: string, view: Props['view'], direction: 1 | -1): string {
-    const value = new Date(`${date}T00:00:00`);
+    const value = new Date(`${date}T00:00:00Z`);
 
     if (view === 'day') {
-        value.setDate(value.getDate() + direction);
+        value.setUTCDate(value.getUTCDate() + direction);
     } else if (view === 'week') {
-        value.setDate(value.getDate() + 7 * direction);
+        value.setUTCDate(value.getUTCDate() + 7 * direction);
     } else {
-        value.setMonth(value.getMonth() + direction);
+        value.setUTCMonth(value.getUTCMonth() + direction);
     }
 
     return value.toISOString().slice(0, 10);
@@ -56,12 +63,12 @@ function shiftDate(date: string, view: Props['view'], direction: 1 | -1): string
 
 function daysBetween(from: string, to: string): string[] {
     const days: string[] = [];
-    const cursor = new Date(`${from}T00:00:00`);
-    const end = new Date(`${to}T00:00:00`);
+    const cursor = new Date(`${from}T00:00:00Z`);
+    const end = new Date(`${to}T00:00:00Z`);
 
     while (cursor <= end) {
         days.push(cursor.toISOString().slice(0, 10));
-        cursor.setDate(cursor.getDate() + 1);
+        cursor.setUTCDate(cursor.getUTCDate() + 1);
     }
 
     return days;
@@ -74,8 +81,8 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
     const booking = useForm<Record<string, string>>({ request_id: '', professional_id: '', date: date, time: '' });
     const blocking = useForm<Record<string, string>>({ professional_id: '', date: date, start: '', end: '', reason: '' });
 
-    const navigate = (nextView: Props['view'], nextDate: string) => {
-        router.get(agendaIndex.url(), { view: nextView, date: nextDate }, { preserveState: true, replace: true });
+    const navigate = (nextView: Props['view'], nextDate?: string) => {
+        router.get(agendaIndex.url(), nextDate === undefined ? { view: nextView } : { view: nextView, date: nextDate }, { preserveState: true, replace: true });
     };
 
     const loadSlots = async (requestId: string, professionalId: string, day: string) => {
@@ -111,7 +118,7 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
                 <PageHeader title="Agenda" description="Visualize atendimentos e bloqueios, agende horários livres e remarque ou cancele quando necessário." />
 
                 <div className="flex flex-wrap items-center gap-3">
-                    <div role="group" aria-label="Visualização" className="inline-flex rounded-md border border-vs-border bg-white p-1">
+                    <div role="group" aria-label="Visualização" className="inline-flex rounded-md border border-vs-border bg-card p-1">
                         {(Object.keys(viewLabels) as (keyof typeof viewLabels)[]).map((option) => (
                             <button
                                 key={option}
@@ -125,15 +132,15 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
                         ))}
                     </div>
                     <Button type="button" variant="outline" onClick={() => navigate(view, shiftDate(date, view, -1))}>Anterior</Button>
-                    <Button type="button" variant="outline" onClick={() => navigate(view, new Date().toISOString().slice(0, 10))}>Hoje</Button>
+                    <Button type="button" variant="outline" onClick={() => navigate(view)}>Hoje</Button>
                     <Button type="button" variant="outline" onClick={() => navigate(view, shiftDate(date, view, 1))}>Próximo</Button>
-                    <p className="text-sm text-vs-muted">{range.from} a {range.to}</p>
+                    <p className="text-sm text-vs-muted">{range.from === range.to ? formatDay(range.from) : `${formatDay(range.from)} a ${formatDay(range.to)}`}</p>
                 </div>
 
                 <div className={`grid gap-4 ${view === 'day' ? 'grid-cols-1' : 'sm:grid-cols-2 xl:grid-cols-4'}`}>
                     {days.map((day) => (
                         <Card key={day} className="grid content-start gap-2 border-vs-border/70 p-4 shadow-sm">
-                            <h2 className="text-sm font-semibold text-vs-text">{day}</h2>
+                            <h2 className="text-sm font-semibold text-vs-text">{formatDay(day)}</h2>
                             {appointmentsByDay(day).length === 0 && blocksByDay(day).length === 0 && (
                                 <p className="text-sm text-vs-muted">Sem compromissos.</p>
                             )}
@@ -143,11 +150,11 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
                                     <p className="text-vs-muted">{appointment.customer ?? '—'} · {appointment.professional ?? '—'}</p>
                                     <p className="text-vs-muted">Situação: {appointment.status_label}</p>
                                     <div className="mt-2 flex flex-wrap gap-3 text-sm">
-                                        <Link href={requestShow.url({ serviceRequest: appointment.request_id })} className="font-medium text-vs-blue hover:underline">Abrir solicitação</Link>
+                                        <Link href={requestShow.url({ serviceRequest: appointment.request_id })} className="font-medium text-vs-link hover:underline">Abrir solicitação</Link>
                                         {appointment.can_change && (
                                             <>
                                                 <details>
-                                                    <summary className="cursor-pointer font-medium text-vs-blue hover:underline">Remarcar</summary>
+                                                    <summary className="cursor-pointer font-medium text-vs-link hover:underline">Remarcar</summary>
                                                     <RescheduleForm appointmentId={appointment.id} current={appointment.starts_at} />
                                                 </details>
                                                 <CancelAppointment appointmentId={appointment.id} />
@@ -161,7 +168,7 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
                                     Bloqueio {block.time}–{block.ends} · {block.professional ?? '—'}{block.reason ? ` · ${block.reason}` : ''}
                                     <div className="mt-1">
                                         <ConfirmAction
-                                            trigger={<button type="button" className="font-medium text-red-600 hover:underline">Remover bloqueio</button>}
+                                            trigger={<button type="button" className="font-medium text-vs-danger hover:underline">Remover bloqueio</button>}
                                             title="Remover bloqueio?"
                                             description="O período volta a aceitar agendamentos."
                                             confirmLabel="Remover"
@@ -223,7 +230,7 @@ export default function AgendaIndex({ view, date, range, appointments, blocks, p
                                                 type="button"
                                                 onClick={() => booking.setData('time', slot)}
                                                 aria-pressed={booking.data.time === slot}
-                                                className={`rounded-md border px-3 py-1.5 text-sm ${booking.data.time === slot ? 'border-vs-blue bg-vs-blue text-white' : 'border-vs-border bg-white text-vs-text'}`}
+                                                className={`rounded-md border px-3 py-1.5 text-sm ${booking.data.time === slot ? 'border-vs-blue bg-vs-blue text-white' : 'border-input bg-card text-vs-text'}`}
                                             >
                                                 {slot}
                                             </button>
@@ -344,7 +351,7 @@ function RescheduleForm({ appointmentId, current }: { appointmentId: number; cur
             />
             <Button type="submit" size="sm" variant="outline" disabled={sending}>Confirmar</Button>
             {error && (
-                <p id={`reschedule-error-${appointmentId}`} role="alert" className="w-full text-sm text-red-600">
+                <p id={`reschedule-error-${appointmentId}`} role="alert" className="w-full text-sm text-vs-danger">
                     {error}
                 </p>
             )}
@@ -369,7 +376,7 @@ function CancelAppointment({ appointmentId }: { appointmentId: number }) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <button type="button" className="font-medium text-red-600 hover:underline">Cancelar</button>
+                <button type="button" className="font-medium text-vs-danger hover:underline">Cancelar</button>
             </DialogTrigger>
             <DialogContent>
                 <form
@@ -398,7 +405,7 @@ function CancelAppointment({ appointmentId }: { appointmentId: number }) {
                             value={form.data.reason}
                             onChange={(event) => form.setData('reason', event.target.value)}
                             aria-invalid={form.errors.reason ? true : undefined}
-                            className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none"
+                            className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none"
                         />
                     </Field>
                     <DialogFooter>

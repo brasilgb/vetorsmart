@@ -75,7 +75,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                 <PageHeader
                     title="Meu Site"
                     description="Seu site profissional. Alterações ficam em rascunho até a publicação."
-                    action={website.is_live && website.public_url ? <a href={website.public_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-vs-blue hover:underline">Abrir site publicado</a> : null}
+                    action={website.is_live && website.public_url ? <a href={website.public_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-vs-link hover:underline">Abrir site publicado</a> : null}
                 />
 
                 <nav aria-label="Seções do Meu Site" className="flex flex-wrap gap-2 border-b border-vs-border/70 pb-3">
@@ -94,7 +94,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                         <div><span className="text-vs-muted">Endereço público:</span> {website.public_url ?? 'Disponível após verificar um domínio'}</div>
                         <div><span className="text-vs-muted">Última publicação:</span> {website.published_at ?? '—'}{website.version ? ` (versão ${website.version})` : ''}</div>
                         <div><span className="text-vs-muted">Último rascunho:</span> {website.updated_at ?? '—'}</div>
-                        <div><Link href="/meu-site/previa" className="font-medium text-vs-blue hover:underline">Ver prévia do rascunho</Link></div>
+                        <div><Link href="/meu-site/previa" className="font-medium text-vs-link hover:underline">Ver prévia do rascunho</Link></div>
                     </Card>
                 )}
 
@@ -131,7 +131,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                                 <Input id="headline" value={content.data.headline} disabled={disabled} onChange={(e) => content.setData('headline', e.target.value)} className="h-10" />
                             </Field>
                             <Field id="about" label="Texto institucional" error={content.errors.about}>
-                                <textarea id="about" rows={4} value={content.data.about} disabled={disabled} onChange={(e) => content.setData('about', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                                <textarea id="about" rows={4} value={content.data.about} disabled={disabled} onChange={(e) => content.setData('about', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                             </Field>
                             <div className="grid gap-2">
                                 <p className="text-sm font-medium text-vs-text">Diferenciais (até 6)</p>
@@ -195,7 +195,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                             {domains.map((item) => (
                                 <div key={item.id} className="grid gap-2 rounded-md border border-vs-border/70 p-4 text-sm">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
-                                        <span className="font-medium text-vs-text">{item.hostname}{item.is_primary && <span className="ml-2 text-xs text-vs-blue">(principal)</span>}</span>
+                                        <span className="font-medium text-vs-text">{item.hostname}{item.is_primary && <span className="ml-2 text-xs text-vs-link">(principal)</span>}</span>
                                         <span className="text-vs-muted">{item.kind === 'subdomain' ? 'Endereço da plataforma' : 'Domínio próprio'} · {item.status === 'verified' ? 'Verificado' : 'Aguardando verificação'}</span>
                                     </div>
                                     {item.dns && (
@@ -205,10 +205,10 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                                     )}
                                     {canEdit && (
                                         <div className="flex flex-wrap gap-3">
-                                            {item.status !== 'verified' && <button type="button" className="font-medium text-vs-blue hover:underline" onClick={() => router.post(verify.url({ domain: item.id }), {}, { preserveScroll: true })}>Verificar</button>}
-                                            {item.status === 'verified' && !item.is_primary && <button type="button" className="font-medium text-vs-blue hover:underline" onClick={() => router.post(primary.url({ domain: item.id }), {}, { preserveScroll: true })}>Tornar principal</button>}
+                                            {item.status !== 'verified' && <button type="button" className="font-medium text-vs-link hover:underline" onClick={() => router.post(verify.url({ domain: item.id }), {}, { preserveScroll: true })}>Verificar</button>}
+                                            {item.status === 'verified' && !item.is_primary && <button type="button" className="font-medium text-vs-link hover:underline" onClick={() => router.post(primary.url({ domain: item.id }), {}, { preserveScroll: true })}>Tornar principal</button>}
                                             <ConfirmAction
-                                                trigger={<button type="button" className="font-medium text-red-600 hover:underline">Remover</button>}
+                                                trigger={<button type="button" className="font-medium text-vs-danger hover:underline">Remover</button>}
                                                 title="Remover este endereço?"
                                                 description="Visitantes deixarão de acessar o site por este endereço."
                                                 confirmLabel="Remover"
@@ -250,7 +250,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                                 <Input id="seo-title" value={seo.data.seo.title} disabled={disabled} onChange={(e) => seo.setData('seo', { ...seo.data.seo, title: e.target.value })} className="h-10" />
                             </Field>
                             <Field id="seo-description" label="Descrição" error={seo.errors['seo.description']} hint="Até 160 caracteres.">
-                                <textarea id="seo-description" rows={2} value={seo.data.seo.description} disabled={disabled} onChange={(e) => seo.setData('seo', { ...seo.data.seo, description: e.target.value })} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                                <textarea id="seo-description" rows={2} value={seo.data.seo.description} disabled={disabled} onChange={(e) => seo.setData('seo', { ...seo.data.seo, description: e.target.value })} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                             </Field>
                             <label className="flex items-center gap-3 text-sm text-vs-text">
                                 <input type="checkbox" checked={seo.data.seo.indexable} disabled={disabled} onChange={(e) => seo.setData('seo', { ...seo.data.seo, indexable: e.target.checked })} className="size-4 accent-vs-blue" />

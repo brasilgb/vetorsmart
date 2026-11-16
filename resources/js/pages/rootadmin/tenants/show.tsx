@@ -166,7 +166,7 @@ export default function TenantShow({ tenant, settings, operations, history, user
                             >
                                 {isActive ? 'Suspender empresa' : 'Ativar empresa'}
                             </Button>
-                            {form.errors.confirm && <p className="text-sm text-red-600">{form.errors.confirm}</p>}
+                            {form.errors.confirm && <p className="text-sm text-vs-danger">{form.errors.confirm}</p>}
                         </form>
                     </CardContent>
                 </Card>

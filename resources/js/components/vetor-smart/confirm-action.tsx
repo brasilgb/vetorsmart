@@ -40,7 +40,7 @@ export function ConfirmAction({ trigger, title, description, confirmLabel, onCon
                 </DialogHeader>
                 <DialogFooter className="gap-2 sm:gap-2">
                     <DialogClose asChild>
-                        <Button type="button" variant="outline">Cancelar</Button>
+                        <Button type="button" variant="outline">Voltar</Button>
                     </DialogClose>
                     <Button
                         type="button"

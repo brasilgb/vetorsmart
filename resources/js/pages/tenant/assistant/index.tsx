@@ -100,7 +100,7 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
             {items.map((item) => (
                 <li key={item.id} className="space-y-2 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                        <Link href={assistantIndex.url({ query: { conversation: item.id } })} className="font-medium text-vs-blue hover:underline">
+                        <Link href={assistantIndex.url({ query: { conversation: item.id } })} className="font-medium text-vs-link hover:underline">
                             Conversa #{item.id} — {item.customer ?? 'Não identificado'}
                         </Link>
                         <span className="text-xs text-vs-muted">{item.last_activity}</span>
@@ -145,7 +145,7 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
 
                 <Card className="space-y-2 border-vs-border/70 p-4 shadow-sm">
                     <p className="text-sm text-vs-text">
-                        Endereço do atendimento: {publicUrl ? <a className="font-medium text-vs-blue hover:underline" href={publicUrl} target="_blank" rel="noreferrer">{publicUrl}</a> : 'disponível após a empresa ter um domínio verificado e o site publicado.'}
+                        Endereço do atendimento: {publicUrl ? <a className="font-medium text-vs-link hover:underline" href={publicUrl} target="_blank" rel="noreferrer">{publicUrl}</a> : 'disponível após a empresa ter um domínio verificado e o site publicado.'}
                     </p>
                     <p className="text-xs text-vs-muted">O visitante só agenda por horários reais do cadastro. Desativar a recepcionista mantém os contatos da empresa visíveis na página.</p>
                 </Card>
@@ -170,11 +170,11 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
                         </Field>
 
                         <Field id="greeting" label="Saudação inicial" error={form.errors.greeting}>
-                            <textarea id="greeting" rows={2} value={form.data.greeting} disabled={disabled} onChange={(e) => form.setData('greeting', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                            <textarea id="greeting" rows={2} value={form.data.greeting} disabled={disabled} onChange={(e) => form.setData('greeting', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                         </Field>
 
                         <Field id="presentation" label="Apresentação da empresa" error={form.errors.presentation}>
-                            <textarea id="presentation" rows={2} value={form.data.presentation} disabled={disabled} onChange={(e) => form.setData('presentation', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                            <textarea id="presentation" rows={2} value={form.data.presentation} disabled={disabled} onChange={(e) => form.setData('presentation', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                         </Field>
 
                         <Field id="service_region" label="Região de atendimento" error={form.errors.service_region}>
@@ -186,15 +186,15 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
                         </Field>
 
                         <Field id="commercial_info" label="Informações comerciais adicionais" error={form.errors.commercial_info}>
-                            <textarea id="commercial_info" rows={2} value={form.data.commercial_info} disabled={disabled} onChange={(e) => form.setData('commercial_info', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                            <textarea id="commercial_info" rows={2} value={form.data.commercial_info} disabled={disabled} onChange={(e) => form.setData('commercial_info', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                         </Field>
 
                         <Field id="guidance" label="Orientações específicas" error={form.errors.guidance}>
-                            <textarea id="guidance" rows={2} value={form.data.guidance} disabled={disabled} onChange={(e) => form.setData('guidance', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                            <textarea id="guidance" rows={2} value={form.data.guidance} disabled={disabled} onChange={(e) => form.setData('guidance', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                         </Field>
 
                         <Field id="handoff_conditions" label="Condições para encaminhar a um humano" error={form.errors.handoff_conditions}>
-                            <textarea id="handoff_conditions" rows={2} value={form.data.handoff_conditions} disabled={disabled} onChange={(e) => form.setData('handoff_conditions', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text disabled:opacity-60" />
+                            <textarea id="handoff_conditions" rows={2} value={form.data.handoff_conditions} disabled={disabled} onChange={(e) => form.setData('handoff_conditions', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
                         </Field>
 
                         <Field id="privacy_policy_url" label="Link da política de privacidade (https)" error={form.errors.privacy_policy_url}>
@@ -259,7 +259,7 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
                             ) : (
                                 <p className="text-xs text-vs-muted">Assuma a conversa para responder ao cliente. Enquanto um atendente conduz, a recepcionista virtual não responde.</p>
                             )}
-                            {reply_.errors.body && <p className="text-xs text-red-700">{reply_.errors.body}</p>}
+                            {reply_.errors.body && <p className="text-xs text-vs-danger">{reply_.errors.body}</p>}
 
                             {!selected.identified && selected.status !== 'closed' && (
                                 <form onSubmit={submitIdentify} className="space-y-3 rounded-md border border-vs-border/70 p-3">

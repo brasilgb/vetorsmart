@@ -51,7 +51,7 @@ export default function Login({ status }: Props) {
                                 autoFocus
                                 autoComplete="email"
                                 placeholder="voce@empresa.com.br"
-                                className="h-11 border-vs-border"
+                                className="h-11 border-input"
                             />
                             <InputError message={errors.email} />
                         </div>
@@ -66,7 +66,7 @@ export default function Login({ status }: Props) {
                                 required
                                 autoComplete="current-password"
                                 placeholder="Sua senha"
-                                className="h-11 border-vs-border"
+                                className="h-11 border-input"
                             />
                             <InputError message={errors.password} />
                         </div>

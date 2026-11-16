@@ -29,6 +29,8 @@ type Props = {
 
 const priceLabel: Record<string, string> = { fixed: 'Valor fixo', starting_at: 'A partir de', on_request: 'Sob consulta' };
 
+const currency = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
+
 /**
  * Filters use a plain GET form with values taken from the server, so the screen keeps no local
  * copy of them. The server reads the same parameters and decides what each member may change.
@@ -94,16 +96,16 @@ export default function ServicesIndex({ filters, categories, services }: Props) 
                                             <td className="px-4 py-3 text-vs-muted">
                                                 {service.price_type === 'on_request' || service.price === null
                                                     ? priceLabel[service.price_type] ?? '—'
-                                                    : `${priceLabel[service.price_type]} R$ ${service.price}`}
+                                                    : `${priceLabel[service.price_type]} ${currency.format(Number(service.price))}`}
                                             </td>
                                             <td className="px-4 py-3"><StatusBadge active={service.active} /></td>
                                             <td className="space-x-3 px-4 py-3 text-right whitespace-nowrap">
                                                 {canManage ? (
                                                     <>
-                                                        <Link href={edit.url({ service: service.id })} className="font-medium text-vs-blue hover:underline">Editar</Link>
+                                                        <Link href={edit.url({ service: service.id })} className="font-medium text-vs-link hover:underline">Editar</Link>
                                                         {service.active && (
                                                             <ConfirmAction
-                                                                trigger={<button type="button" className="font-medium text-red-600 hover:underline">Desativar</button>}
+                                                                trigger={<button type="button" className="font-medium text-vs-danger hover:underline">Desativar</button>}
                                                                 title="Desativar serviço?"
                                                                 description="Ele deixa de aceitar novos agendamentos. O histórico é mantido."
                                                                 confirmLabel="Desativar"

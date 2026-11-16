@@ -62,7 +62,7 @@
             <p>Atendimento virtual</p>
         </div>
         <div style="display:flex;gap:10px;align-items:center">
-            <span id="state" class="pill" role="status" aria-live="polite">Conectando…</span>
+            <span id="state" class="pill" role="status" aria-live="polite">{{ $available ? 'Conectando…' : 'Indisponível' }}</span>
             <a class="back" href="{{ $siteUrl }}">Voltar ao site</a>
         </div>
     </header>

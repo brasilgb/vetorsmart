@@ -93,7 +93,7 @@ export function HeroSection() {
                                             <span className="text-[11px] font-semibold uppercase text-vs-muted">{kpi.label}</span>
                                             <div className="mt-1 flex items-baseline gap-2">
                                                 <span className={`font-display text-2xl font-bold ${kpi.tone}`}>{kpi.value}</span>
-                                                <span className="text-xs font-semibold text-emerald-600">{kpi.delta}</span>
+                                                <span className="text-xs font-semibold text-emerald-700">{kpi.delta}</span>
                                             </div>
                                             <span className="mt-1 block text-xs text-vs-muted">{kpi.hint}</span>
                                         </div>
@@ -145,7 +145,7 @@ export function HeroSection() {
                                             </span>
                                             <div>
                                                 <h4 className="text-sm font-bold text-vs-text">Atendimento VetorSmart</h4>
-                                                <p className="text-xs font-medium text-emerald-600">Recepcionista virtual ativa • 24/7</p>
+                                                <p className="text-xs font-medium text-emerald-700">Recepcionista virtual ativa • 24/7</p>
                                             </div>
                                         </div>
                                         <span className="rounded bg-vs-canvas-blue px-2 py-0.5 text-xs font-semibold text-vs-muted">Site ClimaTech</span>
@@ -175,7 +175,7 @@ export function HeroSection() {
                                             <span className="block text-[11px] text-emerald-700">Adicionado à agenda automaticamente</span>
                                         </div>
                                     </div>
-                                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-xs font-semibold text-white">Solicitação #1042</span>
+                                    <span className="rounded bg-emerald-700 px-2 py-0.5 text-xs font-semibold text-white">Solicitação #1042</span>
                                 </div>
                             </div>
                         </div>

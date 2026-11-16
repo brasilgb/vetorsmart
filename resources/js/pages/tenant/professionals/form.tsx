@@ -89,7 +89,7 @@ export default function ProfessionalForm({ professional, services }: Props) {
                         </Field>
                         <div className="md:col-span-2">
                             <Field id="notes" label="Especialidades e observações" error={form.errors.notes}>
-                                <textarea id="notes" rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none" />
+                                <textarea id="notes" rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none" />
                             </Field>
                         </div>
                         <label className="flex items-center gap-3 text-sm text-vs-text md:col-span-2">
@@ -112,7 +112,7 @@ export default function ProfessionalForm({ professional, services }: Props) {
                                 ))}
                             </div>
                         )}
-                        {form.errors.service_ids && <p className="text-sm text-red-600">{form.errors.service_ids}</p>}
+                        {form.errors.service_ids && <p className="text-sm text-vs-danger">{form.errors.service_ids}</p>}
                     </Card>
 
                     <Card className="grid gap-4 border-vs-border/70 p-6 shadow-sm">
@@ -136,10 +136,10 @@ export default function ProfessionalForm({ professional, services }: Props) {
                                 <Field id={`end-${index}`} label="Término">
                                     <Input id={`end-${index}`} type="time" value={window.end_time} onChange={(e) => updateWindow(index, { end_time: e.target.value })} className="h-10" />
                                 </Field>
-                                <Button type="button" variant="ghost" onClick={() => removeWindow(index)} className="h-10 text-red-600">Remover</Button>
+                                <Button type="button" variant="ghost" onClick={() => removeWindow(index)} className="h-10 text-vs-danger">Remover</Button>
                             </div>
                         ))}
-                        {(form.errors as Record<string, string | undefined>).availability && <p className="text-sm text-red-600">{(form.errors as Record<string, string | undefined>).availability}</p>}
+                        {(form.errors as Record<string, string | undefined>).availability && <p className="text-sm text-vs-danger">{(form.errors as Record<string, string | undefined>).availability}</p>}
                     </Card>
 
                     <div className="flex flex-wrap gap-3">

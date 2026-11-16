@@ -131,12 +131,12 @@ export default function CustomerForm({ customer, history }: Props) {
 
                         <div className="md:col-span-2">
                             <Field id="notes" label="Observações" error={form.errors.notes}>
-                                <textarea id="notes" rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none" />
+                                <textarea id="notes" rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none" />
                             </Field>
                         </div>
 
                         {(form.errors as Record<string, string | undefined>).duplicate && (
-                            <p className="md:col-span-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{(form.errors as Record<string, string | undefined>).duplicate}</p>
+                            <p className="md:col-span-2 rounded-md bg-vs-danger-soft px-3 py-2 text-sm text-vs-danger">{(form.errors as Record<string, string | undefined>).duplicate}</p>
                         )}
 
                         <div className="flex flex-wrap gap-3 md:col-span-2">

@@ -49,13 +49,13 @@ export default function UsersIndex({ filters, memberships }: Props) {
 
                 <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_180px_180px_auto]">
                     <Input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Buscar por nome ou e-mail" aria-label="Buscar usuário" className="h-10" />
-                    <select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Perfil" className="h-10 rounded-md border border-vs-border bg-white px-3 text-sm">
+                    <select value={role} onChange={(event) => setRole(event.target.value)} aria-label="Perfil" className="h-10 rounded-md border border-input bg-card px-3 text-sm text-vs-text">
                         <option value="">Todos os perfis</option>
                         <option value="owner">Proprietário</option>
                         <option value="admin">Administrador</option>
                         <option value="operator">Operador</option>
                     </select>
-                    <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Vínculo" className="h-10 rounded-md border border-vs-border bg-white px-3 text-sm">
+                    <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Vínculo" className="h-10 rounded-md border border-input bg-card px-3 text-sm text-vs-text">
                         <option value="">Todos os vínculos</option>
                         <option value="active">Ativo</option>
                         <option value="inactive">Inativo</option>
@@ -85,7 +85,7 @@ export default function UsersIndex({ filters, memberships }: Props) {
                                         <td className="px-4 py-3 text-vs-text">{row.name}</td>
                                         <td className="px-4 py-3 text-vs-muted">{row.email}</td>
                                         <td className="px-4 py-3">
-                                            <Link href={tenantShow.url({ tenant: row.tenant_id })} className="text-vs-blue hover:underline">{row.tenant ?? '—'}</Link>
+                                            <Link href={tenantShow.url({ tenant: row.tenant_id })} className="text-vs-link hover:underline">{row.tenant ?? '—'}</Link>
                                         </td>
                                         <td className="px-4 py-3">{roleLabel[row.role] ?? row.role}</td>
                                         <td className="px-4 py-3">{row.membership_status === 'active' ? 'Ativo' : 'Inativo'}</td>

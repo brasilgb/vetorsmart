@@ -23,7 +23,7 @@ export default function Welcome({ segments }: Props) {
         <>
             <Head title="VetorSmart — Seu negócio mais organizado" />
 
-            <div className="flex min-h-dvh flex-col overflow-x-clip bg-vs-canvas text-vs-text antialiased">
+            <div className="vs-light flex min-h-dvh flex-col overflow-x-clip bg-vs-canvas text-vs-text antialiased">
                 <LandingHeader />
 
                 <main className="flex-1">

@@ -49,13 +49,13 @@ export default function TenantsIndex({ filters, segments, tenants }: Props) {
 
                 <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_180px_220px_auto]">
                     <Input value={term} onChange={(event) => setTerm(event.target.value)} placeholder="Buscar por nome" aria-label="Buscar por nome" className="h-10" />
-                    <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Status" className="h-10 rounded-md border border-vs-border bg-white px-3 text-sm">
+                    <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="Status" className="h-10 rounded-md border border-input bg-card px-3 text-sm text-vs-text">
                         <option value="">Todos os status</option>
                         <option value="active">Ativas</option>
                         <option value="suspended">Suspensas</option>
                         <option value="cancelled">Canceladas</option>
                     </select>
-                    <select value={segmentId} onChange={(event) => setSegmentId(event.target.value)} aria-label="Segmento" className="h-10 rounded-md border border-vs-border bg-white px-3 text-sm">
+                    <select value={segmentId} onChange={(event) => setSegmentId(event.target.value)} aria-label="Segmento" className="h-10 rounded-md border border-input bg-card px-3 text-sm text-vs-text">
                         <option value="">Todos os segmentos</option>
                         {segments.map((segment) => (
                             <option key={segment.id} value={segment.id}>{segment.name}</option>
@@ -91,7 +91,7 @@ export default function TenantsIndex({ filters, segments, tenants }: Props) {
                                         </td>
                                         <td className="px-4 py-3 text-vs-muted">{tenant.created_at ?? '—'}</td>
                                         <td className="px-4 py-3 text-right">
-                                            <Link href={tenantShow.url({ tenant: tenant.id })} className="font-medium text-vs-blue hover:underline">Ver</Link>
+                                            <Link href={tenantShow.url({ tenant: tenant.id })} className="font-medium text-vs-link hover:underline">Ver</Link>
                                         </td>
                                     </tr>
                                 ))}

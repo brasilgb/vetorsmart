@@ -21,7 +21,7 @@ type Props = {
     segments: Segment[];
 };
 
-const fieldClass = 'h-10 border-vs-border';
+const fieldClass = 'h-10 border-input';
 
 /**
  * Company and owner in one screen. Only what the account needs is requested: no
@@ -66,7 +66,7 @@ export default function Register({ passwordRules, segments }: Props) {
                                 name="segment_id"
                                 required
                                 defaultValue=""
-                                className="h-10 w-full rounded-md border border-vs-border bg-white px-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none"
+                                className="h-10 w-full rounded-md border border-input bg-white px-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none"
                             >
                                 <option value="" disabled>
                                     Selecione um segmento

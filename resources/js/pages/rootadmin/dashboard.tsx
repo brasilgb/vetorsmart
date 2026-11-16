@@ -91,7 +91,7 @@ export default function RootadminDashboard({ totals, sites, appointments, ai, pe
                                     {recent.map((tenant) => (
                                         <tr key={tenant.id} className="border-t border-vs-border/70">
                                             <td className="py-2">
-                                                <Link href={tenantShow.url({ tenant: tenant.id })} className="font-medium text-vs-blue hover:underline">
+                                                <Link href={tenantShow.url({ tenant: tenant.id })} className="font-medium text-vs-link hover:underline">
                                                     {tenant.name}
                                                 </Link>
                                             </td>

@@ -41,7 +41,7 @@ export default function RequestCreate({ customers }: Props) {
                             rows={4}
                             value={form.data.description}
                             onChange={(event) => form.setData('description', event.target.value)}
-                            className="w-full rounded-md border border-vs-border bg-white px-3 py-2 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none"
+                            className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none"
                             required
                         />
                     </Field>

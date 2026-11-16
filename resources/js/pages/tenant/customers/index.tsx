@@ -81,10 +81,10 @@ export default function CustomersIndex({ filters, customers }: Props) {
                                             <td className="px-4 py-3 text-vs-muted">{customer.city ?? '—'}</td>
                                             <td className="px-4 py-3"><StatusBadge active={customer.status === 'active'} /></td>
                                             <td className="space-x-3 px-4 py-3 text-right whitespace-nowrap">
-                                                <Link href={edit.url({ customer: customer.id })} className="font-medium text-vs-blue hover:underline">Editar</Link>
+                                                <Link href={edit.url({ customer: customer.id })} className="font-medium text-vs-link hover:underline">Editar</Link>
                                                 {customer.status === 'active' && (
                                                     <ConfirmAction
-                                                        trigger={<button type="button" className="font-medium text-red-600 hover:underline">Arquivar</button>}
+                                                        trigger={<button type="button" className="font-medium text-vs-danger hover:underline">Arquivar</button>}
                                                         title="Arquivar cliente?"
                                                         description="O cliente deixa de aparecer nas buscas padrão, mas o histórico é mantido."
                                                         confirmLabel="Arquivar"

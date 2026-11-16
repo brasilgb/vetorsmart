@@ -77,7 +77,7 @@ export default function RequestsIndex({ filters, statuses, requests }: Props) {
                                             <td className="px-4 py-3 text-vs-text">{item.status_label}</td>
                                             <td className="px-4 py-3 text-vs-muted">{item.created_at}</td>
                                             <td className="px-4 py-3 text-right">
-                                                <Link href={show.url({ serviceRequest: item.id })} className="font-medium text-vs-blue hover:underline">Abrir</Link>
+                                                <Link href={show.url({ serviceRequest: item.id })} className="font-medium text-vs-link hover:underline">Abrir</Link>
                                             </td>
                                         </tr>
                                     ))}

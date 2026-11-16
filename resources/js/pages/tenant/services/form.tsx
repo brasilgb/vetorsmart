@@ -118,7 +118,7 @@ export default function ServiceForm({ service, categories, professionals, linked
 
                         <div className="md:col-span-2">
                             <Field id="description" label="Descrição" error={form.errors.description}>
-                                <textarea id="description" rows={3} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} className="w-full rounded-md border border-vs-border bg-white p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none" />
+                                <textarea id="description" rows={3} value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text focus-visible:ring-[3px] focus-visible:ring-vs-blue/30 focus-visible:outline-none" />
                             </Field>
                         </div>
 

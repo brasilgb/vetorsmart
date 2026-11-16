@@ -6,7 +6,7 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
 /* Auth screens (.vs-auth) always render the light brand surface, so dark variants skip them. */
-@custom-variant dark (&:is(.dark *):not(:is(.vs-auth, .vs-auth *)));
+@custom-variant dark (&:is(.dark *):not(:is(.vs-auth, .vs-auth *, .vs-light, .vs-light *)));
 
 @theme {
     --font-sans:
@@ -153,10 +153,19 @@
     --color-vs-blue: #2563EB;
     --color-vs-blue-hover: #1D4ED8;
     --color-vs-cyan: #06B6D4;
-    --color-vs-surface: #F8FAFC;
-    --color-vs-border: #CBD5E1;
-    --color-vs-text: #0B1220;
-    --color-vs-muted: #475569;
+
+    /*
+     * Theme-aware text, surface and line tokens. They read the --vs-* variables below, so the same
+     * utility (text-vs-text, text-vs-muted, ...) follows the light or dark theme. The brand hues
+     * above stay fixed: they are used as fills behind white text, where they pass in both themes.
+     */
+    --color-vs-surface: var(--vs-surface);
+    --color-vs-border: var(--vs-border);
+    --color-vs-text: var(--vs-text);
+    --color-vs-muted: var(--vs-muted);
+    --color-vs-link: var(--vs-link);
+    --color-vs-danger: var(--vs-danger);
+    --color-vs-danger-soft: var(--vs-danger-soft);
 
     /* Landing: neutral line, soft category tints and the ink used on each tint (contrast checked). */
     --color-vs-line: #E2E8F0;
@@ -193,7 +202,8 @@
     --ring: #2563EB;
     --muted-foreground: #475569;
     --border: #CBD5E1;
-    --input: #CBD5E1;
+    /* Field outlines: 3.2:1 on white (WCAG 1.4.11). Decorative lines keep the lighter --border. */
+    --input: #8291A7;
     --sidebar: #0F172A;
     --sidebar-foreground: #E2E8F0;
     --sidebar-primary: #2563EB;
@@ -202,6 +212,15 @@
     --sidebar-accent-foreground: #FFFFFF;
     --sidebar-border: #1E3A5F;
     --sidebar-ring: #06B6D4;
+
+    /* Light values of the theme-aware VetorSmart tokens (contrast on white). */
+    --vs-text: #0B1220; /* 18:1 */
+    --vs-muted: #475569; /* 7.6:1 */
+    --vs-border: #CBD5E1;
+    --vs-surface: #F8FAFC;
+    --vs-link: #1D4ED8; /* 6.7:1 */
+    --vs-danger: #B91C1C; /* 6.5:1 */
+    --vs-danger-soft: #FEF2F2;
 }
 
 /*
@@ -223,9 +242,11 @@
     --muted-foreground: #94A3B8;
     --accent: #1E293B;
     --accent-foreground: #E2E8F0;
-    --border: #1E293B;
-    --input: #1E293B;
+    --border: #334155;
+    /* Field outlines: 3.6:1 on cards. */
+    --input: #64748B;
     --ring: #3B82F6;
+    --destructive-foreground: #F87171;
     --sidebar: #0B1220;
     --sidebar-foreground: #E2E8F0;
     --sidebar-primary: #3B82F6;
@@ -234,6 +255,18 @@
     --sidebar-accent-foreground: #FFFFFF;
     --sidebar-border: #1E293B;
     --sidebar-ring: #06B6D4;
+
+    /*
+     * Dark values of the theme-aware tokens. Contrast on cards (#111A2E): text 13.6:1, muted 7.6:1,
+     * links 6.8:1, danger 6.3:1. Lines are lifted so cards and tables stay distinct from the page.
+     */
+    --vs-text: #E2E8F0;
+    --vs-muted: #A3B3C9;
+    --vs-border: #334155;
+    --vs-surface: #16213A;
+    --vs-link: #60A5FA;
+    --vs-danger: #F87171;
+    --vs-danger-soft: #2A1418;
 }
 
 /* Landing type scale: fluid, so headings keep their rhythm from 390 px to 1440 px. */
@@ -274,6 +307,21 @@
 }
 
 /*
+ * Surfaces that always render light, whatever the app theme: the landing page (.vs-light) and the
+ * authentication screens (.vs-auth). They pin the theme-aware tokens to their light values.
+ */
+.vs-auth,
+.vs-light {
+    --vs-text: #0B1220;
+    --vs-muted: #475569;
+    --vs-border: #CBD5E1;
+    --vs-surface: #F8FAFC;
+    --vs-link: #1D4ED8;
+    --vs-danger: #B91C1C;
+    --vs-danger-soft: #FEF2F2;
+}
+
+/*
  * Authentication screens. The form sits on a white card over the brand background, so the
  * light tokens are pinned here even when the app runs in dark mode. Without this, dark mode
  * gave inputs near-white text on the white card. Contrast on white: text 18:1, labels and
@@ -297,7 +345,7 @@
     --accent-foreground: #0B1220;
     --destructive: #B91C1C;
     --border: #CBD5E1;
-    --input: #94A3B8;
+    --input: #8291A7;
     --ring: #2563EB;
     color: var(--foreground);
 }
