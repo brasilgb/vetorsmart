@@ -68,14 +68,15 @@ export default function SettingsIndex({ settings, segments, canEdit }: Props) {
 
     const identity = useForm({ brand_color: settings.brand_color });
 
-    const days = Array.from({ length: 7 }, (_, weekday) => {
-        const day = settings.business_hours?.[String(weekday)] ?? null;
-
-        return { open: day !== null, from: day?.open ?? '08:00', to: day?.close ?? '18:00' };
+    const hours = useForm<{ business_hours: Record<string, DayHours> }>({
+        business_hours: Object.fromEntries(Array.from({ length: 7 }, (_, weekday) => [weekday, settings.business_hours?.[String(weekday)] ?? null])) as Record<string, DayHours>,
     });
 
-    const hours = useForm<{ business_hours: Record<string, DayHours> }>({
-        business_hours: Object.fromEntries(days.map((day, weekday) => [weekday, day.open ? { open: day.from, close: day.to, breaks: [] } : null])) as Record<string, DayHours>,
+    // Read from the form, not from the saved settings: the checkbox and the time fields must follow what the user just changed.
+    const days = Array.from({ length: 7 }, (_, weekday) => {
+        const day = hours.data.business_hours[String(weekday)] ?? null;
+
+        return { open: day !== null, from: day?.open ?? '08:00', to: day?.close ?? '18:00', breaks: day?.breaks ?? [] };
     });
 
     const preferences = useForm({
@@ -98,7 +99,7 @@ export default function SettingsIndex({ settings, segments, canEdit }: Props) {
 
         hours.setData('business_hours', {
             ...hours.data.business_hours,
-            [weekday]: next.open ? { open: next.from, close: next.to, breaks: [] } : null,
+            [weekday]: next.open ? { open: next.from, close: next.to, breaks: next.breaks } : null,
         });
     };
 
