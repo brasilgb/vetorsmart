@@ -4,6 +4,7 @@ use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\ResolveTenant;
+use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SiteHostGuard;
 use App\Services\Websites\TrustedHosts;
 use Illuminate\Foundation\Application;
@@ -25,6 +26,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustHosts(at: fn (): array => app(TrustedHosts::class)->patterns());
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
+
+        // Every response, including errors and the API.
+        $middleware->append(SecurityHeaders::class);
 
         $middleware->web(prepend: [
             SiteHostGuard::class,

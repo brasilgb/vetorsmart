@@ -95,3 +95,15 @@ test('growth events of one company are not visible to another company', function
     expect(GrowthEvent::query()->where('tenant_id', $this->tenant->id)->count())->toBe(0)
         ->and(GrowthEvent::query()->where('tenant_id', $other->id)->count())->toBe(1);
 });
+
+test('every response carries the browser hardening headers, and HTTPS adds strict transport', function () {
+    foreach (['/', '/login', '/pagina-que-nao-existe/nem-esta'] as $path) {
+        $this->get($path)
+            ->assertHeader('X-Content-Type-Options', 'nosniff')
+            ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
+            ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
+            ->assertHeaderMissing('Strict-Transport-Security');
+    }
+
+    $this->get('https://localhost/login')->assertHeader('Strict-Transport-Security', 'max-age=31536000');
+});
