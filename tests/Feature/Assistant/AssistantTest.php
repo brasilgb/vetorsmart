@@ -16,9 +16,11 @@ use App\Models\Customer;
 use App\Models\Professional;
 use App\Models\ProfessionalAvailability;
 use App\Models\ProfessionalBlock;
+use App\Models\Segment;
 use App\Models\Service;
 use App\Models\ServiceRequest;
 use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -26,6 +28,7 @@ use App\Services\AppointmentScheduler;
 use App\Services\Assistant\AssistantConversations;
 use App\Services\Assistant\AssistantOperations;
 use App\Services\Assistant\AssistantProvider;
+use App\Services\Websites\TrustedHosts;
 use Carbon\CarbonImmutable;
 use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Database\QueryException;
@@ -37,16 +40,16 @@ use Illuminate\Testing\TestResponse;
 use Mockery;
 use PDOException;
 
-const ASSISTANT_HOST = 'clima-total.vetorsmart.test';
+const ASSISTANT_SITE = 'climatizacao/clima-total';
 
 /**
- * Request the visitor page or endpoints as if they arrived on the company's hostname.
+ * Request the visitor page or endpoints at the company's official address /{segment}/{company}.
  *
  * @param  array<string, mixed>  $data
  */
-function visitAssistant(string $method, string $path, array $data = [], string $host = ASSISTANT_HOST): TestResponse
+function visitAssistant(string $method, string $path, array $data = [], string $site = ASSISTANT_SITE): TestResponse
 {
-    $url = 'http://'.$host.$path;
+    $url = 'http://localhost/'.$site.$path;
     $client = test();
 
     // Always send the current visitor's cookie, empty when there is none, so a token from an earlier visitor never reaches this one.
@@ -55,9 +58,6 @@ function visitAssistant(string $method, string $path, array $data = [], string $
     $response = $method === 'GET'
         ? $client->get($url, ['Accept' => 'application/json'])
         : $client->post($url, $data, ['Accept' => 'application/json']);
-
-    // Requests to the company host change the URL root of the test; restore the central host for route() calls.
-    URL::forceRootUrl('http://localhost');
 
     return $response;
 }
@@ -140,7 +140,8 @@ function fakeAssistantProvider(?array $answer = null, ?Throwable $failure = null
 
 beforeEach(function () {
     assistantToken(null, true);
-    $this->tenant = Tenant::factory()->create(['name' => 'Clima Total']);
+    $this->segment = Segment::factory()->create(['name' => 'Climatização', 'slug' => 'climatizacao', 'active' => true]);
+    $this->tenant = Tenant::factory()->create(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment_id' => $this->segment->id]);
     TenantSetting::factory()->create([
         'tenant_id' => $this->tenant->id,
         'business_name' => 'Clima Total Ltda',
@@ -186,9 +187,8 @@ beforeEach(function () {
         ]);
     }
 
-    // The company publishes its site on its platform subdomain, which is the hostname the visitor uses.
+    // The company publishes its site; visitors reach it at /climatizacao/clima-total, with no domain to configure.
     $this->actingAs($this->owner);
-    $this->post('/meu-site/dominios', ['kind' => 'subdomain'])->assertRedirect('/meu-site');
     $this->patch('/meu-site/rascunho', ['section' => 'content', 'headline' => 'Clima Total'])->assertRedirect('/meu-site');
     $this->post('/meu-site/publicar')->assertRedirect('/meu-site');
 
@@ -530,13 +530,28 @@ test('the visitor page is offered only on a published company site with the assi
     startAssistant()->assertStatus(503);
 });
 
-test('the visitor page never answers on a host that is not a published company site', function () {
-    visitAssistant('GET', '/atendimento', [], 'desconhecido.vetorsmart.test')->assertNotFound();
+test('the visitor page never answers for a company or segment that does not exist', function () {
+    visitAssistant('GET', '/atendimento', [], 'climatizacao/desconhecida')->assertNotFound();
+    visitAssistant('GET', '/atendimento', [], 'inexistente/clima-total')->assertNotFound();
+    visitAssistant('POST', '/atendimento/conversa', [], 'climatizacao/desconhecida')->assertStatus(503);
 });
 
-test('the site host exposes no administrative route to visitors', function () {
-    visitAssistant('GET', '/atendimento-ia')->assertNotFound();
-    visitAssistant('GET', '/clientes')->assertNotFound();
+test('the company comes from the address only: a tenant sent by the browser is ignored', function () {
+    $other = Tenant::factory()->create(['segment_id' => $this->segment->id]);
+
+    startAssistant()->assertOk();
+    visitAssistant('POST', '/atendimento/mensagens', ['body' => 'oi', 'after' => 0, 'tenant_id' => $other->id, 'tenant' => $other->slug]);
+
+    expect(AssistantConversation::query()->where('tenant_id', $other->id)->exists())->toBeFalse()
+        ->and(AssistantConversation::query()->where('tenant_id', $this->tenant->id)->count())->toBe(1);
+});
+
+test('the visitor cookie is scoped to the company path, so companies on the same domain never share it', function () {
+    $cookie = collect(startAssistant()->headers->getCookies())->first(fn ($item) => $item->getName() === (string) config('assistant.session_cookie'));
+
+    expect($cookie)->not->toBeNull()
+        ->and($cookie->getPath())->toBe('/climatizacao/clima-total/atendimento')
+        ->and($cookie->isHttpOnly())->toBeTrue();
 });
 
 test('an operator takes a waiting conversation, replies and returns it to the assistant', function () {
@@ -644,11 +659,13 @@ test('a resent visitor message with the same client id is processed only once', 
         ->and($conversation->state)->toBe(AssistantState::Customer);
 });
 
-test('every public assistant route is behind the per-minute limit of 30 requests per company host and IP', function () {
-    $limit = RateLimiter::limiter('assistant-public')(Request::create('http://'.ASSISTANT_HOST.'/atendimento/mensagens', 'GET'));
+test('every public assistant route is behind the per-minute limit of 30 requests per company site and IP', function () {
+    $request = Request::create('http://localhost/'.ASSISTANT_SITE.'/atendimento/mensagens', 'GET');
+    $request->setRouteResolver(fn () => app('router')->getRoutes()->match($request)->bind($request));
+    $limit = RateLimiter::limiter('assistant-public')($request);
 
     expect($limit->maxAttempts)->toBe(30)
-        ->and($limit->key)->toBe('127.0.0.1|'.ASSISTANT_HOST);
+        ->and($limit->key)->toBe('127.0.0.1|'.ASSISTANT_SITE);
 
     foreach (['site.assistant.start', 'site.assistant.messages', 'site.assistant.send'] as $name) {
         expect(app('router')->getRoutes()->getByName($name)->gatherMiddleware())->toContain('throttle:assistant-public');
@@ -912,14 +929,14 @@ test('the public assistant answers 429 after 30 requests per minute from one vis
     expect(visitAssistant('GET', '/atendimento/mensagens')->status())->not->toBe(429);
 });
 
-test('the limit of one company host does not block the visitors of another company', function () {
+test('the limit of one company site does not block the visitors of another company', function () {
     for ($attempt = 1; $attempt <= 30; $attempt++) {
         visitAssistant('GET', '/atendimento/mensagens');
     }
 
     visitAssistant('GET', '/atendimento/mensagens')->assertStatus(429);
 
-    expect(visitAssistant('GET', '/atendimento/mensagens', [], 'outra-empresa.vetorsmart.test')->status())->not->toBe(429);
+    expect(visitAssistant('GET', '/atendimento/mensagens', [], 'climatizacao/outra-empresa')->status())->not->toBe(429);
 });
 
 test('a failure while writing the appointment rolls back the request and transfers the visitor without technical details', function () {
@@ -956,4 +973,37 @@ test('a failure while writing the appointment rolls back the request and transfe
     expect($conversation->appointment_id)->toBeNull()
         ->and($conversation->service_request_id)->toBe($handoff->getKey())
         ->and($conversation->state)->not->toBe(AssistantState::Done);
+});
+
+test('on the company own domain the assistant answers at /atendimento with a cookie scoped to that path', function () {
+    TenantDomain::query()->create(['tenant_id' => $this->tenant->id, 'hostname' => 'www.climatotal.com.br', 'kind' => 'custom', 'status' => 'verified', 'is_primary' => true, 'verified_at' => now()]);
+    app(TrustedHosts::class)->forgetCache();
+
+    $page = $this->get('http://www.climatotal.com.br/atendimento')->assertOk()->assertSee('Clima Total', false)->getContent();
+    expect($page)->toContain("var endpoint = '\\/atendimento'")
+        ->and($page)->toContain('href="https://www.climatotal.com.br/"');
+
+    $start = $this->withCookie((string) config('assistant.session_cookie'), '')
+        ->post('http://www.climatotal.com.br/atendimento/conversa', [], ['Accept' => 'application/json'])
+        ->assertOk();
+    URL::forceRootUrl('http://localhost');
+
+    $cookie = collect($start->headers->getCookies())->first(fn ($item) => $item->getName() === (string) config('assistant.session_cookie'));
+
+    expect($cookie->getPath())->toBe('/atendimento')
+        ->and(AssistantConversation::query()->sole()->tenant_id)->toBe($this->tenant->id);
+
+    // The visitor token of this company is useless at another company's standard address.
+    $token = CookieValuePrefix::remove(Crypt::decrypt($cookie->getValue(), false));
+    $other = Tenant::factory()->create(['slug' => 'frio-bom', 'segment_id' => $this->segment->id]);
+    expect($other->exists)->toBeTrue();
+    assistantToken($token);
+    visitAssistant('GET', '/atendimento/mensagens', [], 'climatizacao/frio-bom')->assertNotFound();
+
+    // The panel shows the canonical address of the assistant, on the company domain.
+    $this->actingAs($this->owner)->get('/atendimento-ia')->assertInertia(fn ($page) => $page->where('publicUrl', 'https://www.climatotal.com.br/atendimento'));
+});
+
+test('the panel shows the standard address of the assistant when the company has no domain of its own', function () {
+    $this->actingAs($this->owner)->get('/atendimento-ia')->assertInertia(fn ($page) => $page->where('publicUrl', 'https://vetorsmart.com.br/climatizacao/clima-total/atendimento'));
 });

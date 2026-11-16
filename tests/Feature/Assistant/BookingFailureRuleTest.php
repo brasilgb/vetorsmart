@@ -34,11 +34,11 @@ use Tests\TestCase;
 function visitorReadyToBook(TestCase $test): array
 {
     $company = $test->company;
-    $start = VisitorSite::start($test, $company['host']);
-    VisitorSite::say($test, $company['host'], $start['token'], 'limpeza');
-    VisitorSite::say($test, $company['host'], $start['token'], 'Maria Souza 11 98765-4321');
-    VisitorSite::say($test, $company['host'], $start['token'], 'amanhã');
-    VisitorSite::say($test, $company['host'], $start['token'], '1');
+    $start = VisitorSite::start($test, $company['site']);
+    VisitorSite::say($test, $company['site'], $start['token'], 'limpeza');
+    VisitorSite::say($test, $company['site'], $start['token'], 'Maria Souza 11 98765-4321');
+    VisitorSite::say($test, $company['site'], $start['token'], 'amanhã');
+    VisitorSite::say($test, $company['site'], $start['token'], '1');
 
     return [
         'token' => $start['token'],
@@ -65,7 +65,7 @@ test('a failed booking preserves the triage request in a recoverable state', fun
     $visitor = visitorReadyToBook($this);
     ($this->failingScheduler)();
 
-    VisitorSite::say($this, $this->company['host'], $visitor['token'], 'sim');
+    VisitorSite::say($this, $this->company['site'], $visitor['token'], 'sim');
 
     $request = ServiceRequest::query()->where('tenant_id', $this->company['tenant']->id)->sole();
     expect($request->status)->toBe(RequestStatus::Triaged)
@@ -78,7 +78,7 @@ test('a failed booking is never confirmed to the visitor nor stored as an appoin
     $visitor = visitorReadyToBook($this);
     ($this->failingScheduler)();
 
-    $reply = VisitorSite::say($this, $this->company['host'], $visitor['token'], 'sim')->getContent();
+    $reply = VisitorSite::say($this, $this->company['site'], $visitor['token'], 'sim')->getContent();
 
     expect($reply)->not->toContain('Agendamento confirmado')
         ->and($reply)->not->toContain('SQLSTATE')
@@ -93,7 +93,7 @@ test('the operator receives the conversation handed over with a reference, and t
     $visitor = visitorReadyToBook($this);
     ($this->failingScheduler)();
 
-    VisitorSite::say($this, $this->company['host'], $visitor['token'], 'sim');
+    VisitorSite::say($this, $this->company['site'], $visitor['token'], 'sim');
 
     $conversation = $visitor['conversation']->fresh();
     expect($conversation->status)->toBe(ConversationStatus::AwaitingHuman)
@@ -117,7 +117,7 @@ test('the request history shows the real result and never a booking', function (
     $visitor = visitorReadyToBook($this);
     ($this->failingScheduler)();
 
-    VisitorSite::say($this, $this->company['host'], $visitor['token'], 'sim');
+    VisitorSite::say($this, $this->company['site'], $visitor['token'], 'sim');
 
     $request = ServiceRequest::query()->where('tenant_id', $this->company['tenant']->id)->sole();
     $states = ServiceRequestEvent::query()->where('service_request_id', $request->getKey())->pluck('to_status')->all();
@@ -130,7 +130,7 @@ test('the request history shows the real result and never a booking', function (
 test('after the failure the operator can retry, and the retry books exactly once', function () {
     $visitor = visitorReadyToBook($this);
     ($this->failingScheduler)();
-    VisitorSite::say($this, $this->company['host'], $visitor['token'], 'sim');
+    VisitorSite::say($this, $this->company['site'], $visitor['token'], 'sim');
 
     // The failure is gone: the operator retries with the real scheduler, on the preserved request.
     app()->forgetInstance(AppointmentScheduler::class);
@@ -153,9 +153,9 @@ test('after the failure the operator can retry, and the retry books exactly once
 test('a visitor retry of the same confirmation does not book a second time after the failure', function () {
     $visitor = visitorReadyToBook($this);
     ($this->failingScheduler)();
-    VisitorSite::say($this, $this->company['host'], $visitor['token'], 'sim');
+    VisitorSite::say($this, $this->company['site'], $visitor['token'], 'sim');
 
-    VisitorSite::say($this, $this->company['host'], $visitor['token'], 'sim');
+    VisitorSite::say($this, $this->company['site'], $visitor['token'], 'sim');
 
     expect(Appointment::query()->count())->toBe(0)
         ->and(ServiceRequest::query()->where('tenant_id', $this->company['tenant']->id)->count())->toBe(1);

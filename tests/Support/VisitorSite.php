@@ -6,6 +6,7 @@ use App\Enums\PriceType;
 use App\Models\AssistantSetting;
 use App\Models\Professional;
 use App\Models\ProfessionalAvailability;
+use App\Models\Segment;
 use App\Models\Service;
 use App\Models\Tenant;
 use App\Models\TenantSetting;
@@ -18,19 +19,20 @@ use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 /**
- * Publishes a company site on its platform subdomain and talks to its visitor assistant over HTTP, the way a browser does:
- * the request goes to the company's hostname and the visitor's token travels in the encrypted cookie.
+ * Publishes a company site at /{segment}/{company} and talks to its visitor assistant over HTTP, the way a browser does:
+ * the request goes to the company's official address and the visitor's token travels in the encrypted cookie.
  */
 final class VisitorSite
 {
     /**
      * A company with a published site, an active service, a professional available every day, and the assistant enabled.
      *
-     * @return array{tenant: Tenant, owner: User, service: Service, professional: Professional, host: string}
+     * @return array{tenant: Tenant, owner: User, service: Service, professional: Professional, site: string}
      */
     public static function publish(TestCase $test, string $name, string $slug): array
     {
-        $tenant = Tenant::factory()->create(['name' => $name]);
+        $segment = Segment::query()->firstOrCreate(['slug' => 'climatizacao'], ['name' => 'Climatização', 'active' => true]);
+        $tenant = Tenant::factory()->create(['name' => $name, 'slug' => $slug, 'segment_id' => $segment->id]);
         TenantSetting::factory()->create(['tenant_id' => $tenant->id, 'business_name' => $name.' Ltda', 'city' => 'Campinas', 'state' => 'SP']);
 
         $owner = User::factory()->create();
@@ -70,23 +72,22 @@ final class VisitorSite
             'retention_days' => 30,
         ]);
 
-        $test->actingAs($owner)->post('/meu-site/dominios', ['kind' => 'subdomain'])->assertRedirect('/meu-site');
-        $test->patch('/meu-site/rascunho', ['section' => 'content', 'headline' => $name])->assertRedirect('/meu-site');
+        $test->actingAs($owner)->patch('/meu-site/rascunho', ['section' => 'content', 'headline' => $name])->assertRedirect('/meu-site');
         $test->post('/meu-site/publicar')->assertRedirect('/meu-site');
         auth()->logout();
         URL::forceRootUrl('http://localhost');
 
-        return ['tenant' => $tenant, 'owner' => $owner, 'service' => $service, 'professional' => $professional, 'host' => $slug.'.vetorsmart.test'];
+        return ['tenant' => $tenant, 'owner' => $owner, 'service' => $service, 'professional' => $professional, 'site' => 'climatizacao/'.$slug];
     }
 
     /**
-     * Starts a visitor conversation on the company's host. Returns the response and the visitor's plain token.
+     * Starts a visitor conversation on the company's site (segment/company). Returns the response and the visitor's plain token.
      *
      * @return array{response: TestResponse, token: ?string}
      */
-    public static function start(TestCase $test, string $host): array
+    public static function start(TestCase $test, string $site): array
     {
-        $response = self::withToken($test, null)->post(self::url($host, '/atendimento/conversa'), [], ['Accept' => 'application/json']);
+        $response = self::withToken($test, null)->post(self::url($site, '/atendimento/conversa'), [], ['Accept' => 'application/json']);
         URL::forceRootUrl('http://localhost');
 
         return ['response' => $response, 'token' => self::tokenOf($response)];
@@ -95,10 +96,10 @@ final class VisitorSite
     /**
      * Sends one visitor message with the given token (null sends no cookie at all).
      */
-    public static function say(TestCase $test, string $host, ?string $token, string $text): TestResponse
+    public static function say(TestCase $test, string $site, ?string $token, string $text): TestResponse
     {
         $client = self::withToken($test, $token);
-        $response = $client->post(self::url($host, '/atendimento/mensagens'), ['body' => $text, 'after' => 0], ['Accept' => 'application/json']);
+        $response = $client->post(self::url($site, '/atendimento/mensagens'), ['body' => $text, 'after' => 0], ['Accept' => 'application/json']);
         URL::forceRootUrl('http://localhost');
 
         return $response;
@@ -107,9 +108,9 @@ final class VisitorSite
     /**
      * Reads the visitor's messages with the given token.
      */
-    public static function read(TestCase $test, string $host, ?string $token): TestResponse
+    public static function read(TestCase $test, string $site, ?string $token): TestResponse
     {
-        $response = self::withToken($test, $token)->get(self::url($host, '/atendimento/mensagens?after=0'), ['Accept' => 'application/json']);
+        $response = self::withToken($test, $token)->get(self::url($site, '/atendimento/mensagens?after=0'), ['Accept' => 'application/json']);
         URL::forceRootUrl('http://localhost');
 
         return $response;
@@ -138,8 +139,8 @@ final class VisitorSite
         return $test->withCookie((string) config('assistant.session_cookie'), $token ?? '');
     }
 
-    private static function url(string $host, string $path): string
+    private static function url(string $site, string $path): string
     {
-        return 'http://'.$host.$path;
+        return 'http://localhost/'.$site.$path;
     }
 }

@@ -28,6 +28,8 @@
         <env name="VETORSMART_TEST_DATABASE" value="vetorsmart_test"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
+        <env name="PLATFORM_CENTRAL_HOST" value="localhost"/>
+        <env name="PLATFORM_PUBLIC_URL" value="https://vetorsmart.com.br"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
