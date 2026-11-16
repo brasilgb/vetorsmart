@@ -19,15 +19,9 @@ class WebsiteDomainController extends Controller
         $tenant = $context->requireTenant();
         Gate::authorize('manageSettings', $tenant);
 
-        if ($request->string('kind')->value() === 'subdomain') {
-            $domains->createSubdomain($tenant, $this->actor($request));
+        $domains->addCustomDomain($tenant, (string) $request->string('hostname')->value(), $this->actor($request));
 
-            Inertia::flash('toast', ['type' => 'success', 'message' => 'Endereço da plataforma criado.']);
-        } else {
-            $domains->addCustomDomain($tenant, (string) $request->string('hostname')->value(), $this->actor($request));
-
-            Inertia::flash('toast', ['type' => 'success', 'message' => 'Domínio adicionado. Publique o registro DNS indicado e depois verifique.']);
-        }
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Domínio adicionado. Publique o registro DNS indicado e depois verifique.']);
 
         return to_route('tenant.website.index');
     }

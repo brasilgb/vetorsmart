@@ -4,11 +4,12 @@ namespace App\Services;
 
 use App\Models\Segment;
 use App\Models\User;
+use App\Services\Websites\ReservedPaths;
 use Illuminate\Support\Str;
 
 final class SegmentService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(private AuditLogger $auditLogger, private ReservedPaths $reserved) {}
 
     /**
      * Create a global segment.
@@ -49,14 +50,15 @@ final class SegmentService
     }
 
     /**
-     * Build a slug unique across segments, appending a short suffix on collision.
+     * Build a slug unique across segments, appending a short suffix on collision. The slug is the first part of the
+     * public site address /{segment}/{company}, so a name owned by a platform route is never used.
      */
     private function uniqueSlug(string $name): string
     {
         $base = Str::slug($name) ?: 'segmento';
         $slug = $base;
 
-        while (Segment::query()->where('slug', $slug)->exists()) {
+        while ($this->reserved->isReserved($slug) || Segment::query()->where('slug', $slug)->exists()) {
             $slug = $base.'-'.Str::lower(Str::random(4));
         }
 

@@ -117,6 +117,7 @@
     var input = document.getElementById('body');
     var sendBtn = document.getElementById('send');
     var csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    var endpoint = {{ Js::from($endpoint) }};
     var lastId = 0;
     var timer = null;
 
@@ -183,7 +184,7 @@
     }
 
     function poll() {
-        request('GET', '/atendimento/mensagens?after=' + lastId).then(function (data) {
+        request('GET', endpoint + '/mensagens?after=' + lastId).then(function (data) {
             render(data.messages || []);
             applyStatus(data);
         }).catch(function () { /* the next poll tries again */ });
@@ -198,7 +199,7 @@
         sendBtn.disabled = !enabled;
     }
 
-    request('POST', '/atendimento/conversa').then(function (data) {
+    request('POST', endpoint + '/conversa').then(function (data) {
         render(data.messages || []);
         applyStatus(data);
         enable(true);
@@ -231,7 +232,7 @@
         enable(false);
         showError('');
 
-        request('POST', '/atendimento/mensagens', { body: body, after: lastId, client_id: pendingSend.clientId }).then(function (data) {
+        request('POST', endpoint + '/mensagens', { body: body, after: lastId, client_id: pendingSend.clientId }).then(function (data) {
             pendingSend = null;
             input.value = '';
             render(data.messages || []);

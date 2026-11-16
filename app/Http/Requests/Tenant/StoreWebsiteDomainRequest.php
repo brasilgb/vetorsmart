@@ -4,6 +4,10 @@ namespace App\Http\Requests\Tenant;
 
 use Illuminate\Foundation\Http\FormRequest;
 
+/**
+ * An optional custom domain. The official address /{segment}/{company} needs no domain, so platform subdomains are
+ * no longer created.
+ */
 class StoreWebsiteDomainRequest extends FormRequest
 {
     /**
@@ -12,8 +16,17 @@ class StoreWebsiteDomainRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'kind' => ['required', 'in:subdomain,custom'],
-            'hostname' => ['required_if:kind,custom', 'nullable', 'string', 'max:253'],
+            'hostname' => ['required', 'string', 'max:253'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'hostname.required' => 'Informe o domínio próprio, como www.suaempresa.com.br.',
         ];
     }
 }

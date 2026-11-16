@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Enums\AssistantMessageRole;
 use App\Enums\ConversationStatus;
-use App\Enums\DomainStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Assistant\IdentifyAssistantConversationRequest;
 use App\Http\Requests\Tenant\Assistant\OperatorReplyRequest;
@@ -13,11 +12,12 @@ use App\Models\AssistantConversation;
 use App\Models\AssistantSetting;
 use App\Models\Service;
 use App\Models\Tenant;
-use App\Models\TenantDomain;
 use App\Services\Assistant\AssistantConversations;
 use App\Services\Assistant\AssistantOperations;
 use App\Services\Assistant\AssistantSettingsService;
 use App\Services\Tenancy\TenantContext;
+use App\Services\Websites\PublicSiteAddress;
+use App\Services\Websites\WebsiteResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -230,16 +230,17 @@ class AssistantController extends Controller
     }
 
     /**
-     * Address of the visitor page: the company's primary verified domain, or null when there is none yet.
+     * Canonical address of the visitor page (on the company's own domain when it has one, otherwise
+     * /{segment}/{company}/atendimento), or null while the site is not live.
      */
     private function publicUrl(Tenant $tenant): ?string
     {
-        $domain = TenantDomain::query()
-            ->forTenant($tenant)
-            ->where('is_primary', true)
-            ->where('status', DomainStatus::Verified)
-            ->first();
+        if (! app(WebsiteResolver::class)->isLive($tenant)) {
+            return null;
+        }
 
-        return $domain === null ? null : config('platform.public_scheme', 'https').'://'.$domain->hostname.'/atendimento';
+        $base = app(PublicSiteAddress::class)->canonicalBase($tenant);
+
+        return $base === null ? null : $base.'/atendimento';
     }
 }

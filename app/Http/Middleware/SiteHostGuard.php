@@ -7,18 +7,26 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
- * On a tenant's public hostname only the site, its sitemap and its robots file exist.
- * Any other path answers with a generic 404, so the administrative area is never served
- * under a company's domain.
+ * On a company hostname (its own domain, or an earlier platform subdomain) only the public site exists: its home, its
+ * services page, its visitor assistant, its sitemap and its robots file. Any other path or method answers with a
+ * generic 404, so the administrative area is never served under a company's domain.
  */
 class SiteHostGuard
 {
-    private const array PUBLIC_PATHS = ['/', '/sitemap.xml', '/robots.txt'];
-
     /**
-     * The visitor assistant of the site: its page and its two public endpoints. Nothing else under /atendimento.
+     * Allowed paths and their methods on a company hostname.
+     *
+     * @var array<string, list<string>>
      */
-    private const array ASSISTANT_PATHS = ['/atendimento', '/atendimento/conversa', '/atendimento/mensagens'];
+    private const array SITE_PATHS = [
+        '/' => ['GET', 'HEAD'],
+        '/servicos' => ['GET', 'HEAD'],
+        '/sitemap.xml' => ['GET', 'HEAD'],
+        '/robots.txt' => ['GET', 'HEAD'],
+        '/atendimento' => ['GET', 'HEAD'],
+        '/atendimento/conversa' => ['POST'],
+        '/atendimento/mensagens' => ['GET', 'HEAD', 'POST'],
+    ];
 
     /**
      * @param  Closure(Request): Response  $next
@@ -29,11 +37,7 @@ class SiteHostGuard
             return $next($request);
         }
 
-        if (in_array($request->getPathInfo(), self::ASSISTANT_PATHS, true) && in_array($request->getMethod(), ['GET', 'HEAD', 'POST'], true)) {
-            return $next($request);
-        }
-
-        if (! in_array($request->getPathInfo(), self::PUBLIC_PATHS, true) || $request->isMethod('POST') || $request->isMethod('PATCH') || $request->isMethod('DELETE')) {
+        if (! in_array($request->getMethod(), self::SITE_PATHS[$request->getPathInfo()] ?? [], true)) {
             abort(404);
         }
 

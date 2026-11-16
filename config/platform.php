@@ -36,6 +36,22 @@ return [
     'public_scheme' => env('PLATFORM_PUBLIC_SCHEME', 'https'),
 
     /*
+    | Absolute base address of the official public sites: {public_url}/{segment}/{company}. Every company site lives
+    | under this single domain, so no DNS record or subdomain is needed per company. Defaults to APP_URL.
+    */
+    'public_url' => rtrim((string) env('PLATFORM_PUBLIC_URL', env('APP_URL', 'http://localhost')), '/'),
+
+    /*
+    | First path segments that can never be a segment slug, besides the first segment of every registered route
+    | (see App\Services\Websites\ReservedPaths). They cover files and folders served straight from public/.
+    */
+    'reserved_paths' => [
+        'build', 'storage', 'assets', 'images', 'img', 'css', 'js', 'fonts', 'vendor', '.well-known',
+        'favicon.ico', 'favicon.svg', 'apple-touch-icon.png', 'robots.txt', 'sitemap.xml', 'index.php',
+        'www', 'app', 'admin', 'painel', 'site', 'sites', 'empresa', 'empresas', 'segmento', 'segmentos',
+    ],
+
+    /*
     | Subdomains a company can never claim, so they cannot impersonate platform services.
     */
     'reserved_subdomains' => [

@@ -2,24 +2,18 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Controllers\Site\SiteController;
 use App\Models\Segment;
-use App\Services\Websites\WebsiteResolver;
-use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Inertia\Response;
 
 /**
- * The central host shows the commercial landing page. A company's hostname shows its
- * published site instead, and anything unknown answers with a plain 404.
+ * The commercial landing page of the central host. Company hostnames never reach it: their routes are registered
+ * first (routes/web.php) and serve the company site or redirect to it.
  */
 class LandingController extends Controller
 {
-    public function __invoke(Request $request, SiteController $site): mixed
+    public function __invoke(): Response
     {
-        if ($request->getHost() !== (string) config('platform.central_host')) {
-            return $site->show($request, app(WebsiteResolver::class));
-        }
-
         return Inertia::render('welcome', [
             'segments' => Segment::query()
                 ->where('active', true)

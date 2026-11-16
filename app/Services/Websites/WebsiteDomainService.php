@@ -15,8 +15,10 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Manages the hostnames a company uses for its public site. Platform subdomains are
- * created verified; custom domains stay pending until the DNS record is seen.
+ * Manages the optional custom domains of a company. Every site has a standard address, /{segment}/{company} on the
+ * platform domain; a verified custom domain also serves the site and becomes its canonical address. Custom domains
+ * stay pending until the DNS record is seen. Platform subdomains created earlier only redirect to the standard
+ * address, and new ones are no longer created.
  */
 class WebsiteDomainService
 {
@@ -27,40 +29,6 @@ class WebsiteDomainService
         private AuditLogger $auditLogger,
         private GrowthEventRecorder $growth,
     ) {}
-
-    /**
-     * Create the platform subdomain for a company (e.g. clima-total.<base>).
-     */
-    public function createSubdomain(Tenant $tenant, User $actor): TenantDomain
-    {
-        $this->ensureLimit($tenant);
-
-        return DB::transaction(function () use ($tenant, $actor): TenantDomain {
-            $base = (string) config('platform.tenant_base_domain');
-            $label = Str::limit(Str::slug($tenant->name) ?: 'empresa', 40, '');
-
-            $candidate = $label;
-            $suffix = 2;
-
-            while (! $this->isAvailable($candidate.'.'.$base) || in_array($candidate, (array) config('platform.reserved_subdomains'), true)) {
-                $candidate = $label.'-'.$suffix;
-                $suffix++;
-            }
-
-            $domain = TenantDomain::create([
-                'tenant_id' => $tenant->getKey(),
-                'hostname' => $candidate.'.'.$base,
-                'kind' => DomainKind::Subdomain,
-                'status' => DomainStatus::Verified,
-                'is_primary' => ! TenantDomain::query()->forTenant($tenant)->where('is_primary', true)->exists(),
-                'verified_at' => now(),
-            ]);
-
-            $this->auditLogger->record('website.domain_added', $tenant, $domain, ['kind' => 'subdomain'], $actor);
-
-            return $domain;
-        });
-    }
 
     /**
      * Register a custom domain as pending and return it with the TXT value to publish.

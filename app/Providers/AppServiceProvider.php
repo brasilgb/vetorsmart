@@ -93,12 +93,13 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Public visitor routes: limited per client and per company hostname, so one visitor cannot flood a company's chat.
+     * Public visitor routes: limited per client and per company site (/{segment}/{company} on the main domain, or the
+     * company's own hostname), so one visitor cannot flood a company's chat and companies never share a limit.
      */
     protected function configureRateLimiters(): void
     {
         RateLimiter::for('assistant-public', fn (Request $request): Limit => Limit::perMinute((int) config('assistant.public_requests_per_minute', 30))
-            ->by($request->ip().'|'.$request->getHost()));
+            ->by($request->ip().'|'.(is_string($request->route('segment')) ? $request->route('segment').'/'.$request->route('company') : $request->getHost())));
     }
 
     /**
