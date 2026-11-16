@@ -27,8 +27,8 @@ class WebsitePresenter
             'name' => $website->name,
             'status' => $website->status->value,
             'is_live' => $website->isLive(),
-            'published_at' => $publishedAt?->format('d/m/Y H:i'),
-            'updated_at' => $updatedAt?->format('d/m/Y H:i'),
+            'published_at' => $publishedAt === null ? null : $tenant->toLocal($publishedAt)->format('d/m/Y H:i'),
+            'updated_at' => $updatedAt === null ? null : $tenant->toLocal($updatedAt)->format('d/m/Y H:i'),
             'public_url' => $this->publicUrl($tenant),
             'version' => $website->published_version_id === null ? null : (int) $website->versions()->max('version'),
         ];
@@ -70,7 +70,7 @@ class WebsitePresenter
                 'kind' => $domain->kind->value,
                 'status' => $domain->status->value,
                 'is_primary' => $domain->is_primary,
-                'verified_at' => $verifiedAt?->format('d/m/Y H:i'),
+                'verified_at' => $verifiedAt === null ? null : $tenant->toLocal($verifiedAt)->format('d/m/Y H:i'),
                 'dns' => $domain->status === DomainStatus::Pending ? [
                     'type' => 'TXT',
                     'name' => '_vetorsmart-verify.'.$domain->hostname,

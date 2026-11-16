@@ -61,6 +61,7 @@ class DashboardController extends Controller
         $requests = ServiceRequest::query()->forTenant($tenant);
         $appointments = Appointment::query()->forTenant($tenant);
 
+        $todayStart = $tenant->startOfLocalDay($tenant->toLocal(now())->format('Y-m-d'));
         $recent = (clone $requests)->where('created_at', '>=', $since);
         $recentTotal = (clone $recent)->count();
         $recentScheduled = (clone $recent)->whereIn('status', [
@@ -73,7 +74,9 @@ class DashboardController extends Controller
         return [
             'open_requests' => (clone $requests)->whereIn('status', [RequestStatus::Requested->value, RequestStatus::Triaged->value])->count(),
             'today_appointments' => (clone $appointments)->where('status', AppointmentStatus::Scheduled->value)
-                ->whereDate('starts_at', today())->count(),
+                ->where('starts_at', '>=', $todayStart)
+                ->where('starts_at', '<', $todayStart->addDay())
+                ->count(),
             'in_progress' => (clone $requests)->where('status', RequestStatus::InProgress->value)->count(),
             'completed_30_days' => (clone $requests)->where('status', RequestStatus::Completed->value)->where('closed_at', '>=', $since)->count(),
             'cancelled_30_days' => (clone $requests)->where('status', RequestStatus::Cancelled->value)->where('closed_at', '>=', $since)->count(),
@@ -86,7 +89,7 @@ class DashboardController extends Controller
                 ->get()
                 ->map(fn (Appointment $appointment): array => [
                     'id' => $appointment->id,
-                    'starts_at' => $appointment->starts_at->format('d/m/Y H:i'),
+                    'starts_at' => $tenant->toLocal($appointment->starts_at)->format('d/m/Y H:i'),
                     'customer' => $appointment->serviceRequest?->customer?->name,
                     'service' => $appointment->serviceRequest?->service?->name,
                     'professional' => $appointment->professional?->name,

@@ -4,6 +4,8 @@ namespace App\Http\Controllers\RootAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
+use App\Support\PlatformTime;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -29,19 +31,23 @@ class AuditLogController extends Controller
             $query->where('tenant_id', $request->integer('tenant_id'));
         }
 
-        if ($request->filled('from')) {
-            $query->where('created_at', '>=', $request->date('from')?->startOfDay());
+        $from = $this->dayFilter($request, 'from');
+
+        if ($from !== null) {
+            $query->where('created_at', '>=', $from);
         }
 
-        if ($request->filled('to')) {
-            $query->where('created_at', '<=', $request->date('to')?->endOfDay());
+        $to = $this->dayFilter($request, 'to');
+
+        if ($to !== null) {
+            $query->where('created_at', '<', $to->addDay());
         }
 
         return Inertia::render('rootadmin/audit/index', [
             'filters' => $request->only(['action', 'tenant_id', 'from', 'to']),
             'entries' => $query->paginate(30)->withQueryString()->through(fn (AuditLog $entry): array => [
                 'id' => $entry->id,
-                'created_at' => $entry->created_at->format('d/m/Y H:i'),
+                'created_at' => PlatformTime::dateTime($entry->created_at),
                 'action' => $entry->action,
                 'tenant' => $entry->tenant?->name,
                 'user' => $entry->user?->name,
@@ -49,5 +55,19 @@ class AuditLogController extends Controller
                 'metadata' => $entry->metadata,
             ]),
         ]);
+    }
+
+    /**
+     * Start of the filtered day, typed in the platform time zone, as a UTC instant. Malformed dates are ignored.
+     */
+    private function dayFilter(Request $request, string $key): ?CarbonImmutable
+    {
+        $value = $request->string($key)->trim()->value();
+
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $parts) !== 1 || ! checkdate((int) $parts[2], (int) $parts[3], (int) $parts[1])) {
+            return null;
+        }
+
+        return PlatformTime::startOfDay($value);
     }
 }

@@ -61,10 +61,12 @@ class AssistantFlow
             return;
         }
 
-        $intro = 'Olá! Sou a recepcionista virtual de '.($setting->display_name ?: $tenant->name).'.';
-        $extra = filled($setting->greeting) ? ' '.$setting->greeting : '';
+        $greeting = trim((string) $setting->greeting);
+        $intro = $greeting !== ''
+            ? $greeting
+            : 'Olá! Sou a recepcionista virtual de '.($setting->display_name ?: $tenant->name).'.';
 
-        $this->say($conversation, $intro.$extra.' Qual serviço você precisa? Nossos serviços: '.$this->serviceCatalog($services).'.');
+        $this->say($conversation, $intro.' Qual serviço você precisa? Nossos serviços: '.$this->serviceCatalog($services).'.');
         $this->move($conversation, AssistantState::Service);
     }
 
@@ -130,6 +132,12 @@ class AssistantFlow
             return;
         }
 
+        if ($this->isVagueServiceRequest($body)) {
+            $this->say($conversation, 'Posso ajudar com o agendamento. Nossos serviços: '.$this->serviceList($services).'. Diga qual deles você precisa ou conte mais detalhes.');
+
+            return;
+        }
+
         $service = $this->text->matchService($body, $services) ?? $this->classifyWithProvider($tenant, $conversation, $body, $services);
 
         if ($service === null) {
@@ -155,6 +163,17 @@ class AssistantFlow
 
         $this->move($conversation, AssistantState::Customer);
         $this->say($conversation, 'Certo: '.$service->name.'. Aviso de privacidade: usaremos seu nome e telefone somente para este atendimento e para o agendamento. Para continuar, informe seu nome e o telefone com DDD.');
+    }
+
+    /**
+     * Small-talk at the service-selection step is not a service lookup. Answering it locally keeps
+     * the conversation helpful and avoids spending a provider call on a message with no service intent.
+     */
+    private function isVagueServiceRequest(string $body): bool
+    {
+        $normalized = preg_replace('/[^a-z0-9]+/', ' ', Str::ascii(mb_strtolower($body))) ?? '';
+
+        return in_array(trim($normalized), ['oi', 'ola', 'oi tudo bem', 'ola tudo bem', 'ajuda', 'preciso de ajuda'], true);
     }
 
     private function handleCustomer(Tenant $tenant, AssistantConversation $conversation, string $body): void

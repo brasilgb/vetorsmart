@@ -87,7 +87,7 @@ class AssistantController extends Controller
                     'role' => $message->role,
                     'role_label' => AssistantMessageRole::from($message->role)->label(),
                     'body' => $message->body,
-                    'at' => $message->created_at?->format('d/m H:i') ?? '',
+                    'at' => $message->created_at === null ? '' : $tenant->toLocal($message->created_at)->format('d/m H:i'),
                 ])->values()->all(),
                 'can_reply' => $found->status === ConversationStatus::HumanAssumed && $found->handled_by_user_id === $request->user()?->getKey(),
             ];

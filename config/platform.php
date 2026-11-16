@@ -18,6 +18,12 @@ return [
     'tenant_base_domain' => env('PLATFORM_TENANT_BASE_DOMAIN', 'vetorsmart.test'),
 
     /*
+    | Time zone used to present platform-level records (RootAdmin console, audit trail). Instants stay in UTC
+    | in the database; companies keep their own time zone for their own screens.
+    */
+    'display_timezone' => env('PLATFORM_DISPLAY_TIMEZONE', 'America/Sao_Paulo'),
+
+    /*
     | Explicit confirmation of the database used by automated tests and by destructive commands. Both must repeat the
     | exact database name; the name alone is never enough (see App\Support\DatabaseGuard).
     */

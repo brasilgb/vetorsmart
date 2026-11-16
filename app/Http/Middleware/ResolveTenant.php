@@ -7,6 +7,7 @@ use App\Services\Tenancy\TenantContext;
 use App\Services\Tenancy\TenantResolver;
 use Closure;
 use Illuminate\Http\Request;
+use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -38,7 +39,7 @@ class ResolveTenant
                 return redirect()->route('rootadmin.dashboard');
             }
 
-            abort(403, 'Nenhuma empresa ativa disponível para este usuário.');
+            return $this->denyWithoutCompany($request);
         }
 
         $request->session()->put('current_tenant_id', $membership->tenant_id);
@@ -50,5 +51,24 @@ class ResolveTenant
         } finally {
             $this->context->forget();
         }
+    }
+
+    /**
+     * The signed-in user has no active company (suspended company, inactive membership or none at all).
+     *
+     * Browsers get a page that explains the situation and offers to sign out. An Inertia visit is turned
+     * into a full page load of the same address, so that page is not shown inside the error overlay.
+     */
+    private function denyWithoutCompany(Request $request): Response
+    {
+        if ($request->expectsJson()) {
+            abort(403, 'Nenhuma empresa ativa disponível para este usuário.');
+        }
+
+        if ($request->isMethod('GET') && $request->header('X-Inertia')) {
+            return Inertia::location($request->fullUrl());
+        }
+
+        return response()->view('errors.no-active-company', status: 403);
     }
 }

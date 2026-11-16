@@ -10,6 +10,7 @@ use App\Models\AssistantUsage;
 use App\Models\Tenant;
 use App\Models\TenantWebsite;
 use App\Models\User;
+use App\Support\PlatformTime;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -46,7 +47,7 @@ class DashboardController extends Controller
                 'name' => $tenant->name,
                 'segment' => $tenant->segment?->name,
                 'status' => $tenant->status->value,
-                'created_at' => $tenant->created_at?->toDateString(),
+                'created_at' => PlatformTime::date($tenant->created_at),
             ]);
 
         $monthStart = now()->startOfMonth()->toDateString();

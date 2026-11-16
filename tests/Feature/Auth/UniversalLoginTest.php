@@ -78,6 +78,25 @@ test('a owner of a suspended company signs in but gets no company area', functio
     $this->get(route('dashboard'))->assertForbidden();
 });
 
+test('a owner of a suspended company is told why and can sign out', function () {
+    $this->tenant->forceFill(['status' => TenantStatus::Suspended])->save();
+
+    $this->actingAs($this->owner)
+        ->get(route('dashboard'))
+        ->assertForbidden()
+        ->assertSee('Sua empresa está sem acesso')
+        ->assertSee(route('logout'));
+});
+
+test('an inertia visit without an active company becomes a full page load', function () {
+    $this->tenant->forceFill(['status' => TenantStatus::Suspended])->save();
+
+    $this->actingAs($this->owner)
+        ->get(route('dashboard'), ['X-Inertia' => 'true'])
+        ->assertStatus(409)
+        ->assertHeader('X-Inertia-Location', route('dashboard'));
+});
+
 test('a suspended user cannot sign in at all', function () {
     $this->owner->forceFill(['status' => 'suspended'])->save();
 

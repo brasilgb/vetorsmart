@@ -28,7 +28,7 @@ class ServiceRequestController extends Controller
 
         $query = ServiceRequest::query()
             ->forTenant($context->requireTenant())
-            ->with(['customer:id,name', 'service:id,name'])
+            ->with(['customer:id,name', 'service:id,name', 'tenant:id,timezone'])
             ->latest('id');
 
         $status = $request->string('status')->value();
@@ -196,7 +196,7 @@ class ServiceRequestController extends Controller
             'priority' => $serviceRequest->priority->label(),
             'status' => $serviceRequest->status->value,
             'status_label' => $serviceRequest->status->label(),
-            'created_at' => $serviceRequest->created_at->format('d/m/Y H:i'),
+            'created_at' => $serviceRequest->tenant->toLocal($serviceRequest->created_at)->format('d/m/Y H:i'),
         ];
     }
 

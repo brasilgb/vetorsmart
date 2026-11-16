@@ -274,6 +274,28 @@ test('an unknown service is not invented and the list of real services is offere
         ->and(AssistantConversation::query()->sole()->service_id)->toBeNull();
 });
 
+test('a configured greeting replaces the default greeting instead of being appended to it', function () {
+    $this->setting->update(['greeting' => 'Bem-vindo à Clima Total!']);
+
+    $message = lastAssistantText(startAssistant()->json('messages'));
+
+    expect($message)->toStartWith('Bem-vindo à Clima Total!')
+        ->not->toContain('Olá! Sou a recepcionista virtual');
+});
+
+test('a vague greeting offers the available services without calling the optional provider', function () {
+    $provider = Mockery::mock(AssistantProvider::class);
+    $provider->shouldNotReceive('classify');
+    app()->instance(AssistantProvider::class, $provider);
+
+    startAssistant();
+    $reply = lastAssistantText(sayToAssistant('Olá'));
+
+    expect($reply)->toContain('Posso ajudar com o agendamento')
+        ->toContain('Limpeza de ar-condicionado')
+        ->not->toContain('Não encontrei esse serviço');
+});
+
 test('an inactive service is never offered or booked', function () {
     startAssistant();
 
@@ -504,7 +526,7 @@ test('the visitor page is offered only on a published company site with the assi
 
     $this->setting->update(['enabled' => false]);
 
-    visitAssistant('GET', '/atendimento')->assertOk()->assertSee('não está disponível', false);
+    visitAssistant('GET', '/atendimento')->assertOk()->assertSee('não está disponível', false)->assertSee('Indisponível')->assertDontSee('Conectando…');
     startAssistant()->assertStatus(503);
 });
 

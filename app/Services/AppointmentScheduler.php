@@ -136,7 +136,7 @@ class AppointmentScheduler
             ])->save();
 
             $request = ServiceRequest::query()->whereKey($appointment->service_request_id)->lockForUpdate()->firstOrFail();
-            $request->transitionTo(RequestStatus::Triaged, $actor, 'Agendamento cancelado por '.$actor->name.' em '.now()->format('d/m/Y H:i').': '.$reason);
+            $request->transitionTo(RequestStatus::Triaged, $actor, 'Agendamento cancelado por '.$actor->name.' em '.$appointment->tenant->toLocal(now())->format('d/m/Y H:i').': '.$reason);
 
             $this->auditLogger->record('appointment.cancelled', $appointment->tenant, $appointment, [
                 'service_request_id' => $request->getKey(),

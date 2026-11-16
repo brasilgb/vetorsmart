@@ -219,3 +219,17 @@ test('the company owner sees the settings screen editable', function () {
             ->where('settings.brand_color', '#2563EB')
             ->where('settings.currency', 'BRL'));
 });
+
+test('owners and admins can read and update company settings', function () {
+    $this->actingAs($this->admin)
+        ->get('/configuracoes')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('tenant/settings/index')
+            ->where('canEdit', true));
+
+    $this->actingAs($this->admin)
+        ->patch('/configuracoes', ['business_name' => 'Alfa Administrada'])
+        ->assertRedirect('/configuracoes');
+
+    expect(TenantSetting::query()->forTenant($this->tenantA)->value('business_name'))->toBe('Alfa Administrada');
+});

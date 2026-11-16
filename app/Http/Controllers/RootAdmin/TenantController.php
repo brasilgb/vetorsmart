@@ -15,6 +15,7 @@ use App\Models\TenantUser;
 use App\Models\TenantWebsite;
 use App\Models\User;
 use App\Services\TenantStatusService;
+use App\Support\PlatformTime;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -118,7 +119,7 @@ class TenantController extends Controller
                 'id' => $entry->id,
                 'action' => $entry->action,
                 'user' => $entry->user?->name,
-                'created_at' => $entry->created_at->format('d/m/Y H:i'),
+                'created_at' => PlatformTime::dateTime($entry->created_at),
             ]),
             'settings' => $tenant->settings === null ? null : [
                 'business_name' => $tenant->settings->business_name,
@@ -173,7 +174,7 @@ class TenantController extends Controller
             'segment_id' => $tenant->segment_id,
             'owner' => $owner?->user === null ? null : ['name' => $owner->user->name, 'email' => $owner->user->email],
             'status' => $tenant->status->value,
-            'created_at' => $tenant->created_at?->toDateString(),
+            'created_at' => PlatformTime::date($tenant->created_at),
         ];
     }
 }

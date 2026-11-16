@@ -21,11 +21,10 @@ use Illuminate\Support\Carbon;
 class AuditLog extends Model
 {
     /**
-     * Audit entries are append-only and have no update timestamp.
-     *
-     * @var bool
+     * Audit entries are append-only and have no update timestamp. The creation instant comes from the
+     * application clock (UTC), never from the database server clock.
      */
-    public $timestamps = false;
+    public const UPDATED_AT = null;
 
     /**
      * @return BelongsTo<User, $this>

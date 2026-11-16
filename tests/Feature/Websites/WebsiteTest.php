@@ -47,6 +47,7 @@ beforeEach(function () {
     fakeDomainVerifier(false);
 
     $this->owner = User::factory()->create();
+    $this->admin = User::factory()->create();
     $this->operator = User::factory()->create();
 
     $this->tenant = Tenant::factory()->create(['name' => 'Clima Total']);
@@ -58,6 +59,7 @@ beforeEach(function () {
         'state' => 'SP',
     ]);
     TenantUser::factory()->owner()->create(['tenant_id' => $this->tenant->id, 'user_id' => $this->owner->id]);
+    TenantUser::factory()->admin()->create(['tenant_id' => $this->tenant->id, 'user_id' => $this->admin->id]);
     TenantUser::factory()->create(['tenant_id' => $this->tenant->id, 'user_id' => $this->operator->id, 'role' => 'operator']);
 
     $this->actingAs($this->owner);
@@ -278,6 +280,16 @@ test('an operator can read Meu Site but cannot change or publish it', function (
     $this->actingAs($this->operator)->get('/meu-site')->assertOk();
     $this->actingAs($this->operator)->patch('/meu-site/rascunho', ['section' => 'content', 'headline' => 'Indevido'])->assertForbidden();
     $this->actingAs($this->operator)->post('/meu-site/publicar')->assertForbidden();
+});
+
+test('an admin can read, edit and publish Meu Site', function () {
+    $this->actingAs($this->admin)->get('/meu-site')->assertOk();
+    $this->actingAs($this->admin)
+        ->patch('/meu-site/rascunho', ['section' => 'content', 'headline' => 'Administrado'])
+        ->assertRedirect('/meu-site');
+    $this->actingAs($this->admin)->post('/meu-site/publicar')->assertRedirect('/meu-site');
+
+    expect(WebsiteVersion::query()->where('tenant_id', $this->tenant->id)->exists())->toBeTrue();
 });
 
 test('publishing and first configuration are recorded as growth events, without personal data', function () {
