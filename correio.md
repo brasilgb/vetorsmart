@@ -1,96 +1,113 @@
-# VETORSMART-BACKEND-05.3 — Homologação final do atendimento
+# VETORSMART-DEPLOY-08 — Implantação Controlada em Produção
 
 **Projeto:** VetorSmart  
+**Ambiente obrigatório:** VPS de produção  
 **Diretório:** `gateway/vetorsmart/`  
-**Banco:** MySQL
+**Versão de destino:** `ce8404b`  
+**Versão anteriormente identificada:** `d2aec27`
 
-## Objetivo
+## 1. Objetivo
 
-Eliminar as pendências críticas da BACKEND-05.2 e preparar o atendimento para liberação controlada em produção.
+Implantar a release operacional homologada, preservando dados, infraestrutura compartilhada e serviços dos demais SaaS.
 
-Preservar todas as funcionalidades existentes.
+A autorização é exclusiva para o VetorSmart e condicionada às verificações de segurança e compatibilidade descritas abaixo.
 
-## 1. Homologação real de navegador
+## 2. Pré-deploy
 
-Preparar uma empresa de teste isolada, com site publicado, serviços, profissionais e horários configurados.
+Antes de modificar o ambiente:
 
-Validar em desktop (1440 px) e mobile (390 px):
+- Confirmar que a execução ocorre na VPS de produção correta.
+- Conferir o commit atual e a integridade do repositório.
+- Confirmar que `origin/main` contém `ce8404b`.
+- Identificar arquivos locais modificados e preservá-los.
+- Verificar estado dos containers.
+- Conferir a configuração efetiva do Laravel e o timezone da conexão MySQL.
+- Executar `php artisan migrate:status` sem aplicar migrações.
+- Comparar arquivos de configuração e dependências com a versão de destino.
+- Verificar se existem mudanças de schema ou configurações obrigatórias.
 
-- Site público e widget de atendimento.
-- Seleção de serviço e identificação do visitante.
-- Preferência de horário e confirmação.
-- Indisponibilidade e escolha de alternativa.
-- Encaminhamento humano sem identificação.
-- Identificação posterior pelo operador.
-- Conversão em solicitação.
-- Triagem, execução e conclusão do serviço.
+**Se houver divergência inesperada, interromper antes do deploy.**
 
-Registrar capturas e resultados. Não declarar homologação visual sem navegador real.
+## 3. Backup e recuperação
 
-## 2. Concorrência real
+Antes da implantação:
 
-Executar processos simultâneos com conexões MySQL independentes, disputando o mesmo profissional e horário.
+- Criar backup consistente do banco de dados exclusivo do VetorSmart.
+- Verificar a integridade e a possibilidade de restauração do backup.
+- Registrar a versão anterior das imagens e do código.
+- Documentar o procedimento de rollback.
+- Não incluir bancos ou arquivos de outros SaaS.
 
-Verificar:
+Se não for possível garantir recuperação segura, interromper.
 
-- Ausência de agendamentos conflitantes.
-- Integridade transacional.
-- Tratamento de deadlocks e timeouts.
-- Idempotência sob requisições concorrentes.
-- Ausência de solicitações duplicadas.
+## 4. Implantação
 
-Usar somente dados de teste.
+Após aprovação dos pré-requisitos:
 
-## 3. Falhas controladas
+- Atualizar exclusivamente o código do VetorSmart até `ce8404b`.
+- Usar o procedimento de build e implantação já existente no projeto.
+- Atualizar somente os serviços necessários ao VetorSmart.
+- Não executar comandos globais de infraestrutura.
+- Não executar `docker compose down` sobre o ambiente compartilhado.
+- Não recriar MySQL, Redis ou Nginx compartilhados.
+- Não alterar volumes persistentes.
+- Não executar migrações automaticamente sem verificar seu conteúdo e necessidade.
+- Preservar variáveis de ambiente e credenciais.
 
-Simular falha na gravação do agendamento.
+## 5. Verificação pós-deploy
 
-Garantir:
+Confirmar:
 
-- Rollback da transação.
-- Nenhuma confirmação indevida.
-- Nenhuma solicitação parcialmente gravada.
-- Mensagem adequada ao visitante.
-- Registro técnico sem exposição de dados sensíveis.
+- Aplicação acessível por HTTPS.
+- Autenticação funcional.
+- Dashboard carregando corretamente.
+- Clientes, serviços, profissionais e agenda acessíveis.
+- Atendimento público operacional.
+- Isolamento multi-tenant preservado.
+- Permissões administrativas corretas.
+- Modo claro e escuro legíveis.
+- Worker e scheduler saudáveis.
+- Ausência de erros críticos em logs.
+- Versão implantada correspondente a `ce8404b`.
 
-## 4. Privacidade
+Utilizar testes não destrutivos e evitar criar registros artificiais em produção.
 
-Implementar aviso público com acesso à política de privacidade.
+## 6. Falhas e rollback
 
-Permitir configuração de URL específica por empresa.
+Caso haja falha crítica:
 
-Definir tratamento seguro para empresas sem política própria, distinguindo as responsabilidades da plataforma e da prestadora.
+- Interromper a implantação.
+- Preservar logs e evidências.
+- Retornar à versão anterior do VetorSmart utilizando o procedimento validado.
+- Não restaurar o banco automaticamente se isso puder eliminar transações legítimas posteriores.
+- Confirmar a recuperação do serviço.
 
-Não apresentar texto jurídico genérico como garantia automática de conformidade com a LGPD.
+Não realizar rollback de infraestrutura compartilhada.
 
-## 5. Limites e segurança
+## 7. Restrições
 
-Homologar respostas HTTP 429 nas rotas públicas, verificando limites por contexto apropriado, recuperação após bloqueio e ausência de interferência indevida entre empresas.
+- Não modificar outros SaaS.
+- Não executar limpeza de dados.
+- Não alterar planos ou cobranças.
+- Não alterar configurações globais do MySQL.
+- Não modificar o histórico de auditoria.
+- Não adicionar funcionalidades.
+- Não realizar mudanças estruturais fora do escopo da release.
 
-Preservar proteções existentes.
+## 8. Entrega
 
-## 6. Documentação e entrega
+Gerar `docs/VETORSMART-DEPLOY-08.md` e atualizar `executed.md`.
 
-Atualizar a documentação do atendimento.
+Registrar:
 
-Apresentar:
+1. Versão anterior e nova versão.
+2. Backup e verificação de recuperação.
+3. Comandos efetivamente executados.
+4. Serviços atualizados.
+5. Resultados de saúde e smoke tests.
+6. Migrações executadas ou justificativa da ausência.
+7. Problemas identificados.
+8. Situação final da produção.
+9. Parecer: APROVADO ou BLOQUEADO.
 
-- Arquivos modificados.
-- Testes executados.
-- Evidências de navegador.
-- Resultado da concorrência simultânea.
-- Resultado das falhas controladas.
-- Pendências e riscos restantes.
-- Necessidade de migrações.
-- Situação de commit e deploy.
-
-## Restrições
-
-- Não integrar IA paga.
-- Não alterar infraestrutura compartilhada.
-- Não executar operações destrutivas.
-- Não implantar na VPS sem autorização.
-- Não fazer commit sem autorização.
-- Não iniciar novos módulos comerciais.
-
-**Critério de aceite:** funcionamento comprovado no navegador, ausência de conflitos de agenda sob concorrência real e comportamento seguro em falhas de persistência.
+Caso qualquer requisito crítico não seja atendido, interromper sem forçar a implantação.
