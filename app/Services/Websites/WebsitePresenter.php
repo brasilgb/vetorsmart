@@ -13,7 +13,7 @@ use App\Models\TenantWebsite;
  */
 class WebsitePresenter
 {
-    public function __construct(private WebsiteDomainService $domains) {}
+    public function __construct(private WebsiteDomainService $domains, private PublicSiteAddress $address, private ReservedPaths $reserved) {}
 
     /**
      * @return array<string, mixed>
@@ -22,6 +22,7 @@ class WebsitePresenter
     {
         $publishedAt = $website->published_at;
         $updatedAt = $website->updated_at;
+        $customHost = $this->address->customHost($tenant);
 
         return [
             'name' => $website->name,
@@ -29,7 +30,11 @@ class WebsitePresenter
             'is_live' => $website->isLive(),
             'published_at' => $publishedAt === null ? null : $tenant->toLocal($publishedAt)->format('d/m/Y H:i'),
             'updated_at' => $updatedAt === null ? null : $tenant->toLocal($updatedAt)->format('d/m/Y H:i'),
-            'public_url' => $this->publicUrl($tenant),
+            'public_url' => $this->address->home($tenant),
+            'custom_url' => $customHost === null ? null : $this->address->hostBase($customHost).'/',
+            'canonical_url' => $this->address->canonical($tenant),
+            'address_issue' => $this->addressIssue($tenant),
+            'visible' => $website->isLive() && $this->addressIssue($tenant) === null,
             'version' => $website->published_version_id === null ? null : (int) $website->versions()->max('version'),
         ];
     }
@@ -83,22 +88,19 @@ class WebsitePresenter
     }
 
     /**
-     * Address visitors use: the primary verified domain, else the first verified one.
+     * Why the official address cannot show the site even when it is published, in words for the company, or null.
      */
-    public function publicUrl(Tenant $tenant): ?string
+    public function addressIssue(Tenant $tenant): ?string
     {
-        $domain = TenantDomain::query()
-            ->forTenant($tenant)
-            ->where('status', DomainStatus::Verified)
-            ->orderByDesc('is_primary')
-            ->orderBy('id')
-            ->first();
+        $tenant->loadMissing('segment');
+        $segment = $tenant->segment;
 
-        if ($domain === null) {
-            return null;
-        }
-
-        return config('platform.public_scheme', 'https').'://'.$domain->hostname;
+        return match (true) {
+            ! $tenant->isActive() => 'A empresa está suspensa. O site fica fora do ar até a reativação.',
+            $segment === null => 'A empresa ainda não tem segmento definido. O endereço público é criado quando o segmento for definido pelo suporte.',
+            ! $segment->active || $this->reserved->isReserved($segment->slug) => 'O segmento da empresa está indisponível no momento. Fale com o suporte.',
+            default => null,
+        };
     }
 
     private function colorLabel(BrandColor $color): string

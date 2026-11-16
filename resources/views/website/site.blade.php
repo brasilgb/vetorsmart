@@ -12,6 +12,26 @@
     $hours = $content['hours'] ?? null;
     $hasContact = collect($contact)->filter(fn ($value) => filled($value))->isNotEmpty();
     $location = trim(implode(', ', array_filter([$contact['address'] ?? null, $contact['city'] ?? null, $contact['state'] ?? null])));
+    $page = $page ?? 'home';
+    $links = $links ?? ['home' => null, 'services' => null, 'assistant' => null];
+    $title = $page === 'services' ? 'Serviços · '.$title : $title;
+    // Built inside this PHP block: in the template body, Blade would compile the schema.org context key as a directive.
+    $structuredData = json_encode(array_filter([
+        '@context' => 'https://schema.org',
+        '@type' => 'ProfessionalService',
+        'name' => $business,
+        'description' => ($content['about'] ?? null) ?: null,
+        'telephone' => ($contact['phone'] ?? null) ?: null,
+        'email' => ($contact['email'] ?? null) ?: null,
+        'url' => $canonical,
+        'address' => ($contact['city'] ?? null) ? array_filter([
+            '@type' => 'PostalAddress',
+            'streetAddress' => ($contact['address'] ?? null) ?: null,
+            'addressLocality' => $contact['city'],
+            'addressRegion' => ($contact['state'] ?? null) ?: null,
+            'addressCountry' => 'BR',
+        ]) : null,
+    ]), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT);
 @endphp
 <!doctype html>
 <html lang="pt-BR">
@@ -29,6 +49,10 @@
         <link rel="canonical" href="{{ $canonical }}">
     @endif
     <meta property="og:type" content="website">
+    <meta property="og:locale" content="pt_BR">
+    @if ($business !== '')
+        <meta property="og:site_name" content="{{ $business }}">
+    @endif
     <meta property="og:title" content="{{ $title }}">
     @if ($description)
         <meta property="og:description" content="{{ $description }}">
@@ -38,22 +62,7 @@
     @endif
     @if (! $noindex && ! $preview && $business !== '')
         <script type="application/ld+json">
-        {!! json_encode(array_filter([
-            '@context' => 'https://schema.org',
-            '@type' => 'ProfessionalService',
-            'name' => $business,
-            'description' => $content['about'] ?: null,
-            'telephone' => $contact['phone'] ?: null,
-            'email' => $contact['email'] ?: null,
-            'url' => $canonical,
-            'address' => ($contact['city'] ?? null) ? array_filter([
-                '@type' => 'PostalAddress',
-                'streetAddress' => $contact['address'] ?: null,
-                'addressLocality' => $contact['city'] ?: null,
-                'addressRegion' => $contact['state'] ?: null,
-                'addressCountry' => 'BR',
-            ]) : null,
-        ]), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}
+        {!! $structuredData !!}
         </script>
     @endif
     <style>
@@ -73,7 +82,7 @@
         header.site .wrap { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-top: 16px; padding-bottom: 16px; flex-wrap: wrap; }
         header.site .name { font-weight: 700; font-size: 1.1rem; color: var(--site-text); text-decoration: none; }
         .cta { display: inline-block; background: var(--site-accent); color: #fff; padding: 12px 22px; border-radius: 10px; text-decoration: none; font-weight: 600; }
-        .hero { padding: 64px 0 40px; }
+        .hero { padding-top: 64px; padding-bottom: 40px; }
         .hero h1 { font-size: clamp(1.9rem, 4vw, 2.8rem); line-height: 1.15; margin: 0 0 16px; }
         .hero p { color: var(--site-muted); font-size: 1.05rem; max-width: 720px; margin: 0 0 24px; white-space: pre-line; }
         section.block { padding: 40px 0; border-top: 1px solid var(--site-border); }
@@ -90,7 +99,11 @@
         table.hours td:first-child { color: var(--site-text); font-weight: 600; }
         .preview-banner { background: #FEF3C7; color: #78350F; text-align: center; padding: 10px; font-size: .9rem; font-weight: 600; }
         footer.site { border-top: 1px solid var(--site-border); padding: 28px 0; color: var(--site-muted); font-size: .9rem; }
-        @media (max-width: 640px) { .hero { padding: 40px 0 28px; } }
+        nav.site { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
+        nav.site a { color: var(--site-text); text-decoration: none; font-weight: 500; padding: 8px 0; }
+        nav.site a[aria-current="page"] { color: var(--site-accent); text-decoration: underline; text-underline-offset: 4px; }
+        a:focus-visible { outline: 3px solid var(--site-accent); outline-offset: 2px; }
+        @media (max-width: 640px) { .hero { padding-top: 40px; padding-bottom: 28px; } }
     </style>
 </head>
 <body>
@@ -100,7 +113,18 @@
 
 <header class="site">
     <div class="wrap">
-        <a class="name" href="{{ $canonical ?? '#' }}">{{ $business }}</a>
+        <a class="name" href="{{ $links['home'] ?? '#' }}">{{ $business }}</a>
+        @if ($links['home'] && ($links['services'] || $links['assistant']))
+            <nav class="site" aria-label="Navegação do site">
+                <a href="{{ $links['home'] }}" @if ($page === 'home') aria-current="page" @endif>Início</a>
+                @if ($links['services'])
+                    <a href="{{ $links['services'] }}" @if ($page === 'services') aria-current="page" @endif>Serviços</a>
+                @endif
+                @if ($links['assistant'])
+                    <a href="{{ $links['assistant'] }}">Atendimento</a>
+                @endif
+            </nav>
+        @endif
         @if ($phoneDigits !== '' || $whatsDigits !== '')
             <a class="cta" href="{{ $whatsDigits !== '' ? 'https://wa.me/'.$whatsDigits : 'tel:+'.$phoneDigits }}">Entrar em contato</a>
         @endif
@@ -108,6 +132,12 @@
 </header>
 
 <main>
+    @if ($page === 'services')
+    <section class="wrap hero">
+        <h1>Serviços</h1>
+        <p>Conheça os serviços de {{ $business }}.</p>
+    </section>
+    @else
     <section class="wrap hero">
         <h1>{{ $content['headline'] ?: $business }}</h1>
         @if (filled($content['about'] ?? null))
@@ -117,8 +147,9 @@
             <p style="font-size:.95rem">{{ $content['segment'] }}</p>
         @endif
     </section>
+    @endif
 
-    @if (filled($content['about'] ?? null))
+    @if ($page === 'home' && filled($content['about'] ?? null))
         <section class="block">
             <div class="wrap">
                 <h2>Sobre a empresa</h2>
@@ -130,7 +161,7 @@
     @if (! empty($content['services'] ?? []))
         <section class="block">
             <div class="wrap">
-                <h2>Serviços</h2>
+                <h2>{{ $page === 'services' ? 'Todos os serviços' : 'Serviços' }}</h2>
                 <div class="cards">
                     @foreach ($content['services'] as $service)
                         <div class="card">
@@ -151,6 +182,7 @@
         </section>
     @endif
 
+    @if ($page === 'home')
     @if (! empty($content['differentials'] ?? []))
         <section class="block">
             <div class="wrap">
@@ -219,6 +251,7 @@
                 <p style="margin:0; color: var(--site-muted)">{{ $location }}</p>
             </div>
         </section>
+    @endif
     @endif
 </main>
 

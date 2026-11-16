@@ -1,12 +1,13 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { ConfirmAction } from '@/components/vetor-smart/confirm-action';
 import { Field, selectClass } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
+import { StatusBadge } from '@/components/vetor-smart/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { draft as websiteDraft, publish, unpublish } from '@/routes/tenant/website';
+import { draft as websiteDraft, preview, publish, unpublish } from '@/routes/tenant/website';
 import { store as domainStore, verify, primary, destroy as domainDestroy } from '@/routes/tenant/website/domains';
 
 type Draft = {
@@ -33,7 +34,19 @@ type Domain = {
 };
 
 type Props = {
-    website: { name: string; status: string; is_live: boolean; published_at: string | null; updated_at: string | null; public_url: string | null; version: number | null };
+    website: {
+        name: string;
+        status: string;
+        is_live: boolean;
+        visible: boolean;
+        published_at: string | null;
+        updated_at: string | null;
+        public_url: string | null;
+        custom_url: string | null;
+        canonical_url: string | null;
+        address_issue: string | null;
+        version: number | null;
+    };
     draft: Draft;
     options: { services: { id: number; name: string }[]; professionals: { id: number; name: string }[]; colors: { value: string; label: string }[] };
     domains: Domain[];
@@ -63,7 +76,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
     const content = useForm({ section: 'content', headline: draft.headline ?? '', about: draft.about ?? '', differentials: draft.differentials, show_hours: draft.show_hours });
     const services = useForm({ section: 'services', service_ids: draft.service_ids, show_professionals: draft.show_professionals, professional_ids: draft.professional_ids });
     const seo = useForm({ section: 'seo', seo: { title: draft.seo.title ?? '', description: draft.seo.description ?? '', indexable: draft.seo.indexable } });
-    const domain = useForm({ kind: 'subdomain', hostname: '' });
+    const domain = useForm({ hostname: '' });
 
     const toggle = (list: number[], id: number) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
@@ -75,7 +88,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                 <PageHeader
                     title="Meu Site"
                     description="Seu site profissional. Alterações ficam em rascunho até a publicação."
-                    action={website.is_live && website.public_url ? <a href={website.public_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-vs-link hover:underline">Abrir site publicado</a> : null}
+                    action={website.visible && website.canonical_url ? <a href={website.canonical_url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-vs-link hover:underline">Abrir site publicado</a> : null}
                 />
 
                 <nav aria-label="Seções do Meu Site" className="flex flex-wrap gap-2 border-b border-vs-border/70 pb-3">
@@ -90,11 +103,21 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                     <Card className="grid gap-3 border-vs-border/70 p-6 shadow-sm text-sm">
                         <div><span className="text-vs-muted">Nome:</span> {website.name}</div>
                         <div><span className="text-vs-muted">Modelo:</span> {segment ? `Modelo base · ${segment}` : 'Modelo base'}</div>
-                        <div><span className="text-vs-muted">Situação:</span> {website.is_live ? 'No ar' : 'Não publicado'}</div>
-                        <div><span className="text-vs-muted">Endereço público:</span> {website.public_url ?? 'Disponível após verificar um domínio'}</div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-vs-muted">Situação:</span>
+                            <StatusBadge active={website.visible} activeLabel="No ar" inactiveLabel={website.is_live ? 'Publicado, fora do ar' : 'Não publicado'} />
+                        </div>
+                        <PublicAddress label="Endereço padrão" url={website.public_url} />
+                        {website.custom_url && <PublicAddress label="Domínio próprio" url={website.custom_url} />}
+                        {website.custom_url && website.canonical_url && (
+                            <p className="text-xs text-vs-muted">
+                                Os dois endereços exibem o mesmo site. Para os buscadores, o endereço principal é <span className="break-all">{website.canonical_url}</span>.
+                            </p>
+                        )}
+                        <SiteNotice website={website} />
                         <div><span className="text-vs-muted">Última publicação:</span> {website.published_at ?? '—'}{website.version ? ` (versão ${website.version})` : ''}</div>
                         <div><span className="text-vs-muted">Último rascunho:</span> {website.updated_at ?? '—'}</div>
-                        <div><Link href="/meu-site/previa" className="font-medium text-vs-link hover:underline">Ver prévia do rascunho</Link></div>
+                        <div><a href={preview.url()} target="_blank" rel="noopener noreferrer" className="font-medium text-vs-link hover:underline">Ver prévia do rascunho</a></div>
                     </Card>
                 )}
 
@@ -190,13 +213,14 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                 {tab === 'domains' && (
                     <div className="grid gap-6">
                         <Card className="grid gap-4 border-vs-border/70 p-6 shadow-sm">
-                            <h2 className="text-base font-semibold text-vs-text">Domínios</h2>
-                            {domains.length === 0 && <p className="text-sm text-vs-muted">Nenhum endereço criado ainda.</p>}
+                            <h2 className="text-base font-semibold text-vs-text">Domínio próprio (opcional)</h2>
+                            <p className="text-sm text-vs-muted">Seu site já tem um endereço padrão no VetorSmart, sem domínio nem configuração de DNS. Um domínio próprio verificado também exibe o site e passa a ser o endereço principal para os buscadores; o endereço padrão continua funcionando.</p>
+                            {domains.length === 0 && <p className="text-sm text-vs-muted">Nenhum domínio próprio cadastrado.</p>}
                             {domains.map((item) => (
                                 <div key={item.id} className="grid gap-2 rounded-md border border-vs-border/70 p-4 text-sm">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <span className="font-medium text-vs-text">{item.hostname}{item.is_primary && <span className="ml-2 text-xs text-vs-link">(principal)</span>}</span>
-                                        <span className="text-vs-muted">{item.kind === 'subdomain' ? 'Endereço da plataforma' : 'Domínio próprio'} · {item.status === 'verified' ? 'Verificado' : 'Aguardando verificação'}</span>
+                                        <span className="text-vs-muted">{item.kind === 'subdomain' ? 'Endereço antigo da plataforma, redireciona' : 'Domínio próprio'} · {item.status === 'verified' ? 'Verificado' : 'Aguardando verificação'}</span>
                                     </div>
                                     {item.dns && (
                                         <div className="text-vs-muted">
@@ -222,19 +246,11 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                         </Card>
                         {canEdit && (
                             <Card className="grid gap-4 border-vs-border/70 p-6 shadow-sm">
-                                <h3 className="text-sm font-semibold text-vs-text">Adicionar endereço</h3>
-                                <form onSubmit={(e) => { e.preventDefault(); domain.post(domainStore.url(), { preserveScroll: true }); }} className="grid gap-4 md:grid-cols-[180px_1fr_auto] md:items-end">
-                                    <Field id="kind" label="Tipo" error={domain.errors.kind}>
-                                        <select id="kind" value={domain.data.kind} onChange={(e) => domain.setData('kind', e.target.value)} className={selectClass}>
-                                            <option value="subdomain">Endereço da plataforma</option>
-                                            <option value="custom">Domínio próprio</option>
-                                        </select>
+                                <h3 className="text-sm font-semibold text-vs-text">Adicionar domínio próprio</h3>
+                                <form onSubmit={(e) => { e.preventDefault(); domain.post(domainStore.url(), { preserveScroll: true }); }} className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                                    <Field id="hostname" label="Domínio" error={domain.errors.hostname}>
+                                        <Input id="hostname" value={domain.data.hostname} onChange={(e) => domain.setData('hostname', e.target.value)} placeholder="www.suaempresa.com.br" className="h-10" />
                                     </Field>
-                                    {domain.data.kind === 'custom' && (
-                                        <Field id="hostname" label="Domínio" error={domain.errors.hostname}>
-                                            <Input id="hostname" value={domain.data.hostname} onChange={(e) => domain.setData('hostname', e.target.value)} placeholder="www.suaempresa.com.br" className="h-10" />
-                                        </Field>
-                                    )}
                                     <Button type="submit" disabled={domain.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Adicionar</Button>
                                 </form>
                             </Card>
@@ -267,7 +283,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                         <h2 className="text-base font-semibold text-vs-text">Publicação</h2>
                         <p className="text-sm text-vs-muted">Salve as alterações e veja a prévia antes de publicar. Publicar cria uma nova versão; retirar do ar mantém os dados e o histórico.</p>
                         <div className="flex flex-wrap gap-3">
-                            <Link href="/meu-site/previa" className="inline-flex h-10 items-center rounded-md border border-vs-border px-4 text-sm font-medium text-vs-text hover:bg-muted">Visualizar prévia</Link>
+                            <a href={preview.url()} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center rounded-md border border-vs-border px-4 text-sm font-medium text-vs-text hover:bg-muted">Visualizar prévia</a>
                             {canEdit && (
                                 <Button type="button" className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover" onClick={() => router.post(publish.url(), {}, { preserveScroll: true })}>Publicar</Button>
                             )}
@@ -286,5 +302,64 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                 )}
             </div>
         </>
+    );
+}
+
+/**
+ * A public address with a button that copies it. The standard address exists as soon as the company has a segment.
+ */
+function PublicAddress({ label, url }: { label: string; url: string | null }) {
+    const [copied, setCopied] = useState(false);
+
+    if (!url) {
+        return (
+            <div>
+                <span className="text-vs-muted">{label}:</span> ainda não disponível
+            </div>
+        );
+    }
+
+    const copy = () => {
+        navigator.clipboard
+            ?.writeText(url)
+            .then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 2000);
+            })
+            .catch(() => setCopied(false));
+    };
+
+    return (
+        <div className="flex flex-wrap items-center gap-2">
+            <span className="text-vs-muted">{label}:</span>
+            <code className="max-w-full rounded bg-muted px-2 py-1 text-xs break-all text-vs-text">{url}</code>
+            <Button type="button" variant="outline" size="sm" onClick={copy}>
+                {copied ? 'Link copiado' : 'Copiar link'}
+            </Button>
+            <span className="sr-only" aria-live="polite">
+                {copied ? 'Link copiado para a área de transferência.' : ''}
+            </span>
+        </div>
+    );
+}
+
+/**
+ * Says, in plain words, why visitors cannot see the site yet.
+ */
+function SiteNotice({ website }: { website: Props['website'] }) {
+    if (website.visible) {
+        return null;
+    }
+
+    const message = website.address_issue ?? (website.is_live ? null : 'O site ainda não foi publicado. Visitantes que abrirem o endereço verão uma página não encontrada até a publicação, na aba Publicação.');
+
+    if (!message) {
+        return null;
+    }
+
+    return (
+        <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+            {message}
+        </p>
     );
 }

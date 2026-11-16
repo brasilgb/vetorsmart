@@ -145,7 +145,7 @@ export default function AssistantIndex({ settings, canManage, publicUrl, pending
 
                 <Card className="space-y-2 border-vs-border/70 p-4 shadow-sm">
                     <p className="text-sm text-vs-text">
-                        Endereço do atendimento: {publicUrl ? <a className="font-medium text-vs-link hover:underline" href={publicUrl} target="_blank" rel="noreferrer">{publicUrl}</a> : 'disponível após a empresa ter um domínio verificado e o site publicado.'}
+                        Endereço do atendimento: {publicUrl ? <a className="font-medium text-vs-link hover:underline" href={publicUrl} target="_blank" rel="noreferrer">{publicUrl}</a> : 'disponível depois que o site for publicado em Meu Site.'}
                     </p>
                     <p className="text-xs text-vs-muted">O visitante só agenda por horários reais do cadastro. Desativar a recepcionista mantém os contatos da empresa visíveis na página.</p>
                 </Card>
