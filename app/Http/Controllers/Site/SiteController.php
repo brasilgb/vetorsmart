@@ -8,7 +8,6 @@ use App\Models\AssistantSetting;
 use App\Models\Tenant;
 use App\Services\Websites\PublicSiteAddress;
 use App\Services\Websites\WebsiteResolver;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -27,7 +26,7 @@ class SiteController extends Controller
 {
     public function __construct(private WebsiteResolver $resolver, private PublicSiteAddress $address) {}
 
-    public function page(string $segment, string $company): View
+    public function page(string $segment, string $company): Response
     {
         $site = $this->resolver->resolvePath($segment, $company) ?? abort(404);
 
@@ -37,7 +36,7 @@ class SiteController extends Controller
     /**
      * The services the company chose to publish. Without any, the page does not exist, so no empty page gets indexed.
      */
-    public function services(string $segment, string $company): View
+    public function services(string $segment, string $company): Response
     {
         $site = $this->resolver->resolvePath($segment, $company) ?? abort(404);
 
@@ -51,12 +50,12 @@ class SiteController extends Controller
     /**
      * Home of a company on its own domain. An earlier platform subdomain redirects to the standard address.
      */
-    public function hostPage(Request $request): RedirectResponse|View
+    public function hostPage(Request $request): RedirectResponse|Response
     {
         return $this->onHost($request, '', 'home');
     }
 
-    public function hostServices(Request $request): RedirectResponse|View
+    public function hostServices(Request $request): RedirectResponse|Response
     {
         return $this->onHost($request, '/servicos', 'services');
     }
@@ -129,7 +128,7 @@ class SiteController extends Controller
      * A request on a company hostname. The company's own domain serves the site; another verified domain of the same
      * company moves to that one; an earlier platform subdomain moves to the standard address.
      */
-    private function onHost(Request $request, string $suffix, string $page): RedirectResponse|View
+    private function onHost(Request $request, string $suffix, string $page): RedirectResponse|Response
     {
         $site = $this->resolver->resolve($request->getHost()) ?? abort(404);
         $tenant = $site['tenant'];
@@ -167,7 +166,7 @@ class SiteController extends Controller
      */
     private function indexableLocations(Tenant $tenant, array $content): array
     {
-        if (! ($content['seo']['indexable'] ?? true)) {
+        if ($tenant->isHomolog() || ! ($content['seo']['indexable'] ?? true)) {
             return [];
         }
 
@@ -189,17 +188,22 @@ class SiteController extends Controller
      * Render a site page. Navigation stays on the address the visitor is using ($base, a custom domain or the standard
      * address); the canonical address is the same for every way in.
      *
+     * A homologation company is never indexable, whatever its SEO setting: the page carries noindex in the markup and
+     * in the X-Robots-Tag header, and a banner tells the visitor it is a test environment.
+     *
      * @param  array<string, mixed>  $content
      */
-    private function render(Tenant $tenant, array $content, string $page, string $base, bool $onCustomDomain): View
+    private function render(Tenant $tenant, array $content, string $page, string $base, bool $onCustomDomain): Response
     {
         $assistantEnabled = (bool) AssistantSetting::query()->forTenant($tenant)->value('enabled');
         $home = $onCustomDomain ? $base.'/' : $base;
+        $noindex = $tenant->isHomolog() || ! ($content['seo']['indexable'] ?? true);
 
-        return view('website.site', [
+        $response = response()->view('website.site', [
             'content' => $content,
             'canonical' => $this->address->canonical($tenant, $page === 'services' ? '/servicos' : ''),
-            'noindex' => ! ($content['seo']['indexable'] ?? true),
+            'noindex' => $noindex,
+            'homolog' => $tenant->isHomolog(),
             'preview' => false,
             'page' => $page,
             'links' => [
@@ -208,5 +212,11 @@ class SiteController extends Controller
                 'assistant' => $assistantEnabled ? $base.'/atendimento' : null,
             ],
         ]);
+
+        if ($noindex) {
+            $response->headers->set('X-Robots-Tag', 'noindex, nofollow');
+        }
+
+        return $response;
     }
 }

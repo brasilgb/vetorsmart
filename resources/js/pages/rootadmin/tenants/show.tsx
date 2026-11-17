@@ -12,6 +12,7 @@ type Props = {
     tenant: {
         id: number;
         name: string;
+        is_homolog: boolean;
         slug: string;
         segment: string | null;
         owner: { name: string; email: string } | null;
@@ -78,8 +79,17 @@ export default function TenantShow({ tenant, settings, operations, history, user
                             {tenant.segment ?? 'Sem segmento'} · cadastrada em {tenant.created_at ?? '—'}
                         </p>
                     </div>
-                    <Badge variant={isActive ? 'default' : 'secondary'}>{isActive ? 'Ativa' : 'Suspensa'}</Badge>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {tenant.is_homolog && <Badge variant="outline" className="border-amber-500 text-amber-700 dark:text-amber-400">Homologação</Badge>}
+                        <Badge variant={isActive ? 'default' : 'secondary'}>{isActive ? 'Ativa' : 'Suspensa'}</Badge>
+                    </div>
                 </div>
+
+                {tenant.is_homolog && (
+                    <p role="note" className="rounded-lg border border-amber-500/60 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                        Empresa de homologação: dados fictícios, mantidos para testes. Fica fora dos indicadores comerciais e o site dela nunca é indexado.
+                    </p>
+                )}
 
                 <div className="grid gap-4 xl:grid-cols-2">
                     <Card className="border-vs-border/70 shadow-sm">

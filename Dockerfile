@@ -22,6 +22,9 @@ RUN composer dump-autoload --no-dev --optimize --no-interaction \
  && chown -R www-data:www-data storage bootstrap/cache
 # Não anunciar a versão do PHP no cabeçalho X-Powered-By.
 RUN echo "expose_php=Off" > /usr/local/etc/php/conf.d/zz-hardening.ini
+# Encerramento gracioso: ao receber o sinal de parada (SIGQUIT), o PHP-FPM termina as requisições em andamento
+# antes de sair, em vez de cortá-las. Fica abaixo dos 10 segundos que o Docker espera antes de forçar a parada.
+RUN printf '[global]\nprocess_control_timeout = 8s\n' > /usr/local/etc/php-fpm.d/zz-graceful.conf
 COPY docker-entrypoint.sh /usr/local/bin/infra-entrypoint
 COPY docker-healthcheck.php /usr/local/bin/infra-healthcheck
 RUN chmod +x /usr/local/bin/infra-entrypoint

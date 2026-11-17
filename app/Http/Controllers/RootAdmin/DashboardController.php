@@ -53,6 +53,7 @@ class DashboardController extends Controller
             ->map(fn (Tenant $tenant): array => [
                 'id' => $tenant->id,
                 'name' => $tenant->name,
+                'is_homolog' => $tenant->isHomolog(),
                 'segment' => $tenant->segment?->name,
                 'status' => $tenant->status->value,
                 'created_at' => PlatformTime::date($tenant->created_at),

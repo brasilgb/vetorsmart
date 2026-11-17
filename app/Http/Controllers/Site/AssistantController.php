@@ -13,10 +13,10 @@ use App\Services\Assistant\AssistantConversations;
 use App\Services\Assistant\AssistantFlow;
 use App\Services\Websites\PublicSiteAddress;
 use App\Services\Websites\WebsiteResolver;
-use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 /**
  * Visitor chat of a company site, at /{segment}/{company}/atendimento on the main domain or at /atendimento on the
@@ -28,7 +28,7 @@ class AssistantController extends Controller
 {
     public function __construct(private WebsiteResolver $resolver, private PublicSiteAddress $address) {}
 
-    public function show(Request $request): RedirectResponse|View
+    public function show(Request $request): RedirectResponse|Response
     {
         $redirect = $this->redirectFromHost($request);
 
@@ -41,15 +41,17 @@ class AssistantController extends Controller
         $setting = AssistantSetting::query()->forTenant($tenant)->first();
         $content = $site['content'];
 
-        return view('website.atendimento', [
+        // The chat is never indexable, for any company; the header repeats what the page markup already says.
+        return response()->view('website.atendimento', [
             'companyName' => $setting?->display_name ?: $tenant->name,
+            'homolog' => $tenant->isHomolog(),
             'available' => $this->available($setting),
             'contact' => $content['contact'] ?? [],
             'privacyPolicyUrl' => $setting?->privacy_policy_url,
             'accent' => in_array($content['accent_color'] ?? '', ['#0F172A', '#1E3A5F', '#2563EB', '#06B6D4'], true) ? $content['accent_color'] : '#2563EB',
             'siteUrl' => $site['home'],
             'endpoint' => $site['assistant_path'],
-        ]);
+        ])->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
     /**

@@ -33,6 +33,13 @@ return [
 
     'default_retention_days' => 30,
 
+    /*
+    | Removal of conversations past their retention date. Off by default: the daily routine only reports what has
+    | expired (simulation). Turn on only after the retention policy is decided; `assistant:purge --execute` refuses
+    | to run without it.
+    */
+    'retention_deletion_enabled' => (bool) env('ASSISTANT_RETENTION_DELETION', false),
+
     'session_cookie' => 'vs_assistant',
 
     'session_cookie_days' => 30,

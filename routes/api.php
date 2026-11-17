@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Professionals\ProfessionalAvailabilityController
 use App\Http\Controllers\Api\V1\Professionals\ProfessionalController;
 use App\Http\Controllers\Api\V1\TenantSettingsController;
 use App\Http\Controllers\Api\V1\TenantUserController;
+use App\Http\Controllers\Security\CspReportController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,6 +24,9 @@ use Illuminate\Support\Facades\Route;
 | tenant_id from the client.
 |
 */
+
+// Violation reports of the Content Security Policy, posted by browsers. Public, stateless and rate limited.
+Route::post('csp-report', CspReportController::class)->middleware('throttle:60,1')->name('csp.report');
 
 Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
     Route::get('auth/user', [AuthController::class, 'user'])->name('api.v1.auth.user');

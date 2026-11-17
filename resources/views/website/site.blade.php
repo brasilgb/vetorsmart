@@ -14,6 +14,7 @@
     $hasContact = collect($contact)->filter(fn ($value) => filled($value))->isNotEmpty();
     $location = trim(implode(', ', array_filter([$contact['address'] ?? null, $contact['city'] ?? null, $contact['state'] ?? null])));
     $page = $page ?? 'home';
+    $homolog = $homolog ?? false;
     $links = $links ?? ['home' => null, 'services' => null, 'assistant' => null];
     $title = $page === 'services' ? 'Serviços · '.$title : $title;
     // Built inside this PHP block: in the template body, Blade would compile the schema.org context key as a directive.
@@ -98,7 +99,7 @@
         table.hours { border-collapse: collapse; }
         table.hours td { padding: 6px 16px 6px 0; color: var(--site-muted); }
         table.hours td:first-child { color: var(--site-text); font-weight: 600; }
-        .preview-banner { background: #FEF3C7; color: #78350F; text-align: center; padding: 10px; font-size: .9rem; font-weight: 600; }
+        .preview-banner, .homolog-banner { background: #FEF3C7; color: #78350F; text-align: center; padding: 10px 16px; font-size: .9rem; font-weight: 600; }
         footer.site { border-top: 1px solid var(--site-border); padding: 28px 0; color: var(--site-muted); font-size: .9rem; }
         nav.site { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; }
         nav.site a { color: var(--site-text); text-decoration: none; font-weight: 500; padding: 8px 0; }
@@ -110,6 +111,10 @@
 <body>
 @if ($preview)
     <div class="preview-banner">Prévia do rascunho. Esta versão ainda não está publicada para os visitantes.</div>
+@endif
+
+@if ($homolog)
+    <div class="homolog-banner" role="note">Ambiente de teste da VetorSmart. Esta não é uma empresa real: os dados são fictícios e nenhum pedido feito aqui será atendido.</div>
 @endif
 
 <header class="site">
@@ -141,9 +146,6 @@
     @else
     <section class="wrap hero">
         <h1>{{ $content['headline'] ?: $business }}</h1>
-        @if (filled($content['about'] ?? null))
-            <p>{{ $content['about'] }}</p>
-        @endif
         @if (($content['segment'] ?? null) !== null)
             <p style="font-size:.95rem">{{ $content['segment'] }}</p>
         @endif

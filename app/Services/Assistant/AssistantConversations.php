@@ -265,7 +265,9 @@ class AssistantConversations
 
         $dialogue = $conversation->messages()
             ->whereIn('role', [AssistantMessageRole::Visitor->value, AssistantMessageRole::Assistant->value, AssistantMessageRole::Operator->value])
-            ->latest('id')
+            // The relation is already ordered by id; reorder() replaces that order instead of adding to it, so these
+            // are the last twelve messages, put back in the order they were said.
+            ->reorder('id', 'desc')
             ->limit(12)
             ->get()
             ->reverse()

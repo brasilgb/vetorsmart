@@ -24,7 +24,10 @@
             overflow-x: hidden;
         }
         .shell { max-width: 720px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; background: #fff; }
-        header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        header { padding: 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px 12px; flex-wrap: wrap; }
+        header .who { flex: 1 1 220px; min-width: 0; }
+        header .actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+        .homolog-banner { background: #FEF3C7; color: #78350F; text-align: center; padding: 10px 16px; font-size: .85rem; font-weight: 600; }
         header h1 { font-size: 1.05rem; margin: 0; line-height: 1.3; overflow-wrap: anywhere; }
         header p { margin: 2px 0 0; font-size: .85rem; color: var(--muted); }
         .pill { font-size: .8rem; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
@@ -48,6 +51,7 @@
         .contacts { display: flex; flex-wrap: wrap; gap: 8px; }
         .contacts a { padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); color: var(--text); text-decoration: none; }
         .loading { color: var(--muted); font-size: .9rem; }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
         .privacy { padding: 10px 16px; border-bottom: 1px solid var(--border); font-size: .85rem; color: var(--muted); }
         .privacy p { margin: 4px 0 0; }
         .privacy a { color: var(--accent); }
@@ -56,12 +60,15 @@
 </head>
 <body>
 <div class="shell">
+    @if ($homolog ?? false)
+        <div class="homolog-banner" role="note">Ambiente de teste da VetorSmart. Esta não é uma empresa real: nenhum pedido feito aqui será atendido.</div>
+    @endif
     <header>
-        <div>
+        <div class="who">
             <h1>{{ $companyName }}</h1>
             <p>Atendimento virtual</p>
         </div>
-        <div style="display:flex;gap:10px;align-items:center">
+        <div class="actions">
             <span id="state" class="pill" role="status" aria-live="polite">{{ $available ? 'Conectando…' : 'Indisponível' }}</span>
             <a class="back" href="{{ $siteUrl }}">Voltar ao site</a>
         </div>
@@ -83,7 +90,7 @@
         </main>
         <p class="error" id="error" role="alert"></p>
         <form id="composer" autocomplete="off">
-            <label for="body" class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Sua mensagem</label>
+            <label for="body" class="sr-only">Sua mensagem</label>
             <input id="body" name="body" type="text" maxlength="{{ (int) config('assistant.max_visitor_message_chars', 500) }}" placeholder="Digite sua mensagem" required disabled>
             <button id="send" type="submit" disabled>Enviar</button>
         </form>
@@ -106,7 +113,7 @@
 </div>
 
 @if ($available)
-<script>
+<script nonce="{{ Vite::cspNonce() }}">
 (function () {
     'use strict';
 

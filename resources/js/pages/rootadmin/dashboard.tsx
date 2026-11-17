@@ -10,7 +10,7 @@ type Props = {
     ai: { period: string; messages: number; provider_calls: number; provider_failures: number; tokens: number };
     pending: { label: string; reason: string }[];
     distribution: { name: string; total: number }[];
-    recent: { id: number; name: string; segment: string | null; status: string; created_at: string | null }[];
+    recent: { id: number; name: string; is_homolog: boolean; segment: string | null; status: string; created_at: string | null }[];
 };
 
 export default function RootadminDashboard({ totals, sites, appointments, ai, pending, distribution, recent }: Props) {
@@ -94,6 +94,7 @@ export default function RootadminDashboard({ totals, sites, appointments, ai, pe
                                                 <Link href={tenantShow.url({ tenant: tenant.id })} className="font-medium text-vs-link hover:underline">
                                                     {tenant.name}
                                                 </Link>
+                                                {tenant.is_homolog && <Badge variant="outline" className="ml-2 border-amber-500 text-amber-700 dark:text-amber-400">Homologação</Badge>}
                                             </td>
                                             <td className="py-2 text-vs-muted">{tenant.segment ?? '—'}</td>
                                             <td className="py-2">

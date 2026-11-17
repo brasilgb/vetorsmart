@@ -11,6 +11,7 @@ import type { Paginator } from '@/types';
 type TenantRow = {
     id: number;
     name: string;
+    is_homolog: boolean;
     slug: string;
     segment: string | null;
     segment_id: number | null;
@@ -83,7 +84,10 @@ export default function TenantsIndex({ filters, segments, tenants }: Props) {
                                 )}
                                 {tenants.data.map((tenant) => (
                                     <tr key={tenant.id} className="border-t border-vs-border/70">
-                                        <td className="px-4 py-3 font-medium text-vs-text">{tenant.name}</td>
+                                        <td className="px-4 py-3 font-medium text-vs-text">
+                                            {tenant.name}
+                                            {tenant.is_homolog && <Badge variant="outline" className="ml-2 border-amber-500 text-amber-700 dark:text-amber-400">Homologação</Badge>}
+                                        </td>
                                         <td className="px-4 py-3 text-vs-muted">{tenant.segment ?? '—'}</td>
                                         <td className="px-4 py-3 text-vs-muted">{tenant.owner ? `${tenant.owner.name} (${tenant.owner.email})` : '—'}</td>
                                         <td className="px-4 py-3">

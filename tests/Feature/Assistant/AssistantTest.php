@@ -797,7 +797,9 @@ test('expired conversations are purged and active ones are kept', function () {
         'retention_until' => now()->subDay(),
     ]);
 
-    $this->artisan('assistant:purge')->assertSuccessful();
+    config(['assistant.retention_deletion_enabled' => true]);
+
+    $this->artisan('assistant:purge', ['--execute' => true])->assertSuccessful();
 
     expect(AssistantConversation::query()->count())->toBe(1)
         ->and(AssistantConversation::query()->sole()->status)->toBe(ConversationStatus::Active);

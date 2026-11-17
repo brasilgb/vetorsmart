@@ -169,6 +169,7 @@ class TenantController extends Controller
         return [
             'id' => $tenant->id,
             'name' => $tenant->name,
+            'is_homolog' => $tenant->isHomolog(),
             'slug' => $tenant->slug,
             'segment' => $tenant->segment?->name,
             'segment_id' => $tenant->segment_id,

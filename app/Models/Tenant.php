@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Enums\TenantRole;
 use App\Enums\TenantStatus;
+use App\Services\HomologPurgeService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\TenantFactory;
@@ -40,6 +41,15 @@ class Tenant extends Model
     public function isActive(): bool
     {
         return $this->status === TenantStatus::Active;
+    }
+
+    /**
+     * Whether this is a homologation company (name starting with "[HOMOLOG]"): test data kept in production for
+     * regression checks. Its site is never indexable and it stays out of the commercial indicators.
+     */
+    public function isHomolog(): bool
+    {
+        return str_starts_with((string) $this->name, HomologPurgeService::NAME_PREFIX);
     }
 
     /**

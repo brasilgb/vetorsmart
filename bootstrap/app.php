@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ContentSecurityPolicy;
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Middleware\HandleAppearance;
 use App\Http\Middleware\HandleInertiaRequests;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Every response, including errors and the API.
         $middleware->append(SecurityHeaders::class);
+        $middleware->append(ContentSecurityPolicy::class);
 
         $middleware->web(prepend: [
             SiteHostGuard::class,
