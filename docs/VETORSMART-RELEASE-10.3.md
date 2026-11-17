@@ -427,3 +427,14 @@ O banco `controle`, sem alteração desde 18/09, não tem nome de teste e foi ma
 - Antes, `git fetch --prune` e `git merge-base --is-ancestor` contra a `origin/main` confirmaram que nenhum trabalho se perderia. A remoção usou `--force-with-lease`, que recusaria apagar uma branch alterada depois da verificação.
 - No remoto restam `main`, `abrasil-auth-ux-01` e `abrasil-auth-ux-03`, que não são desta release e não foram tocadas.
 - As cópias locais também foram removidas, depois de autorização, com `git branch -d`, que recusa apagar branch não integrada. O checkout do servidor tem apenas a `main`, sincronizada com a `origin/main`.
+
+## 20. Complemento: branch local `wip/vetorsmart-20261115` removida (autorizado pelo proprietário em 17/11/2026)
+
+- **O que era:** o commit `32a7b45` (15/11, sobre `f2b898b`), com a mensagem "preserva alterações locais antes do deploy f2b898b". Era um instantâneo de 65 arquivos (+6.926/−11.978 linhas), existente só neste servidor e sem cópia no GitHub.
+- **Situação:** não estava integrado à `main`. Desde então a `main` evoluiu (RELEASE-10 a 10.3), e quase todos os arquivos diferem. Parte do conteúdo foi descartada de propósito, como `two-factor-challenge.tsx` e `two-factor-section.tsx` (MFA retirado). Não é possível garantir arquivo por arquivo que nada mais se perderia.
+- **Preservação:** antes da remoção, `git bundle` em `backups/vetorsmart_branch_wip_20261115/`:
+  - `wip-vetorsmart-20261115.bundle` (64 KB), com `SHA256SUMS`;
+  - `arquivos-alterados.txt`;
+  - restauração testada num clone temporário (commit `32a7b45` recuperado intacto).
+- **Para recuperar:** `git fetch /opt/infra-abrasil/backups/vetorsmart_branch_wip_20261115/wip-vetorsmart-20261115.bundle wip/vetorsmart-20261115:wip/vetorsmart-20261115`.
+- **Remoção:** `git branch -D`. O repositório da aplicação tem agora só a `main`, sincronizada com a `origin/main`.

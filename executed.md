@@ -129,6 +129,13 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - No remoto ficaram `main`, `abrasil-auth-ux-01` e `abrasil-auth-ux-03`, que não foram tocadas.
 - As cópias locais também foram removidas (`git branch -d`, que só apaga branch já integrada). O checkout do servidor tem apenas a `main`.
 
+## 14. Complemento: branch local `wip/vetorsmart-20261115` removida (autorizado em 17/11/2026)
+
+- Era um instantâneo de 15/11 (`32a7b45`, 65 arquivos, "preserva alterações locais antes do deploy f2b898b"), só local e não integrado à `main`, que evoluiu depois dele. Incluía, por exemplo, telas de MFA que foram retiradas de propósito.
+- Antes da remoção, o commit foi guardado em `backups/vetorsmart_branch_wip_20261115/wip-vetorsmart-20261115.bundle`, com `SHA256SUMS` e a lista de arquivos. A restauração foi testada num clone temporário.
+- Para recuperar: `git fetch <bundle> wip/vetorsmart-20261115:wip/vetorsmart-20261115`.
+- O repositório da aplicação tem agora só a `main`, sincronizada com a `origin/main`.
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
