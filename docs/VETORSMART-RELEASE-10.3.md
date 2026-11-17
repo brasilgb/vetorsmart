@@ -302,3 +302,17 @@ As entradas de teste nos logs estão identificadas: `teste-persistencia-logs` e 
 - O build de teste do VetorSmart não aproveitou nenhuma etapa do cache (230 s): a limpeza também removeu o cache das etapas de dependências. Cada SaaS terá um primeiro build mais lento e depois volta ao normal.
 - Com o armazenamento de imagens do containerd, o build de teste tirou da lista a imagem do web em execução (`ef2e5b7`), que perdeu a tag `latest`. O container não foi afetado. A nova `latest` (`df25adb`) tem o mesmo código, porque de `b2dea42` para `aa572cd` só mudou documentação. Worker e scheduler não mudaram.
 - **Lição para as próximas limpezas:** marcar com uma tag de rollback a imagem em execução antes de qualquer build.
+
+## 13. Complemento: limpeza das imagens antigas de rollback (autorizada pelo proprietário em 17/11/2026)
+
+| Item | Antes | Depois |
+|---|---|---|
+| Tags de rollback do VetorSmart | 27 (9 gerações × 3 serviços) | 6 (2 gerações × 3) |
+| Imagens (total) | 52 imagens, 46,4 GB | 31 imagens, 28,2 GB |
+| Disco `/` | 78 GB (41%) | **65 GB (35%)** |
+
+- Gerações mantidas: `rollback-pre-logs` (código da 10.3, igual a `release-10.3`) e `rollback-pre-10.3`. Todas executam normalmente (`php -r` em cada uma).
+- Gerações removidas: `rollback-pre-10.2`, `-10.1-fixes`, `-10.1`, `-fd7fa5f`, `-ce8404b`, `-d2aec27` e `-bb29f39`. Antes de cada remoção, verifiquei que a imagem não estava em uso por nenhum container e não era compartilhada com uma tag mantida.
+- Só o VetorSmart tinha tags de rollback. Os outros SaaS não foram tocados.
+- Os 6,6 GB recuperáveis restantes não fazem parte desta autorização: imagens do VetorPet (desativado, 3 × 1,43 GB), Playwright (3,47 GB, usada na homologação em navegador) e certbot (usada na renovação de certificados).
+- **Política sugerida para os próximos deploys:** depois de um deploy estável, manter só as 2 últimas gerações de rollback.

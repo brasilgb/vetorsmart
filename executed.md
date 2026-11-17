@@ -76,6 +76,13 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - Num build de teste do VetorSmart, nenhuma etapa veio do cache (230 s). A limpeza também levou o cache das dependências, então o primeiro build de cada SaaS vai ser mais lento. O cache já se recompôs em parte (18,3 GB) e o disco está em 41%.
 - Efeito colateral: o build de teste moveu a `latest` do web para `df25adb`. Com o armazenamento containerd, a imagem anterior em execução (`ef2e5b7`) saiu da lista. O container segue saudável, e a `df25adb` tem o mesmo código (de `b2dea42` para `aa572cd` só mudou documentação).
 
+## 7. Complemento: limpeza das imagens antigas de rollback (autorizada em 17/11/2026)
+
+- Foram mantidas as 2 gerações mais recentes por serviço: `rollback-pre-logs` (código da 10.3) e `rollback-pre-10.3`. As 6 imagens mantidas foram testadas e executam normalmente.
+- Foram removidas 7 gerações × 3 serviços = **21 tags**: `rollback-pre-10.2`, `-10.1-fixes`, `-10.1`, `-fd7fa5f`, `-ce8404b`, `-d2aec27` e `-bb29f39`. Antes de cada remoção, conferi que a imagem não estava em uso e não era compartilhada com uma tag mantida.
+- Disco: de 78 GB para **65 GB (35%)**. Imagens: de 46,4 GB para 28,2 GB. Os 24 containers seguiram saudáveis e os cinco sites responderam 200.
+- Não foram tocados os 6,6 GB recuperáveis restantes: imagens do VetorPet (desativado), Playwright (usada na homologação) e certbot (usada na renovação de certificados).
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
