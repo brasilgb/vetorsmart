@@ -329,3 +329,26 @@ As entradas de teste nos logs estão identificadas: `teste-persistencia-logs` e 
 - Verificação: os 24 containers seguiram saudáveis; VetorSmart, VetorOS, VetorSales, VetorLeads e abrasilsistemas responderam 200; `vetorpet.com.br` respondeu 302 para o VetorSales, como antes.
 - **Atenção:** o `docker-compose.yml` ainda declara o serviço `vetorpet`, que está em `depends_on` do Nginx. Um `docker compose up -d` sem nome de serviço, ou o Nginx recriado sem `--no-deps`, vai reconstruir a imagem a partir de `gateway/vetorpet` e subir o VetorPet de novo. Para evitar isso, o VetorPet precisaria sair do compose e do `depends_on` do Nginx, o que fica para uma decisão à parte.
 - Os 3,2 GB recuperáveis restantes são imagens mantidas de propósito: as gerações de rollback do VetorSmart e a `latest` do web.
+
+## 15. Complemento: VetorPet retirado do compose e do Nginx (autorizado pelo proprietário em 17/11/2026)
+
+**Feito** na branch de produção `feat/vetorsales-infra` (`2de969c`), com backup prévio em `backups/pre_remocao_vetorpet_compose_20261117_112935/`:
+
+- `docker-compose.yml`: removidos os serviços `vetorpet`, `vetorpet-worker` e `vetorpet-scheduler`, a declaração do volume `vetorpet-build`, as montagens `/var/www/vetorpet/{public,build}` no Nginx e o `vetorpet` do `depends_on`. Na configuração renderizada, só o serviço `nginx` mudou.
+- `nginx/conf.d/apps.conf`: removido o bloco `vetorpet.localhost`, que fazia `fastcgi_pass vetorpet:9000`. Depois, `nginx -t` e `nginx -s reload`.
+
+**Mantido de propósito:**
+
+- Os redirecionamentos de `vetorpet.com.br`: HTTPS responde 302 para o VetorSales; `www` e HTTP respondem 301 para o apex.
+- O certificado de `vetorpet.com.br` e o domínio em `init-letsencrypt.sh`.
+- `VETORPET_DB_PASSWORD` no MySQL e o `mysql-init`: alterar o ambiente do MySQL faria o compose recriá-lo, derrubando o banco de todos os SaaS.
+- Os dados: `volumes/vetorpet`, volume Docker `infra-abrasil_vetorpet-build` e banco `vetorpet`.
+- A `main` da infraestrutura, onde o VetorPet ainda é um serviço completo: o redirecionamento pertence às mudanças do VetorSales.
+
+**Verificação:**
+
+- VetorSmart, VetorOS, VetorSales, VetorLeads e abrasilsistemas responderam 200.
+- O *dry-run* de `docker compose up -d` não constrói nem inicia mais o VetorPet.
+- O mesmo *dry-run* mostrou que o web do VetorSmart seria recriado, porque a `latest` (`df25adb`, gerada no teste de cache, seção 12) era diferente da imagem em execução. Sincronizei pela troca sem interrupção: 383 de 383 com 200, nenhum 502; VetorOS com 77 de 77.
+
+**Pendente:** recriar o container do Nginx (`docker compose up -d --no-deps nginx`) para que ele perca as montagens antigas do VetorPet. Isso deixa todos os sites fora do ar por alguns segundos, então deve ser feito numa janela escolhida pelo proprietário. Até lá, as montagens antigas não têm efeito, porque nenhuma configuração as usa.

@@ -91,6 +91,15 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - Disco: de 65 GB para **61 GB (33%)**. Os 24 containers seguiram saudáveis; os cinco sites responderam 200 e o `vetorpet.com.br` continua redirecionando para o VetorSales (302).
 - Atenção: o compose ainda declara o VetorPet, e o Nginx depende dele. Um `docker compose up -d` sem nome de serviço, ou sem `--no-deps`, vai reconstruir e subir o VetorPet a partir do código-fonte. Tirá-lo do compose é uma decisão à parte.
 
+## 9. Complemento: VetorPet retirado do compose e do Nginx (autorizado em 17/11/2026)
+
+- Na branch de produção (`2de969c`), saíram os serviços `vetorpet`, `-worker` e `-scheduler`, a declaração do volume `vetorpet-build`, a dependência e as montagens no Nginx, e o bloco `vetorpet.localhost`. Fiz `nginx -t` e um `reload` gracioso.
+- Ficaram, de propósito: os redirecionamentos de `vetorpet.com.br` para o VetorSales, o certificado, o banco e a senha no MySQL (mudar o ambiente do MySQL o recriaria). Os dados em `volumes/vetorpet` e no volume Docker `vetorpet-build` estão intactos.
+- A `main` não foi alterada: lá o VetorPet ainda é um serviço completo, e o redirecionamento faz parte das mudanças do VetorSales.
+- Um *dry-run* de `docker compose up -d` não constrói nem sobe mais o VetorPet.
+- O web do VetorSmart foi sincronizado com a `latest` (`df25adb`, mesmo código) pela troca sem interrupção: 383 de 383 com 200, nenhum 502.
+- **Pendente:** recriar o Nginx para que o container perca as montagens antigas. São poucos segundos fora do ar para todos os sites. Enquanto não acontecer, as montagens antigas não têm efeito. Backup em `backups/pre_remocao_vetorpet_compose_20261117_112935/`.
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
