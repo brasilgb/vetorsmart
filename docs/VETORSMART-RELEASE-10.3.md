@@ -161,7 +161,7 @@ A instância temporária custa cerca de 45 MiB por 15 a 30 s, o que equivale a 0
 
 ### Riscos e recomendações
 
-1. **Logs do VetorSmart se perdem a cada deploy** (o risco mais relevante). O Laravel grava em `storage/logs` dentro do container (canal `single`, sem volume), e o scheduler grava na saída do container. Os dois somem quando o container é removido, inclusive os relatórios de CSP e os erros da aplicação. Recomendação: um volume `./volumes/vetorsmart-logs:/var/www/html/storage/logs` nos três serviços, com rotação diária. É uma alteração de infraestrutura e depende de autorização.
+1. **Logs do VetorSmart se perdem a cada deploy** (o risco mais relevante). O Laravel grava em `storage/logs` dentro do container (canal `single`, sem volume), e o scheduler grava na saída do container. Os dois somem quando o container é removido, inclusive os relatórios de CSP e os erros da aplicação. Recomendação: um volume `./volumes/vetorsmart-logs:/var/www/html/storage/logs` nos três serviços, com rotação diária. **Resolvido no mesmo dia, depois da autorização do proprietário (seção 11).**
 2. **Não há histórico de métricas.** Sem `sysstat` nem monitoramento, os picos só aparecem em contadores acumulados (máximo de conexões do MySQL, PSI). Recomendação: `sysstat` (`sar`) ou um coletor leve antes de qualquer decisão de capacidade.
 3. **Nenhum container tem limite de memória.** Hoje isso não é problema (11,7 GiB livres), mas um vazamento em qualquer SaaS afetaria todos. Recomendação: definir limites depois de algumas semanas de histórico.
 4. **Um único MySQL atende todos os SaaS** e também guarda bancos de teste e exportação (`vetorpet_sim`, `vetorsales_vitta_test`, `vetorsales_import_test`, `vetorpet_export_*`, `vetorpet_vitta_src`, cerca de 19 MB). Recomendação: revisar e remover esses bancos com autorização.
@@ -204,7 +204,7 @@ Evidências: `backups/vetorsmart_release10.3_evidencias/rootadmin/`.
 
 | Item | Resultado |
 |---|---|
-| CSP | Continua em `report-only` (`config:show csp`). O Nginx não registrou **nenhum `POST /api/csp-report`** desde que a política entrou na 10.2. Nos testes de navegador, houve 0 violações em Chromium, Firefox e WebKit. Não há violação legítima a corrigir. Restrição: os logs do Laravel não persistem entre deploys (seção 4, item 1) |
+| CSP | Continua em `report-only` (`config:show csp`). O Nginx não registrou **nenhum `POST /api/csp-report`** desde que a política entrou na 10.2. Nos testes de navegador, houve 0 violações em Chromium, Firefox e WebKit. Não há violação legítima a corrigir. Desde a seção 11, os relatórios ficam em volume persistente |
 | Exclusão automática | Desabilitada (`assistant.retention_deletion_enabled = false`). `assistant:purge --execute` recusa a execução |
 | Simulação agendada | `30 6 * * * php artisan assistant:purge` no scheduler; a primeira execução automática é em 18/11 às 06:30 UTC. Simulação manual em 10:50: 0 conversas vencidas, nada removido |
 | Proteção de comandos destrutivos | Confirmada na prática: `migrate:fresh` foi recusado num banco local sem o sufixo `_test` |
@@ -242,7 +242,7 @@ VetorOS, VetorSales, VetorLeads, abrasilsistemas, desgarrados, n8n e WAHA seguem
 
 ### Pendências
 
-1. **Persistir os logs do VetorSmart** (volume para `storage/logs`). Depende de autorização por alterar o compose. Sem isso, a observação da CSP e o diagnóstico de erros recomeçam do zero a cada deploy.
+1. ~~Persistir os logs do VetorSmart~~: **concluído** (seção 11).
 2. **RootAdmin em produção:** homologar quando houver credencial de administrador autorizada.
 3. **CSP em `enforce`:** reavaliar com os logs persistidos e algumas semanas de observação.
 4. **Política de retenção:** decidir os prazos antes de habilitar `ASSISTANT_RETENTION_DELETION`.
@@ -255,6 +255,38 @@ VetorOS, VetorSales, VetorLeads, abrasilsistemas, desgarrados, n8n e WAHA seguem
 **APROVADO COM RESTRIÇÕES.**
 
 - **Aprovado:** Git consolidado (RELEASE-10.2 commitada e `main` da infraestrutura com o VetorSmart isolado do VetorSales); deploy sem 502 nem requisições perdidas, com rollback real validado; capacidade da KVM 4 avaliada com dados reais; testes sem falhas; nenhuma regressão nos demais SaaS.
-- **Restrições:** RootAdmin não homologado em produção (falta credencial; a interface foi validada localmente) e logs da aplicação sem persistência entre deploys.
+- **Restrição:** RootAdmin não homologado em produção (falta credencial; a interface foi validada localmente). A outra restrição, logs sem persistência, foi resolvida na seção 11.
 
 Restrições do correio cumpridas: DNS, certificados e dados reais de tenants intactos; sem MFA, sem migrations, sem limpeza do Docker, sem remoção de backups e sem credenciais nos relatórios.
+
+## 11. Complemento: volume de logs (autorizado pelo proprietário em 17/11/2026)
+
+**Problema:** os logs do Laravel ficavam em `storage/logs` dentro de cada container e se perdiam a cada troca, inclusive os relatórios de CSP e o resultado diário da simulação de retenção.
+
+**Solução:**
+
+- **Infraestrutura:** cada serviço monta o próprio diretório: `volumes/vetorsmart-logs/web`, `worker` e `scheduler` → `/var/www/html/storage/logs`. Os diretórios são separados porque worker e scheduler rodam como root e o PHP-FPM do web roda como `www-data`. Um arquivo comum, criado pelo root, ficaria sem permissão de escrita para o web e faria as requisições falharem. O log passou a ser diário (`LOG_STACK=daily`), com 14 dias de retenção (`VETORSMART_LOG_DAILY_DAYS`). A pasta entrou no `.gitignore`.
+- **Aplicação** (`b2dea42`): o relatório diário de `assistant:purge` passa a ser gravado em `storage/logs/assistant-retention.log`, e não mais na saída do container.
+
+**Execução:**
+
+- Backup do compose em `backups/vetorsmart_pre_logs_20261117_110906/`.
+- Imagens de rollback `:rollback-pre-logs`.
+- Suíte com 454 aprovados, 9 pulados e 0 falhas; PHPStan e Pint sem erros.
+- Deploy pelo procedimento da seção 3 às 11:12: **411 de 411 com 200, 0 erro 502**; VetorOS com 83 de 83.
+
+**Comprovação:**
+
+| Verificação | Resultado |
+|---|---|
+| Web (relatório de CSP de teste) | `web/laravel-2026-11-17.log`, dono `www-data` |
+| Worker e scheduler (aviso de teste) | Um arquivo em cada diretório |
+| Simulação de retenção pelo agendador | `scheduler/assistant-retention.log`, sem remover nada |
+| Recriação de web, worker e scheduler | Os 4 arquivos ficaram intactos (`md5sum`). O novo web (`infra-abrasil-vetorsmart-8`) continuou gravando no mesmo arquivo. A troca teve 339 de 339 com 200 |
+
+**Commits:**
+
+- Infraestrutura: `03a5636` em `feat/vetorsales-infra` e `2bb5f4a` em `feat/vetorsmart-infra`/`main`. Na `main`, o compose renderizado do VetorSmart é idêntico ao de produção.
+- Aplicação: `b2dea42` e o registro deste complemento.
+
+As entradas de teste nos logs estão identificadas: `teste-persistencia-logs` e os documentos `/teste-release-10.3-logs` e `/teste-apos-troca`.

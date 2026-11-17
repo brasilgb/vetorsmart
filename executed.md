@@ -13,7 +13,7 @@ O `correio.md` mudou: a versão commitada era a `RELEASE-10.1`, este arquivo reg
 Restrições:
 
 1. **RootAdmin não homologado em produção.** Não há credencial de administrador autorizada, e o correio proíbe criar uma. A interface foi validada em navegador real com a aplicação local, banco descartável e dados fictícios: 140 de 140 verificações e 0 violações WCAG.
-2. **Os logs do VetorSmart não persistem entre deploys.** Eles ficam dentro do container, inclusive os relatórios de CSP. A correção é um volume para `storage/logs` e depende de autorização.
+2. ~~Os logs do VetorSmart não persistem entre deploys~~: **resolvido** depois da autorização do proprietário (seção 5).
 
 ## 1. Commits
 
@@ -54,13 +54,21 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 
 ## 4. Pendências
 
-1. Volume para os logs do VetorSmart: depende de autorização.
+1. ~~Volume para os logs do VetorSmart~~: concluído (seção 5).
 2. RootAdmin em produção, quando houver credencial autorizada.
 3. CSP em `enforce`, depois de observar os relatórios.
 4. Política de retenção, antes de `ASSISTANT_RETENTION_DELETION=true`.
 5. VetorSales na `main` da infraestrutura: decisão do proprietário.
 6. Capacidade: histórico de métricas, limites de memória, bancos de teste no MySQL de produção, rotação de imagens e do cache de build.
 7. Domínios próprios.
+
+## 5. Complemento: volume de logs (autorizado em 17/11/2026)
+
+- `volumes/vetorsmart-logs/{web,worker,scheduler}` montados em `storage/logs`, com log diário mantido por 14 dias. Os diretórios são separados porque worker e scheduler rodam como root e o web como `www-data`.
+- O relatório diário de retenção vai para `storage/logs/assistant-retention.log` (`b2dea42`).
+- Deploy às 11:12: 411 de 411 com 200, 0 erro 502.
+- Os logs sobreviveram à recriação dos três containers, e o novo web continuou gravando.
+- Commits da infraestrutura: `03a5636` (`feat/vetorsales-infra`) e `2bb5f4a` (`main`). Detalhes na seção 11 do relatório.
 
 ## Restrições cumpridas
 
