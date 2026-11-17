@@ -10,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Websites\TenantSubdomainService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -19,7 +20,7 @@ use Illuminate\Support\Str;
  */
 final class TenantRegistrationService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(private AuditLogger $auditLogger, private TenantSubdomainService $subdomains) {}
 
     /**
      * @param  array{company_name: string, segment_id: int, name: string, email: string, password: string}  $data
@@ -56,6 +57,9 @@ final class TenantRegistrationService
                 'locale' => 'pt_BR',
                 'settings' => [],
             ]);
+
+            // The company's public subdomain, derived from its name and unique across the platform.
+            $this->subdomains->assign($tenant);
 
             $this->auditLogger->record('tenant.created', $tenant, $tenant, [
                 'segment_id' => $tenant->segment_id,

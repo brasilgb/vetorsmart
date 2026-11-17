@@ -16,9 +16,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Manages the optional custom domains of a company. Every site has a standard address, /{segment}/{company} on the
- * platform domain; a verified custom domain also serves the site and becomes its canonical address. Custom domains
- * stay pending until the DNS record is seen. Platform subdomains created earlier only redirect to the standard
- * address, and new ones are no longer created.
+ * platform domain, and a platform subdomain managed by TenantSubdomainService; a verified custom domain also serves the
+ * site and becomes its canonical address. Custom domains stay pending until the DNS record is seen. A company can never
+ * claim a name inside the platform's own namespace here.
  */
 class WebsiteDomainService
 {
@@ -93,20 +93,32 @@ class WebsiteDomainService
      */
     public function makePrimary(TenantDomain $domain, User $actor): void
     {
+        if ($domain->kind !== DomainKind::Custom) {
+            throw ValidationException::withMessages(['domain' => 'Somente um domínio próprio pode ser o principal.']);
+        }
+
         if (! $domain->isServing()) {
             throw ValidationException::withMessages(['domain' => 'Somente um domínio verificado pode ser o principal.']);
         }
 
         DB::transaction(function () use ($domain, $actor): void {
-            TenantDomain::query()->forTenant($domain->tenant_id)->where('is_primary', true)->update(['is_primary' => false]);
+            TenantDomain::query()->forTenant($domain->tenant_id)->where('kind', DomainKind::Custom)->where('is_primary', true)->update(['is_primary' => false]);
             $domain->forceFill(['is_primary' => true])->save();
 
             $this->auditLogger->record('website.domain_primary', $domain->tenant, $domain, [], $actor);
         });
     }
 
+    /**
+     * Remove a custom domain. Platform subdomains are never removed: the current one is the company's address and the
+     * earlier ones keep redirecting and stay reserved for the company (see TenantSubdomainService).
+     */
     public function remove(TenantDomain $domain, User $actor): void
     {
+        if ($domain->kind !== DomainKind::Custom) {
+            throw ValidationException::withMessages(['domain' => 'O endereço VetorSmart da empresa não pode ser removido. Você pode alterá-lo em Meu Site → Domínios.']);
+        }
+
         $tenant = $domain->tenant;
         $hostname = $domain->hostname;
 
@@ -123,7 +135,8 @@ class WebsiteDomainService
 
     private function ensureLimit(Tenant $tenant): void
     {
-        $count = TenantDomain::query()->forTenant($tenant)->count();
+        // Platform subdomains are created by the platform and do not count against the company's custom domains.
+        $count = TenantDomain::query()->forTenant($tenant)->where('kind', DomainKind::Custom)->count();
 
         if ($count >= (int) config('platform.max_domains_per_tenant')) {
             throw ValidationException::withMessages(['hostname' => 'Limite de domínios atingido para esta empresa.']);

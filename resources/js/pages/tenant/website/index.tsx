@@ -9,6 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { draft as websiteDraft, preview, publish, unpublish } from '@/routes/tenant/website';
 import { store as domainStore, verify, primary, destroy as domainDestroy } from '@/routes/tenant/website/domains';
+import { update as subdomainUpdate } from '@/routes/tenant/website/subdomain';
 
 type Draft = {
     headline: string | null;
@@ -33,6 +34,16 @@ type Domain = {
     dns: { type: string; name: string; value: string } | null;
 };
 
+type Subdomain = {
+    hostname: string;
+    label: string;
+    url: string;
+    base_domain: string;
+    serving: boolean;
+    previous: string[];
+    changes_left: number;
+};
+
 type Props = {
     website: {
         name: string;
@@ -43,6 +54,7 @@ type Props = {
         updated_at: string | null;
         public_url: string | null;
         custom_url: string | null;
+        subdomain: Subdomain | null;
         canonical_url: string | null;
         address_issue: string | null;
         version: number | null;
@@ -77,6 +89,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
     const services = useForm({ section: 'services', service_ids: draft.service_ids, show_professionals: draft.show_professionals, professional_ids: draft.professional_ids });
     const seo = useForm({ section: 'seo', seo: { title: draft.seo.title ?? '', description: draft.seo.description ?? '', indexable: draft.seo.indexable } });
     const domain = useForm({ hostname: '' });
+    const subdomain = useForm({ subdomain: website.subdomain?.label ?? '' });
 
     const toggle = (list: number[], id: number) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
@@ -107,11 +120,12 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                             <span className="text-vs-muted">Situação:</span>
                             <StatusBadge active={website.visible} activeLabel="No ar" inactiveLabel={website.is_live ? 'Publicado, fora do ar' : 'Não publicado'} />
                         </div>
+                        {website.subdomain?.serving && <PublicAddress label="Endereço VetorSmart" url={website.subdomain.url} />}
                         <PublicAddress label="Endereço padrão" url={website.public_url} />
                         {website.custom_url && <PublicAddress label="Domínio próprio" url={website.custom_url} />}
-                        {website.custom_url && website.canonical_url && (
+                        {(website.custom_url || website.subdomain?.serving) && website.canonical_url && (
                             <p className="text-xs text-vs-muted">
-                                Os dois endereços exibem o mesmo site. Para os buscadores, o endereço principal é <span className="break-all">{website.canonical_url}</span>.
+                                Todos os endereços exibem o mesmo site. Para os buscadores, o endereço principal é <span className="break-all">{website.canonical_url}</span>.
                             </p>
                         )}
                         <SiteNotice website={website} />
@@ -212,6 +226,33 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
 
                 {tab === 'domains' && (
                     <div className="grid gap-6">
+                        {website.subdomain && (
+                            <Card className="grid gap-4 border-vs-border/70 p-6 shadow-sm">
+                                <h2 className="text-base font-semibold text-vs-text">Endereço VetorSmart</h2>
+                                <p className="text-sm text-vs-muted">
+                                    {website.subdomain.serving
+                                        ? 'Seu site também responde neste endereço, sem configuração de DNS.'
+                                        : 'Este endereço está reservado para a sua empresa. Ele será ativado em breve; até lá, leva os visitantes ao endereço padrão.'}
+                                </p>
+                                <code className="w-fit max-w-full rounded bg-muted px-2 py-1 text-sm break-all text-vs-text">{website.subdomain.hostname}</code>
+                                {website.subdomain.previous.length > 0 && (
+                                    <p className="text-xs text-vs-muted">
+                                        Endereços anteriores, que redirecionam para o atual: <span className="break-words">{website.subdomain.previous.join(', ')}</span>
+                                    </p>
+                                )}
+                                {canEdit && website.subdomain.changes_left > 0 && (
+                                    <form onSubmit={(e) => { e.preventDefault(); subdomain.patch(subdomainUpdate.url(), { preserveScroll: true }); }} className="grid gap-4 md:grid-cols-[1fr_auto] md:items-end">
+                                        <Field id="subdomain" label="Novo endereço" error={subdomain.errors.subdomain} hint={`Letras minúsculas, números e hífen. Restam ${website.subdomain.changes_left} alteração(ões); o endereço anterior continua redirecionando.`}>
+                                            <div className="flex items-center gap-2">
+                                                <Input id="subdomain" value={subdomain.data.subdomain} onChange={(e) => subdomain.setData('subdomain', e.target.value.toLowerCase())} autoCapitalize="none" autoCorrect="off" spellCheck={false} className="h-10" />
+                                                <span className="shrink-0 text-sm text-vs-muted">.{website.subdomain.base_domain}</span>
+                                            </div>
+                                        </Field>
+                                        <Button type="submit" disabled={subdomain.processing || subdomain.data.subdomain === website.subdomain.label} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Alterar</Button>
+                                    </form>
+                                )}
+                            </Card>
+                        )}
                         <Card className="grid gap-4 border-vs-border/70 p-6 shadow-sm">
                             <h2 className="text-base font-semibold text-vs-text">Domínio próprio (opcional)</h2>
                             <p className="text-sm text-vs-muted">Seu site já tem um endereço padrão no VetorSmart, sem domínio nem configuração de DNS. Um domínio próprio verificado também exibe o site e passa a ser o endereço principal para os buscadores; o endereço padrão continua funcionando.</p>
@@ -220,7 +261,7 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                                 <div key={item.id} className="grid gap-2 rounded-md border border-vs-border/70 p-4 text-sm">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <span className="font-medium text-vs-text">{item.hostname}{item.is_primary && <span className="ml-2 text-xs text-vs-link">(principal)</span>}</span>
-                                        <span className="text-vs-muted">{item.kind === 'subdomain' ? 'Endereço antigo da plataforma, redireciona' : 'Domínio próprio'} · {item.status === 'verified' ? 'Verificado' : 'Aguardando verificação'}</span>
+                                        <span className="text-vs-muted">Domínio próprio · {item.status === 'verified' ? 'Verificado' : 'Aguardando verificação'}</span>
                                     </div>
                                     {item.dns && (
                                         <div className="text-vs-muted">

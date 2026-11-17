@@ -10,6 +10,7 @@ use App\Http\Controllers\Tenant\SettingsController;
 use App\Http\Controllers\Tenant\TeamController;
 use App\Http\Controllers\Tenant\WebsiteController;
 use App\Http\Controllers\Tenant\WebsiteDomainController;
+use App\Http\Controllers\Tenant\WebsiteSubdomainController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -79,6 +80,7 @@ Route::middleware(['auth', 'tenant.resolve'])->group(function () {
     Route::post('meu-site/publicar', [WebsiteController::class, 'publish'])->name('tenant.website.publish');
     Route::post('meu-site/retirar', [WebsiteController::class, 'unpublish'])->name('tenant.website.unpublish');
     Route::get('meu-site/previa', [WebsiteController::class, 'preview'])->name('tenant.website.preview');
+    Route::patch('meu-site/subdominio', [WebsiteSubdomainController::class, 'update'])->middleware('throttle:10,1')->name('tenant.website.subdomain.update');
     Route::post('meu-site/dominios', [WebsiteDomainController::class, 'store'])->name('tenant.website.domains.store');
     Route::post('meu-site/dominios/{domain}/verificar', [WebsiteDomainController::class, 'verify'])->whereNumber('domain')->name('tenant.website.domains.verify');
     Route::post('meu-site/dominios/{domain}/principal', [WebsiteDomainController::class, 'primary'])->whereNumber('domain')->name('tenant.website.domains.primary');

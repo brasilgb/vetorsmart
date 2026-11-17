@@ -11,12 +11,15 @@ use App\Models\TenantDomain;
  * Public addresses of a company site.
  *
  * The standard address is {public_url}/{segment}/{company} on the platform's main domain and needs no DNS. A company
- * may also serve the same site on its own verified domain (https://www.empresa.com.br). Both answer, but there is a
- * single canonical address per company so search engines never see two indexable copies: the custom domain when the
- * company has one verified, otherwise the standard address.
+ * also has a platform subdomain ({name}.<tenant_base_domain>), which serves the site once subdomain sites are enabled,
+ * and may serve it on its own verified domain (https://www.empresa.com.br). Every way in answers, but there is a single
+ * canonical address per company so search engines never see two indexable copies, in this order of preference: the
+ * custom domain, the subdomain (when enabled), the standard address.
  */
 class PublicSiteAddress
 {
+    public function __construct(private TenantSubdomainService $subdomains) {}
+
     /**
      * Path of the standard address, such as /refrigeracao/clima-total, or null without a segment.
      */
@@ -51,8 +54,15 @@ class PublicSiteAddress
     }
 
     /**
+     * Whether platform subdomains serve the sites (the wildcard DNS record and certificate are live).
+     */
+    public function subdomainSitesEnabled(): bool
+    {
+        return (bool) config('platform.subdomain_sites');
+    }
+
+    /**
      * The company's own verified domain that serves its site: the one marked as primary, else the oldest verified.
-     * Platform subdomains never serve a site, they only redirect.
      */
     public function customHost(Tenant $tenant): ?string
     {
@@ -68,32 +78,47 @@ class PublicSiteAddress
     }
 
     /**
+     * The company's current platform subdomain, whether or not subdomain sites are enabled.
+     */
+    public function subdomainHost(Tenant $tenant): ?string
+    {
+        return $this->subdomains->current($tenant)?->hostname;
+    }
+
+    /**
+     * The host the canonical address lives on: the custom domain, else the subdomain when subdomain sites are enabled.
+     * Null means the canonical address is the standard one, on the main domain.
+     */
+    public function canonicalHost(Tenant $tenant): ?string
+    {
+        return $this->customHost($tenant) ?? ($this->subdomainSitesEnabled() ? $this->subdomainHost($tenant) : null);
+    }
+
+    /**
      * Base of the canonical address, without a trailing slash: https://www.empresa.com.br or the standard address.
      */
     public function canonicalBase(Tenant $tenant): ?string
     {
-        $custom = $this->customHost($tenant);
+        $host = $this->canonicalHost($tenant);
 
-        if ($custom !== null) {
-            return $this->hostBase($custom);
-        }
-
-        return $this->home($tenant);
+        return $host !== null ? $this->hostBase($host) : $this->home($tenant);
     }
 
     /**
-     * Canonical address of a page: '' for the home, '/servicos' for the services page. The home of a custom domain
-     * keeps its trailing slash (https://www.empresa.com.br/).
+     * Canonical address of a page: '' for the home, '/servicos' for the services page. The home of a host keeps its
+     * trailing slash (https://www.empresa.com.br/).
      */
     public function canonical(Tenant $tenant, string $suffix = ''): ?string
     {
-        $base = $this->canonicalBase($tenant);
+        $host = $this->canonicalHost($tenant);
 
-        if ($base === null) {
-            return null;
+        if ($host !== null) {
+            return $this->hostBase($host).($suffix === '' ? '/' : $suffix);
         }
 
-        return $suffix === '' && $this->customHost($tenant) !== null ? $base.'/' : $base.$suffix;
+        $home = $this->home($tenant);
+
+        return $home === null ? null : $home.$suffix;
     }
 
     /**

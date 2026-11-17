@@ -55,9 +55,33 @@ return [
     | Subdomains a company can never claim, so they cannot impersonate platform services.
     */
     'reserved_subdomains' => [
-        'www', 'app', 'admin', 'api', 'mail', 'smtp', 'imap', 'ftp', 'cdn', 'static',
-        'assets', 'rootadmin', 'painel', 'dashboard', 'login', 'register', 'status', 'suporte',
+        'www', 'app', 'admin', 'api', 'mail', 'smtp', 'imap', 'pop', 'pop3', 'ftp', 'sftp', 'cdn', 'static',
+        'assets', 'rootadmin', 'root', 'painel', 'dashboard', 'login', 'logout', 'register', 'cadastro', 'entrar',
+        'status', 'suporte', 'support', 'ajuda', 'help', 'docs', 'blog', 'webmail', 'mx', 'ns', 'ns1', 'ns2', 'dns',
+        'autodiscover', 'autoconfig', 'auth', 'oauth', 'sso', 'id', 'conta', 'contas', 'account', 'billing',
+        'pagamento', 'pagamentos', 'cobranca', 'financeiro', 'dev', 'staging', 'homolog', 'homologacao', 'teste',
+        'test', 'demo', 'sandbox', 'vetorsmart', 'vetor', 'site', 'sites', 'm', 'mobile', 'localhost', 'n8n',
+        'waha', 'phpmyadmin', 'pma', 'mysql', 'db', 'redis', 'grafana', 'metrics', 'monitor', 'health',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Company subdomains ({name}.<tenant_base_domain>)
+    |--------------------------------------------------------------------------
+    |
+    | Every company gets a subdomain when it is registered. subdomain_sites decides whether that subdomain serves the
+    | site (and becomes its canonical address when the company has no custom domain of its own). Keep it off until the
+    | wildcard DNS record and the wildcard certificate are live: while off, a subdomain only redirects to the standard
+    | address /{segment}/{company}, which is how production has always behaved.
+    |
+    | max_subdomain_changes: how many times a company may change its subdomain. Every earlier name stays reserved for
+    | it and keeps redirecting.
+    |
+    */
+
+    'subdomain_sites' => (bool) env('PLATFORM_SUBDOMAIN_SITES', false),
+
+    'max_subdomain_changes' => (int) env('PLATFORM_MAX_SUBDOMAIN_CHANGES', 3),
 
     /*
     | Abuse limit: domains (subdomain and custom) per company.

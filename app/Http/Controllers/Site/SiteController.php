@@ -13,14 +13,16 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 
 /**
- * Public company sites. Two ways in, one canonical address:
+ * Public company sites. Up to three ways in, one canonical address:
  *
  * - the standard address /{segment}/{company} on the platform's main domain, always available;
+ * - the company's platform subdomain ({name}.<tenant_base_domain>), which serves the site when subdomain sites are
+ *   enabled and otherwise redirects to the standard address; an earlier subdomain redirects to the current one;
  * - the company's own verified domain (https://www.empresa.com.br), when it has one, which serves the same site.
  *
- * The canonical address is the custom domain when there is one, otherwise the standard address, so search engines
- * index a single copy. Earlier platform subdomains only redirect to the standard address. A missing, unpublished or
- * suspended site always answers with a plain 404 that reveals nothing about the company.
+ * The canonical address is the custom domain, else the subdomain (when enabled), else the standard address, so search
+ * engines index a single copy. A missing, unpublished or suspended site always answers with a plain 404 that reveals
+ * nothing about the company.
  */
 class SiteController extends Controller
 {
@@ -48,7 +50,8 @@ class SiteController extends Controller
     }
 
     /**
-     * Home of a company on its own domain. An earlier platform subdomain redirects to the standard address.
+     * Home of a company on one of its hostnames: its own domain or its current subdomain serve the site, anything else
+     * of the company redirects.
      */
     public function hostPage(Request $request): RedirectResponse|Response
     {
@@ -72,14 +75,14 @@ class SiteController extends Controller
             $locations[] = config('platform.public_url').'/';
 
             foreach ($this->resolver->liveSites() as $site) {
-                if ($this->address->customHost($site['tenant']) === null) {
+                if ($this->address->canonicalHost($site['tenant']) === null) {
                     array_push($locations, ...$this->indexableLocations($site['tenant'], $site['content']));
                 }
             }
         } else {
             $site = $this->resolver->resolve($request->getHost());
 
-            if ($site === null || ! $this->servesOnThisHost($site['tenant'], $request->getHost(), $site['domain']->kind)) {
+            if ($site === null || ! $this->isCanonicalHost($site['tenant'], $request->getHost())) {
                 abort(404);
             }
 
@@ -98,8 +101,9 @@ class SiteController extends Controller
     }
 
     /**
-     * robots.txt. The central host and a company domain that serves its site allow crawling and point to their own
-     * sitemap; an earlier platform subdomain only lets crawlers follow its redirect; any other host is closed.
+     * robots.txt. The central host and the canonical host of a company allow crawling and point to their own sitemap;
+     * another hostname of a company (which redirects, or serves the site with its canonical elsewhere) lets crawlers
+     * follow it; any other host is closed.
      */
     public function robots(Request $request): Response
     {
@@ -115,7 +119,7 @@ class SiteController extends Controller
             return response("User-agent: *\nDisallow: /\n", 200, $headers);
         }
 
-        if ($site['domain']->kind === DomainKind::Custom && $this->servesOnThisHost($site['tenant'], $request->getHost(), DomainKind::Custom)) {
+        if ($this->isCanonicalHost($site['tenant'], $request->getHost())) {
             $base = $this->address->hostBase($request->getHost());
 
             return response("User-agent: *\nAllow: /\n\nSitemap: {$base}/sitemap.xml\n", 200, $headers);
@@ -125,39 +129,67 @@ class SiteController extends Controller
     }
 
     /**
-     * A request on a company hostname. The company's own domain serves the site; another verified domain of the same
-     * company moves to that one; an earlier platform subdomain moves to the standard address.
+     * A request on a company hostname.
+     *
+     * - Platform subdomain, subdomain sites disabled: moves to the standard address.
+     * - Platform subdomain, enabled: the current one serves the site; an earlier one moves to the current one.
+     * - Custom domain: the main one serves the site; another verified domain of the same company moves to the main one.
+     *
+     * Redirects keep the path and the query string. Their target is always built from the company's own records, never
+     * from the request, so they cannot be turned into an open redirect.
      */
     private function onHost(Request $request, string $suffix, string $page): RedirectResponse|Response
     {
         $site = $this->resolver->resolve($request->getHost()) ?? abort(404);
         $tenant = $site['tenant'];
+        $host = $request->getHost();
 
         if ($site['domain']->kind === DomainKind::Subdomain) {
-            $target = $this->address->home($tenant) ?? abort(404);
+            if (! $this->address->subdomainSitesEnabled()) {
+                $target = $this->address->home($tenant) ?? abort(404);
 
-            return redirect()->away($target.$suffix, 301);
-        }
+                return redirect()->away($target.$suffix.$this->queryString($request), 301);
+            }
 
-        $customHost = $this->address->customHost($tenant);
+            $current = $this->address->subdomainHost($tenant) ?? abort(404);
 
-        if ($customHost !== null && $customHost !== $request->getHost()) {
-            return redirect()->away($this->address->hostBase($customHost).($suffix === '' ? '/' : $suffix), 301);
+            if ($current !== $host) {
+                return $this->redirectToHost($request, $current, $suffix);
+            }
+        } else {
+            $customHost = $this->address->customHost($tenant);
+
+            if ($customHost !== null && $customHost !== $host) {
+                return $this->redirectToHost($request, $customHost, $suffix);
+            }
         }
 
         if ($page === 'services' && empty($site['content']['services'] ?? [])) {
             abort(404);
         }
 
-        return $this->render($tenant, $site['content'], $page, $this->address->hostBase($request->getHost()), true);
+        return $this->render($tenant, $site['content'], $page, $this->address->hostBase($host), true);
+    }
+
+    private function redirectToHost(Request $request, string $host, string $suffix): RedirectResponse
+    {
+        return redirect()->away($this->address->hostBase($host).($suffix === '' ? '/' : $suffix).$this->queryString($request), 301);
+    }
+
+    private function queryString(Request $request): string
+    {
+        $query = $request->getQueryString();
+
+        return $query === null || $query === '' ? '' : '?'.$query;
     }
 
     /**
-     * Whether this hostname is where the company's site is served (its main verified custom domain).
+     * Whether this hostname is the company's canonical host (its main custom domain, or its current subdomain when
+     * subdomain sites are enabled and it has no custom domain).
      */
-    private function servesOnThisHost(Tenant $tenant, string $host, DomainKind $kind): bool
+    private function isCanonicalHost(Tenant $tenant, string $host): bool
     {
-        return $kind === DomainKind::Custom && $this->address->customHost($tenant) === $host;
+        return $this->address->canonicalHost($tenant) === $host;
     }
 
     /**

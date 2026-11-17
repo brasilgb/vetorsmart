@@ -20,7 +20,8 @@ use Illuminate\Http\Response;
 
 /**
  * Visitor chat of a company site, at /{segment}/{company}/atendimento on the main domain or at /atendimento on the
- * company's own verified domain. The company comes from the address only (the two URL slugs or the hostname), never
+ * company's own verified domain or on its platform subdomain (when subdomain sites are enabled). Only the page moves
+ * when a hostname redirects; the JSON endpoints never redirect. The company comes from the address only (the two URL slugs or the hostname), never
  * from the session or the payload. The visitor is identified by an httpOnly token cookie scoped to the assistant path
  * of that address, so the conversations of different companies on the main domain never share a cookie.
  */
@@ -149,7 +150,7 @@ class AssistantController extends Controller
 
         $site = $this->resolver->resolve($request->getHost());
 
-        if ($site === null || $site['domain']->kind !== DomainKind::Custom || $this->address->customHost($site['tenant']) !== $request->getHost()) {
+        if ($site === null || ! $this->servesOnHost($site['tenant'], $site['domain']->kind, $request->getHost())) {
             return null;
         }
 
@@ -162,8 +163,24 @@ class AssistantController extends Controller
     }
 
     /**
-     * On a company hostname, the assistant page of an earlier platform subdomain moves to the standard address, and a
-     * secondary custom domain moves to the company's main one.
+     * Whether the assistant answers on this company hostname: the main custom domain, or the current platform subdomain
+     * when subdomain sites are enabled.
+     */
+    private function servesOnHost(Tenant $tenant, DomainKind $kind, string $host): bool
+    {
+        return match ($kind) {
+            DomainKind::Custom => $this->address->customHost($tenant) === $host,
+            DomainKind::Subdomain => $this->address->subdomainSitesEnabled() && $this->address->subdomainHost($tenant) === $host,
+        };
+    }
+
+    /**
+     * Where the assistant page moves to, or null when it is served here.
+     *
+     * - Standard address: always served.
+     * - Platform subdomain: moves to the standard address while subdomain sites are disabled, and from an earlier
+     *   subdomain to the current one once they are enabled.
+     * - Custom domain: a secondary one moves to the company's main one.
      */
     private function redirectFromHost(Request $request): ?RedirectResponse
     {
@@ -172,12 +189,19 @@ class AssistantController extends Controller
         }
 
         $site = $this->resolver->resolve($request->getHost()) ?? abort(404);
+        $tenant = $site['tenant'];
 
         if ($site['domain']->kind === DomainKind::Subdomain) {
-            return redirect()->away(($this->address->assistant($site['tenant']) ?? abort(404)), 301);
+            if (! $this->address->subdomainSitesEnabled()) {
+                return redirect()->away(($this->address->assistant($tenant) ?? abort(404)), 301);
+            }
+
+            $current = $this->address->subdomainHost($tenant) ?? abort(404);
+
+            return $current === $request->getHost() ? null : redirect()->away($this->address->hostBase($current).'/atendimento', 301);
         }
 
-        $customHost = $this->address->customHost($site['tenant']);
+        $customHost = $this->address->customHost($tenant);
 
         if ($customHost !== null && $customHost !== $request->getHost()) {
             return redirect()->away($this->address->hostBase($customHost).'/atendimento', 301);

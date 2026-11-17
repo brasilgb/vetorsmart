@@ -3,6 +3,7 @@
 namespace App\Services\Websites;
 
 use App\Enums\BrandColor;
+use App\Enums\DomainKind;
 use App\Enums\DomainStatus;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
@@ -13,7 +14,12 @@ use App\Models\TenantWebsite;
  */
 class WebsitePresenter
 {
-    public function __construct(private WebsiteDomainService $domains, private PublicSiteAddress $address, private ReservedPaths $reserved) {}
+    public function __construct(
+        private WebsiteDomainService $domains,
+        private PublicSiteAddress $address,
+        private ReservedPaths $reserved,
+        private TenantSubdomainService $subdomains,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -32,6 +38,7 @@ class WebsitePresenter
             'updated_at' => $updatedAt === null ? null : $tenant->toLocal($updatedAt)->format('d/m/Y H:i'),
             'public_url' => $this->address->home($tenant),
             'custom_url' => $customHost === null ? null : $this->address->hostBase($customHost).'/',
+            'subdomain' => $this->subdomain($tenant),
             'canonical_url' => $this->address->canonical($tenant),
             'address_issue' => $this->addressIssue($tenant),
             'visible' => $website->isLive() && $this->addressIssue($tenant) === null,
@@ -54,6 +61,33 @@ class WebsitePresenter
     }
 
     /**
+     * The company's platform subdomain for the panel, or null when it has none yet. "serving" says whether it already
+     * shows the site (subdomain sites enabled) or still redirects to the standard address.
+     *
+     * @return array{hostname: string, label: string, url: string, base_domain: string, serving: bool, previous: list<string>, changes_left: int}|null
+     */
+    public function subdomain(Tenant $tenant): ?array
+    {
+        $current = $this->subdomains->current($tenant);
+
+        if ($current === null) {
+            return null;
+        }
+
+        return [
+            'hostname' => $current->hostname,
+            'label' => $this->subdomains->labelOf($current),
+            'url' => $this->address->hostBase($current->hostname).'/',
+            'base_domain' => (string) config('platform.tenant_base_domain'),
+            'serving' => $this->address->subdomainSitesEnabled(),
+            'previous' => $this->subdomains->retiredHostnames($tenant),
+            'changes_left' => max(0, (int) config('platform.max_subdomain_changes') - $this->subdomains->changesUsed($tenant)),
+        ];
+    }
+
+    /**
+     * The company's custom domains. Platform subdomains are shown apart (see subdomain()).
+     *
      * @return list<array<string, mixed>>
      */
     public function domains(Tenant $tenant): array
@@ -62,6 +96,7 @@ class WebsitePresenter
 
         $records = TenantDomain::query()
             ->forTenant($tenant)
+            ->where('kind', DomainKind::Custom)
             ->orderByDesc('is_primary')
             ->orderBy('hostname')
             ->get();

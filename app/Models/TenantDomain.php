@@ -18,8 +18,9 @@ use Illuminate\Support\Carbon;
  * @property DomainStatus $status
  * @property string|null $verification_token
  * @property bool $is_primary
+ * @property Carbon|null $retired_at
  */
-#[Fillable(['tenant_id', 'hostname', 'kind', 'status', 'verification_token', 'is_primary', 'verified_at'])]
+#[Fillable(['tenant_id', 'hostname', 'kind', 'status', 'verification_token', 'is_primary', 'verified_at', 'retired_at'])]
 class TenantDomain extends Model
 {
     use BelongsToTenant;
@@ -27,6 +28,14 @@ class TenantDomain extends Model
     public function isServing(): bool
     {
         return $this->status === DomainStatus::Verified;
+    }
+
+    /**
+     * A platform subdomain the company replaced. It only redirects to the current one and stays reserved for the company.
+     */
+    public function isRetired(): bool
+    {
+        return $this->retired_at !== null;
     }
 
     /**
@@ -39,6 +48,7 @@ class TenantDomain extends Model
             'status' => DomainStatus::class,
             'is_primary' => 'boolean',
             'verified_at' => 'datetime',
+            'retired_at' => 'datetime',
         ];
     }
 }
