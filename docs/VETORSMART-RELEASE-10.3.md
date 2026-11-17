@@ -290,3 +290,15 @@ Restrições do correio cumpridas: DNS, certificados e dados reais de tenants in
 - Aplicação: `b2dea42` e o registro deste complemento.
 
 As entradas de teste nos logs estão identificadas: `teste-persistencia-logs` e os documentos `/teste-release-10.3-logs` e `/teste-apos-troca`.
+
+## 12. Complemento: limpeza do cache de build (autorizada pelo proprietário em 17/11/2026)
+
+| Item | Antes | Depois do `docker builder prune -f` | Depois do build de teste |
+|---|---|---|---|
+| Cache de build | 28,1 GB (114 entradas) | 14,7 GB (60) | 18,3 GB (97) |
+| Disco `/` | 81 GB (43%) | 72 GB (39%) | 78 GB (41%) |
+
+- A limpeza foi sem `--all`. Imagens, volumes, containers e backups não foram tocados. Os 24 containers seguiram saudáveis.
+- O build de teste do VetorSmart não aproveitou nenhuma etapa do cache (230 s): a limpeza também removeu o cache das etapas de dependências. Cada SaaS terá um primeiro build mais lento e depois volta ao normal.
+- Com o armazenamento de imagens do containerd, o build de teste tirou da lista a imagem do web em execução (`ef2e5b7`), que perdeu a tag `latest`. O container não foi afetado. A nova `latest` (`df25adb`) tem o mesmo código, porque de `b2dea42` para `aa572cd` só mudou documentação. Worker e scheduler não mudaram.
+- **Lição para as próximas limpezas:** marcar com uma tag de rollback a imagem em execução antes de qualquer build.

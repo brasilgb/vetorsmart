@@ -70,6 +70,12 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - Os logs sobreviveram à recriação dos três containers, e o novo web continuou gravando.
 - Commits da infraestrutura: `03a5636` (`feat/vetorsales-infra`) e `2bb5f4a` (`main`). Detalhes na seção 11 do relatório.
 
+## 6. Complemento: limpeza do cache de build (autorizada em 17/11/2026)
+
+- `docker builder prune -f` (sem `--all`) liberou **13,4 GB**: o cache caiu de 28,1 GB para 14,7 GB e o disco de 43% para 39%. Imagens, volumes, containers e backups não foram tocados, e os 24 containers seguiram saudáveis.
+- Num build de teste do VetorSmart, nenhuma etapa veio do cache (230 s). A limpeza também levou o cache das dependências, então o primeiro build de cada SaaS vai ser mais lento. O cache já se recompôs em parte (18,3 GB) e o disco está em 41%.
+- Efeito colateral: o build de teste moveu a `latest` do web para `df25adb`. Com o armazenamento containerd, a imagem anterior em execução (`ef2e5b7`) saiu da lista. O container segue saudável, e a `df25adb` tem o mesmo código (de `b2dea42` para `aa572cd` só mudou documentação).
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
