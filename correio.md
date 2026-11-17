@@ -1,171 +1,179 @@
-# VETORSMART-RELEASE-10.1 — Estabilização e Homologação de Produção
+# VETORSMART-RELEASE-10.3
+## Consolidação Git, Deploy e Capacidade da Hostinger KVM 4
 
-**Data:** 16/11/2026  
 **Ambiente:** VPS de produção `srv1990862`  
-**Diretório:** `gateway/vetorsmart/`  
-**Branch:** `main`  
-**HEAD inicial esperado:** `fd7fa5f`
+**Aplicação:** `gateway/vetorsmart/`  
+**Infraestrutura:** `/opt/infra-abrasil/`  
+**Banco:** MySQL 8.4  
+**Referência:** VETORSMART-RELEASE-10.2
 
-## Objetivo
+### OBJETIVO
 
-Consolidar a implantação dos sites públicos do VetorSmart, corrigir a inicialização dos caches Laravel e homologar a experiência completa em produção.
+Consolidar o versionamento, corrigir as falhas residuais do deploy, validar o RootAdmin e avaliar os recursos compartilhados da VPS Hostinger KVM 4.
 
-Priorizar estabilidade, segurança, usabilidade e isolamento multi-tenant.
+Preservar o funcionamento de VetorOS, VetorSales, VetorLeads e VetorSmart.
 
-**Não implementar MFA ou autenticação em duas etapas.**
+### ETAPA 1 — CONSOLIDAÇÃO GIT
 
----
+1. Verificar branches, commits, submódulos e alterações pendentes.
+2. Preservar todas as alterações da RELEASE-10.2.
+3. Revisar o diff antes de qualquer commit.
+4. Criar commit específico da RELEASE-10.2 na aplicação.
+5. Preparar uma branch limpa da infraestrutura, baseada na `main`, contendo somente as configurações necessárias ao VetorSmart.
+6. Não incorporar alterações não relacionadas de `feat/vetorsales-infra`.
+7. Validar referências e dependências dos quatro SaaS.
+8. Integrar somente após os testes e verificações.
+9. Realizar push exclusivamente das alterações revisadas e aprovadas no escopo desta release.
 
-## ETAPA 1 — Inspeção inicial
+Não executar `git reset --hard`, `git clean -fd` ou comandos destrutivos sobre alterações preexistentes.
 
-1. Conferir Git, branch, HEAD e alterações locais.
-2. Verificar os 24 containers e seus estados.
-3. Identificar entrypoints e configurações de inicialização do VetorSmart.
-4. Conferir logs, banco MySQL, Redis e filas.
-5. Inspecionar a configuração atual dos caches Laravel.
-6. Verificar se existem alterações ainda não consolidadas da RELEASE-10.
+### ETAPA 2 — DEPLOY SEM INTERRUPÇÃO
 
-Não sobrescrever arquivos locais ou executar `git reset --hard`.
+Investigar e resolver a requisição sem resposta identificada na RELEASE-10.2.
 
-## ETAPA 2 — Correção dos caches Laravel
+Verificar:
 
-A RELEASE-10 identificou que os caches são perdidos quando o container é recriado.
+- Cache e resolução DNS do upstream no Nginx.
+- IP dos containers e renovação das conexões.
+- Readiness real do PHP-FPM e Laravel.
+- Encerramento gracioso dos processos.
+- Inicialização da nova instância antes de retirar a antiga.
+- Comportamento do scheduler e worker durante a substituição.
+- Possibilidade de rollback imediato.
 
-Corrigir essa condição de maneira permanente.
+Avaliar e aplicar `fastcgi_connect_timeout 2s` exclusivamente ao VetorSmart, caso a configuração efetiva permita esse ajuste com segurança.
 
-Requisitos:
+Antes de modificar o Nginx, executar validação de sintaxe e preservar cópia da configuração anterior.
 
-- Gerar `config:cache`, `route:cache` e, quando aplicável, `view:cache` na inicialização.
-- Utilizar as variáveis reais de runtime.
-- Garantir comportamento consistente no container web, worker e scheduler.
-- Evitar concorrência desnecessária na escrita de caches compartilhados.
-- Impedir que uma falha de configuração deixe o serviço aparentemente saudável.
-- Preservar logs úteis sem expor credenciais.
+**Critério de aprovação:** nenhuma requisição perdida ou erro 502 provocado pela troca de containers durante o teste controlado.
 
-Testar a recriação controlada dos containers específicos do VetorSmart.
+Não alterar o comportamento dos outros SaaS.
 
-Não reiniciar MySQL, Redis, Nginx ou outros SaaS.
+### ETAPA 3 — AUDITORIA HOSTINGER KVM 4
 
-## ETAPA 3 — Empresa de homologação
+Recursos de referência:
 
-Verificar se existe um tenant específico para testes.
+- 4 vCPU
+- 16 GB RAM
+- 200 GB NVMe
 
-Caso não exista, preparar um tenant de homologação isolado, sem cobrança real, integrações externas ou envio de notificações a clientes reais.
+Verificar os recursos efetivamente disponíveis no servidor.
 
-Utilizar uma identificação inequívoca de teste, por exemplo:
+Analisar:
 
-`vetorsmart.com.br/assistencia-tecnica/homologacao-vetorsmart`
+1. CPU total, por processo e por container.
+2. Memória utilizada, disponível e cache.
+3. Swap e ocorrências de OOM.
+4. MySQL: memória, conexões, consultas lentas e utilização.
+5. Redis, se estiver em uso.
+6. PHP-FPM, workers e schedulers.
+7. Consumo individual dos quatro SaaS.
+8. Disco, volumes Docker, imagens e cache de build.
+9. I/O e possíveis gargalos.
+10. Margem de recursos para deploy com instância temporária.
 
-Requisitos:
+Produzir relatório com consumo atual, picos observados, principais riscos e recomendações de capacidade.
 
-- Não modificar a Clima Total.
-- Não utilizar clientes reais.
-- Não gerar pagamentos.
-- Não executar comunicações externas.
-- Restringir acesso administrativo ao tenant de teste.
-- Verificar que suas informações não aparecem em relatórios comerciais reais.
+Não alterar limites de CPU/RAM nem recriar containers apenas para realizar a auditoria.
 
-Se a criação exigir alterações com efeitos comerciais ou administrativos não previstos, registrar a necessidade de autorização e continuar as demais verificações.
+Não excluir imagens, volumes, backups ou cache nesta release.
 
-## ETAPA 4 — Homologação dos sites
+### ETAPA 4 — HOMOLOGAÇÃO ROOTADMIN E INTERFACE
 
-Validar em produção:
+Validar em navegador:
 
-1. Site publicado em `/segmento/empresa`.
-2. Página inicial.
-3. Lista e detalhes de serviços.
-4. Responsividade em desktop e mobile.
-5. Navegação e botões.
-6. Formulários e validações.
-7. Atendimento web.
-8. Encaminhamento humano.
-9. Solicitação de serviço.
-10. Agendamento com horário disponível.
-11. Confirmação do agendamento.
-12. Visualização no painel da empresa.
-13. Alteração de status.
-14. Conclusão do atendimento.
-15. Isolamento dos dados por tenant.
-16. SEO, canonical, sitemap e robots.
+- Login administrativo.
+- Dashboard RootAdmin.
+- Empresas e usuários.
+- Sites publicados.
+- Agendamentos.
+- Indicadores.
+- Configurações.
+- Aparência clara e escura.
+- Responsividade mobile.
+- Contraste e acessibilidade.
 
-Se o servidor não possuir navegador, executar os testes de interface por um ambiente externo autorizado com acesso HTTPS à produção. Não declarar homologação visual com base apenas em respostas HTTP.
+Revisar especialmente textos de baixo contraste, fundos, botões, formulários e cores inconsistentes.
 
-## ETAPA 5 — Segurança e desempenho
+Realizar testes em Chromium e, quando disponíveis, Firefox e WebKit.
 
-Conferir:
+Não reintroduzir MFA/TOTP.
 
-- Rate limiting no login e no atendimento.
-- Sessões e cookies seguros.
-- CSRF.
-- Autorização de rotas.
-- Isolamento de tenants.
-- Logs de ações administrativas.
-- Disponibilidade do worker e scheduler.
-- Consultas lentas.
-- Uso de memória e CPU.
-- Erros HTTP.
-- Ausência de dados sensíveis em respostas públicas.
+Não criar credenciais administrativas artificiais em produção. Caso não haja acesso autorizado, registrar objetivamente o bloqueio.
 
-Não reintroduzir MFA.
+### ETAPA 5 — SEGURANÇA E RETENÇÃO
 
-## ETAPA 6 — Domínios próprios
+Manter a CSP em modo Report-Only.
 
-Inspecionar a arquitetura necessária para domínios personalizados.
+Inspecionar os relatórios coletados e identificar eventuais violações legítimas.
 
-Validar:
+Manter a exclusão automática de conversas desabilitada.
 
-- Verificação de propriedade.
-- Resolução de tenants por domínio.
-- Certificados TLS.
-- Configuração futura do Nginx.
-- Redirecionamentos canônicos.
-- Tratamento de domínios pendentes ou desconhecidos.
+Verificar a simulação agendada de retenção, sem excluir registros.
 
-Não criar certificados nem modificar DNS nesta execução.
+Preservar rate limiting, auditoria, controle de sessões, permissões e isolamento entre tenants.
 
-## ETAPA 7 — Manutenção Docker
+### ETAPA 6 — TESTES E IMPLANTAÇÃO
 
-Identificar imagens antigas e espaço ocupado.
+Executar:
 
-Gerar inventário indicando:
+- Suíte automatizada Laravel.
+- PHPStan.
+- TypeScript.
+- Build de produção.
+- Testes de isolamento multi-tenant.
+- Testes de agendamento concorrente.
+- Testes de atendimento.
+- Testes de acesso público.
+- Testes de deploy e rollback.
 
-- Imagens atualmente utilizadas.
-- Imagens de rollback.
-- Imagens antigas sem referência.
-- Espaço potencialmente recuperável.
+Antes de implantar, confirmar backup válido, estado do Git e imagem de rollback.
 
-Não executar `docker system prune -a`, `docker volume prune` ou remover backups e imagens de rollback necessárias.
+Não executar migrations destrutivas.
 
-## ETAPA 8 — Relatório
+Se algum teste crítico falhar, interromper a implantação e documentar o problema.
 
-Criar:
+### ETAPA 7 — DOCUMENTAÇÃO
 
-`docs/VETORSMART-RELEASE-10.1.md`
+Gerar:
 
-Documentar:
+`docs/VETORSMART-RELEASE-10.3.md`
+
+Incluir:
 
 - Diagnóstico inicial.
-- Arquivos modificados.
-- Correção dos caches.
-- Resultado da recriação dos containers.
-- Tenant utilizado para homologação.
-- Evidências funcionais e visuais.
-- Testes de segurança.
-- Uso de recursos.
-- Pendências.
-- Resultado final: APROVADO, APROVADO COM RESTRIÇÕES ou BLOQUEADO.
+- Commits e SHAs.
+- Arquivos alterados.
+- Resultados dos testes.
+- Evidências do deploy.
+- Resultado da auditoria da KVM 4.
+- Situação dos demais SaaS.
+- Problemas encontrados e resolvidos.
+- Pendências remanescentes.
+- Parecer final: aprovado, aprovado com restrições ou reprovado.
 
-Atualizar `executed.md`.
+### RESTRIÇÕES OBRIGATÓRIAS
 
-## Restrições de execução
+- Não prejudicar VetorOS, VetorSales ou VetorLeads.
+- Não modificar DNS ou certificados.
+- Não alterar dados reais dos tenants.
+- Não habilitar MFA.
+- Não excluir backups.
+- Não executar limpeza geral do Docker.
+- Não introduzir novas funcionalidades comerciais.
+- Não realizar alterações estruturais na infraestrutura sem diagnóstico comprovado.
+- Não expor credenciais, tokens ou segredos nos relatórios.
+- Não declarar testes aprovados sem evidências.
 
-- Não alterar outros SaaS.
-- Não modificar dados da Clima Total.
-- Não implementar MFA.
-- Não executar migrations destrutivas.
-- Não realizar push automaticamente.
-- Não alterar DNS.
-- Não remover volumes ou backups.
-- Preservar possibilidade de rollback.
+### RESULTADO ESPERADO
 
-**Critério de conclusão:** sites públicos e atendimento funcionando em produção, com isolamento correto, caches regenerados automaticamente e experiência desktop/mobile validada por navegador real.
+Ao concluir, o VetorSmart deverá apresentar:
+
+1. Git organizado e consistente.
+2. Deploy confiável, com rollback validado.
+3. RootAdmin homologado ou bloqueios claramente documentados.
+4. Capacidade da KVM 4 avaliada com dados reais.
+5. Ausência de regressões nos quatro SaaS.
+6. Ambiente preparado para continuar o desenvolvimento funcional.
+
+**Após a RELEASE-10.3, retornar à evolução comercial do VetorSmart, priorizando atendimento, conversão, agenda, sites e painel Meu Crescimento.**

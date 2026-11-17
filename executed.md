@@ -1,110 +1,70 @@
-# Execução: VETORSMART-RELEASE-10.1 — Estabilização e Homologação de Produção
+# Execução: VETORSMART-RELEASE-10.3 — Consolidação Git, Deploy e Capacidade da Hostinger KVM 4
 
-Data: 16/11/2026, 19:26 a 20:06 UTC. Local: VPS de produção `srv1990862`, `gateway/vetorsmart/`.
+Data: 17/11/2026, das 10:30 às 11:30 UTC. Local: VPS de produção `srv1990862`, `gateway/vetorsmart/` e `/opt/infra-abrasil/`.
 
 ## Análise do correio
 
-`correio.md` difere do anterior. A última instrução executada era a `RELEASE-10`; a atual é a `RELEASE-10.1`. Ela foi executada em duas sessões: a primeira fez a correção dos caches e o cadastro da empresa de teste; a segunda concluiu as etapas 3 a 8. O conteúdo anterior deste arquivo foi apagado.
+O `correio.md` mudou: a versão commitada era a `RELEASE-10.1`, este arquivo registrava a execução da `RELEASE-10.2` e o correio atual é a `RELEASE-10.3`. A release foi executada e o conteúdo anterior deste arquivo foi substituído.
 
 ## Parecer
 
-**APROVADO COM RESTRIÇÕES.** Relatório técnico completo: `docs/VETORSMART-RELEASE-10.1.md`.
-
-Sites públicos e atendimento funcionam em produção, com isolamento entre empresas, caches regenerados a cada início e experiência desktop e mobile conferida em navegador real.
+**APROVADO COM RESTRIÇÕES.** O relatório completo está em `docs/VETORSMART-RELEASE-10.3.md`.
 
 Restrições:
 
-1. **O healthcheck do VetorSmart na infraestrutura está na branch `feat/vetorsales-infra`**, não na `main`.
-2. **Navegador único:** Chromium headless em 1366, 768 e 390 px. Safari e Firefox reais não foram usados.
-3. **Console RootAdmin não aberto em navegador:** sem credencial de administrador disponível. Indicadores conferidos por teste e por leitura em produção.
-4. **Duas empresas de teste permanecem em produção**, uma com site publicado e indexável.
-5. **Domínios próprios** seguem sem Nginx e sem certificado.
+1. **RootAdmin não homologado em produção.** Não há credencial de administrador autorizada, e o correio proíbe criar uma. A interface foi validada em navegador real com a aplicação local, banco descartável e dados fictícios: 140 de 140 verificações e 0 violações WCAG.
+2. **Os logs do VetorSmart não persistem entre deploys.** Eles ficam dentro do container, inclusive os relatórios de CSP. A correção é um volume para `storage/logs` e depende de autorização.
 
-## 1. HEAD
+## 1. Commits
 
-- Inicial: `fd7fa5f`. Commits feitos após a homologação e enviados ao remoto, a pedido: os sete abaixo e `5661539`, de documentação (`fd7fa5f..5661539`). O registro do push entrou num commit de documentação posterior, também enviado.
-- Commits da aplicação: `1fb41cb` (caches e healthcheck), `4976b2d` (fonte do site), `b07f0df` (horários), `1aa9edb` (indicadores do RootAdmin), `c7b8477` (cabeçalhos de segurança), `89ec6da` (relatórios), `6bb89aa` (correio e executed).
-- Infraestrutura: `33baf62` na branch `feat/vetorsales-infra`, com o healthcheck do `docker-compose.yml` e o submódulo `gateway/vetorsmart`; `bedbacb` avança o submódulo para `5661539`. Enviados ao remoto (`e460ffa..bedbacb`); um commit posterior avança o submódulo para o commit de documentação final.
-- Os commits foram feitos depois do deploy e da homologação. As imagens em produção têm o mesmo código de `c7b8477`.
+Aplicação (`brasilgb/vetorsmart`, `main`):
 
-## 2. Alterações aplicadas
+- `49e8fcc`: código e testes da RELEASE-10.2.
+- `174f230`: relatório da RELEASE-10.2.
+- Commit seguinte: `correio.md`, este arquivo e o relatório da 10.3.
+
+Infraestrutura (`brasilgb/infraabrasil`):
+
+- `52988da` (`feat/vetorsmart-infra`, a partir da `origin/main`): só o VetorSmart (serviços, Nginx, MySQL, certificado, submódulo), sem nada do VetorSales. A configuração renderizada é idêntica à de produção, e o `nginx -t` passou.
+- A `main` avança por fast-forward até essa branch, e o submódulo vai para o último commit da aplicação.
+- `3b3f229` (`feat/vetorsales-infra`, a branch em produção): `fastcgi_connect_timeout 2s` no VetorSmart e, em seguida, o avanço do submódulo. As alterações locais de outros SaaS não foram tocadas.
+
+## 2. Alterações aplicadas em produção
 
 ```
-docker tag infra-abrasil-<serviço>:latest infra-abrasil-<serviço>:rollback-pre-10.1         (sessão anterior)
-docker tag infra-abrasil-<serviço>:latest infra-abrasil-<serviço>:rollback-pre-10.1-fixes
+backup: backups/vetorsmart_pre_release10.3_174f230_20261117_103418/ (dump + nginx)
+docker tag ... :rollback-pre-10.3 (web, worker, scheduler)
+nginx/conf.d/apps.conf: fastcgi_connect_timeout 2s no PHP do vetorsmart; nginx -t; nginx -s reload
 docker compose build vetorsmart vetorsmart-worker vetorsmart-scheduler
-docker compose up -d --no-deps vetorsmart vetorsmart-worker vetorsmart-scheduler
-docker compose run --rm --no-deps ...                    (testes de falha do entrypoint, removidos)
-docker run mcr.microsoft.com/playwright:v1.49.1-noble    (homologação em navegador)
-docker run mysql:8.4 em 127.0.0.1:33111                  (banco da suíte, removido)
+4 trocas com instância temporária: mesma imagem, deploy, rollback, reaplicação
 ```
 
-- Recriados às 19:32 e às 19:58 UTC: `vetorsmart`, `vetorsmart-worker`, `vetorsmart-scheduler`. Os outros 21 containers mantiveram o mesmo ID.
-- Na segunda recriação: três containers saudáveis em 8 segundos; 4 respostas 502 em cerca de 5 segundos.
-- MySQL, Redis e Nginx não foram reiniciados. `.env`, Nginx, DNS e certificados não foram alterados.
+## 3. Entregas
 
-## 3. Correção dos caches
+| Etapa | Resultado |
+|---|---|
+| 1. Git | RELEASE-10.2 commitada. A branch limpa da infraestrutura foi integrada à `main`. Sem reset, clean ou push forçado |
+| 2. Deploy | **1.684 requisições em 4 trocas, todas com 200: 0 com 502 e 0 perdidas**, inclusive no rollback para `rollback-pre-10.3`. O IP antigo é abandonado em 2 s. VetorOS respondeu 338 de 338 |
+| 3. KVM 4 | 4 vCPU EPYC, 15,6 GiB e 197 GB. CPU 87,6% ociosa, 11,7 GiB livres, disco em 39%, swap quase sem uso, 0 OOM. MySQL com máximo de 14 conexões e 0 consultas lentas. VetorSmart usa 114 MiB. Recuperáveis: 3,7 GB em imagens e 8,3 GB em cache de build. Nada removido |
+| 4. RootAdmin | Bloqueado em produção (restrição 1). Localmente: Chromium 60/60, Firefox 40/40, WebKit 40/40, claro e escuro, 390, 768 e 1366 px |
+| 5. Segurança | CSP em Report-Only: nenhum relatório recebido no Nginx e 0 violações nos navegadores. Exclusão de conversas desabilitada; simulação agendada às 06:30 sem remover nada |
+| 6. Testes | Suíte com 454 aprovados, 9 pulados e 0 falhas. Concorrência em MySQL real: 9/9. PHPStan e `tsc` sem erros. Build sem erros |
 
-- O entrypoint gera `config:cache`, `route:cache` e `view:cache` a cada início, em web, worker e scheduler, com as variáveis do próprio container.
-- Cada container escreve no seu sistema de arquivos; só o web publica o build do front no volume compartilhado.
-- Variável obrigatória ausente ou cache não gerado: o container não sobe. O log traz nomes de variáveis, nunca valores.
-- Healthcheck novo (`docker-healthcheck.php`): caches, `APP_KEY`, banco e PHP-FPM.
-- Quatro cenários de falha testados em containers descartáveis; todos barraram com saída 1.
+Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (sondas, capturas, resultados e scripts, sem credenciais).
 
-## 4. Empresas de homologação
+## 4. Pendências
 
-- `[HOMOLOG] Homologação VetorSmart`, em `/assistencia-tecnica/homolog-homologacao-vetorsmart`, site publicado.
-- `[HOMOLOG] Empresa B Isolamento`, só para o teste de isolamento, sem site.
-- Criadas pelo formulário público. Dados fictícios, sem cobrança, sem envio externo (`MAIL_MAILER=log`, IA `none`).
-- Credenciais em `backups/vetorsmart_pre_release10.1_fd7fa5f_20261116_192840.conf/homolog/credentials.env`.
-- Clima Total: nenhum registro alterado. O site dela foi publicado e retirado às 19:25 UTC pelo proprietário, de um navegador externo, não por esta execução.
-- Remoção, quando desejada: `php artisan homolog:purge` e depois `--execute`.
-
-## 5. Homologação em navegador
-
-- **128 de 129 verificações gravadas aprovadas**, mais 21 do fluxo de agendamento conferidas no console. 49 capturas de tela.
-- A única reprovação é do roteiro de cadastro, que leu a URL cedo demais; o cadastro funcionou.
-- Os 16 itens da instrução foram cobertos: site, página inicial, serviços, responsividade, navegação, formulários, atendimento, encaminhamento humano, solicitação, agendamento, confirmação, painel, mudança de status, conclusão, isolamento e SEO.
-- Evidências em `backups/vetorsmart_pre_release10.1_fd7fa5f_20261116_192840.conf/homolog/` (`shots/`, `*.json`, `scripts/`).
-
-## 6. Defeitos corrigidos
-
-1. Site público saía em fonte serifada: aspas escapadas dentro de `<style>` invalidavam a declaração.
-2. Horários de funcionamento: marcar um dia não mudava a caixa nem liberava os campos.
-3. Painel RootAdmin contava as empresas de teste como clientes. Agora ficam fora dos indicadores.
-4. Respostas sem cabeçalhos de segurança e com a versão do PHP exposta. Acrescentados `nosniff`, `X-Frame-Options`, `Referrer-Policy` e HSTS, na aplicação.
-
-## 7. Segurança e desempenho
-
-- Limite de login: 429 na 6ª tentativa. Limite do atendimento: 429 após 30 por minuto.
-- CSRF: 419. Cookies `secure` e `httponly`. Rotas do painel sem sessão: 302. Usuário comum no RootAdmin: 403.
-- Isolamento: 14 tentativas cruzadas de leitura e escrita por ID, todas 404, sem vazamento.
-- Suíte automatizada: 444 aprovados, 9 pulados por desenho, 0 falhas.
-- Recursos: web com 44 MiB; p95 de 53 ms; 0 consultas lentas; nenhum 5xx além dos 502 da recriação; 0 jobs falhos.
-- MFA não implementado.
-
-## 8. Domínios próprios e Docker
-
-- Domínios: verificação por TXT, resolução por host e canonical prontos na aplicação. Faltam bloco de servidor no Nginx e emissão de certificado por domínio.
-- Docker: 41,3 GB em imagens, 20,5 GB em cache de build. 22 imagens de rollback, 21 do VetorSmart. Estimativa do Docker: 6,4 GB recuperáveis em imagens e 5,8 GB em cache. Nada foi removido.
-
-## 9. Pendências
-
-1. Levar o healthcheck do VetorSmart à `main` da infraestrutura (hoje em `feat/vetorsales-infra`).
-2. Destino das empresas de teste.
-3. RootAdmin em navegador; Safari e Firefox.
-4. 5 segundos de 502 na recriação.
-5. Nginx e certificados para domínios próprios.
-6. Retenção de conversas sem rotina agendada (o scheduler não tem tarefas).
-7. `Content-Security-Policy` ausente.
-8. Limpeza de imagens, mediante autorização.
-9. Três observações de layout sem correção.
-
-Detalhes no relatório.
+1. Volume para os logs do VetorSmart: depende de autorização.
+2. RootAdmin em produção, quando houver credencial autorizada.
+3. CSP em `enforce`, depois de observar os relatórios.
+4. Política de retenção, antes de `ASSISTANT_RETENTION_DELETION=true`.
+5. VetorSales na `main` da infraestrutura: decisão do proprietário.
+6. Capacidade: histórico de métricas, limites de memória, bancos de teste no MySQL de produção, rotação de imagens e do cache de build.
+7. Domínios próprios.
 
 ## Restrições cumpridas
 
-- Sem alteração em outros SaaS, Nginx, DNS ou certificados. Sem alteração em dados da Clima Total.
-- Sem MFA, sem migrations, sem push automático: commits e push feitos após a homologação, a pedido.
-- Sem remoção de volumes, backups ou imagens.
-- Nenhuma credencial impressa.
+- VetorOS, VetorSales e VetorLeads sem alteração.
+- DNS, certificados e dados reais de tenants intactos.
+- Sem MFA, sem migrations, sem limpeza do Docker, sem remoção de backups.
+- Nenhuma credencial em relatórios.
