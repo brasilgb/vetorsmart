@@ -379,3 +379,16 @@ As entradas de teste nos logs estão identificadas: `teste-persistencia-logs` e 
 - A permissão de `vetoros_user` em `vetoros_restore_test`, também inexistente.
 
 O banco `controle`, sem alteração desde 18/09, não tem nome de teste e foi mantido.
+
+## 17. Complemento: remoção dos usuários e permissões órfãos do MySQL (autorizada pelo proprietário em 17/11/2026)
+
+| Item | Situação | Ação |
+|---|---|---|
+| `chat129_restore@%` | Desbloqueado, senha de 19/10, `ALL` em `chat129_rehearsal` (inexistente) | `DROP USER` |
+| `chat130_restore@%` | Desbloqueado, senha de 19/10, `ALL` em `chat130_rehearsal` (inexistente) | `DROP USER` |
+| `vetoros_user@%` em `vetoros_restore_test` | Permissão em banco inexistente | `REVOKE ALL` só nesse banco. A permissão em `vetoros` foi mantida |
+
+- **Antes:** nenhuma referência em compose, `.env`, scripts, cron ou código; nenhuma conexão desses usuários; nenhuma permissão em tabela, coluna ou rotina. As permissões anteriores ficaram em `backups/mysql_usuarios_orfaos_pre_remocao_20261117_114554/grants-antes.sql`, sem hashes de senha.
+- **Depois:** `mysql.db` tem só uma permissão por usuário de aplicação, cada uma no próprio banco: `abrasilsistemas`, `desgarrados`, `vetorleads`, `vetoros`, `vetorpet`, `vetorsales` e `vetorsmart`.
+- **Verificação:** o VetorOS acessa o banco (194 migrations lidas, `/login` com 200) e não houve erro de acesso nos logs do web, do worker e do scheduler. Os cinco sites responderam 200 e os containers ficaram saudáveis.
+- **Segurança:** saíram duas contas que aceitavam login de qualquer host na rede interna sem ter uso.

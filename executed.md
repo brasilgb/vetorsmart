@@ -108,6 +108,13 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - Depois da remoção: sites com 200, containers saudáveis e nenhum erro de banco nos logs dos SaaS.
 - Não removidos (fora da autorização): os usuários `chat129_restore` e `chat130_restore`, com permissões em bancos que já não existem, e a permissão de `vetoros_user` em `vetoros_restore_test`, também inexistente.
 
+## 11. Complemento: remoção dos usuários e permissões órfãos do MySQL (autorizada em 17/11/2026)
+
+- `DROP USER` em `chat129_restore@%` e `chat130_restore@%`. Estavam desbloqueados, aceitavam conexão de qualquer host e só tinham permissão em bancos que já não existem.
+- `REVOKE` da permissão de `vetoros_user` em `vetoros_restore_test`, um banco inexistente. A permissão em `vetoros` foi mantida.
+- Antes, conferi que nenhuma configuração ou script usava esses usuários e que não havia conexões abertas. As permissões anteriores, sem hashes de senha, estão em `backups/mysql_usuarios_orfaos_pre_remocao_20261117_114554/`.
+- Depois: cada usuário de aplicação tem permissão só no próprio banco. O VetorOS acessa o banco normalmente (194 migrations lidas, `/login` com 200, sem erro de acesso). Os sites responderam 200.
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
