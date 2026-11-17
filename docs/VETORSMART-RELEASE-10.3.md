@@ -352,3 +352,30 @@ As entradas de teste nos logs estão identificadas: `teste-persistencia-logs` e 
 - O mesmo *dry-run* mostrou que o web do VetorSmart seria recriado, porque a `latest` (`df25adb`, gerada no teste de cache, seção 12) era diferente da imagem em execução. Sincronizei pela troca sem interrupção: 383 de 383 com 200, nenhum 502; VetorOS com 77 de 77.
 
 **Pendente:** recriar o container do Nginx (`docker compose up -d --no-deps nginx`) para que ele perca as montagens antigas do VetorPet. Isso deixa todos os sites fora do ar por alguns segundos, então deve ser feito numa janela escolhida pelo proprietário. Até lá, as montagens antigas não têm efeito, porque nenhuma configuração as usa.
+
+## 16. Complemento: remoção dos bancos de teste do MySQL (autorizada pelo proprietário em 17/11/2026)
+
+| Banco | Tabelas | Tamanho | Última alteração |
+|---|---|---|---|
+| `vetorpet_sim` | 64 | 3,8 MB | 09/11 18:09 |
+| `vetorsales_vitta_test` | 64 | 3,7 MB | 09/11 17:52 |
+| `vetorsales_import_test` | 49 | 3,0 MB | 09/11 18:17 |
+| `vetorpet_export_20261109_181512` | 46 | 2,8 MB | 09/11 18:15 |
+| `vetorpet_export_20261109_181827` | 46 | 2,8 MB | 09/11 18:18 |
+| `vetorpet_vitta_src` | 46 | 2,7 MB | 09/11 17:51 |
+
+**Verificações antes da remoção:**
+
+- Nenhum usuário próprio em `mysql.db` e nenhuma conexão aberta.
+- Nenhuma referência em compose, `.env`, scripts, cron ou código. Só aparecem na documentação do VetorSales, como cópias usadas para testar migrations e rollback.
+
+**Backup:** dump de cada banco em `backups/bancos_teste_pre_remocao_20261117_113510/`, todos terminando em `Dump completed` e com o número de tabelas conferido, mais `SHA256SUMS`. O backup diário de 17/11 (`backups/daily/20261117/`) também contém esses bancos.
+
+**Depois:** restam `abrasilsistemas`, `controle`, `desgarrados`, `phpmyadmin`, `vetorleads`, `vetoros`, `vetorpet`, `vetorsales` e `vetorsmart`. Os sites responderam 200, os containers ficaram saudáveis e nenhum SaaS registrou erro de banco.
+
+**Resíduos encontrados e não removidos** (são usuários e permissões, não bancos):
+
+- Os usuários `chat129_restore` e `chat130_restore`, com permissões em `chat129_rehearsal` e `chat130_rehearsal`, que já não existem.
+- A permissão de `vetoros_user` em `vetoros_restore_test`, também inexistente.
+
+O banco `controle`, sem alteração desde 18/09, não tem nome de teste e foi mantido.

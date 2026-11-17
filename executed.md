@@ -100,6 +100,14 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - O web do VetorSmart foi sincronizado com a `latest` (`df25adb`, mesmo código) pela troca sem interrupção: 383 de 383 com 200, nenhum 502.
 - **Pendente:** recriar o Nginx para que o container perca as montagens antigas. São poucos segundos fora do ar para todos os sites. Enquanto não acontecer, as montagens antigas não têm efeito. Backup em `backups/pre_remocao_vetorpet_compose_20261117_112935/`.
 
+## 10. Complemento: remoção dos bancos de teste do MySQL (autorizada em 17/11/2026)
+
+- Removidos 6 bancos: `vetorpet_sim`, `vetorsales_vitta_test`, `vetorsales_import_test`, `vetorpet_export_20261109_181512`, `vetorpet_export_20261109_181827` e `vetorpet_vitta_src`. Eram cópias de simulação das migrations do VetorSales, criadas e alteradas pela última vez em 09/11.
+- Antes da remoção, conferi que nenhum tinha usuário próprio ou conexão e que nenhuma configuração ou script os referenciava (só a documentação do VetorSales).
+- Cada banco tem um dump completo (`Dump completed`, número de tabelas conferido) em `backups/bancos_teste_pre_remocao_20261117_113510/`, com `SHA256SUMS`.
+- Depois da remoção: sites com 200, containers saudáveis e nenhum erro de banco nos logs dos SaaS.
+- Não removidos (fora da autorização): os usuários `chat129_restore` e `chat130_restore`, com permissões em bancos que já não existem, e a permissão de `vetoros_user` em `vetoros_restore_test`, também inexistente.
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
