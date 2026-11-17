@@ -246,7 +246,7 @@ VetorOS, VetorSales, VetorLeads, abrasilsistemas, desgarrados, n8n e WAHA seguem
 2. **RootAdmin em produção:** homologar quando houver credencial de administrador autorizada.
 3. **CSP em `enforce`:** reavaliar com os logs persistidos e algumas semanas de observação.
 4. **Política de retenção:** decidir os prazos antes de habilitar `ASSISTANT_RETENTION_DELETION`.
-5. **Infraestrutura:** levar o VetorSales para a `main` e o servidor de volta à `main`. É decisão do proprietário, fora do escopo.
+5. ~~Infraestrutura: levar o VetorSales para a `main` e o servidor de volta à `main`~~: **concluído** (seção 18).
 6. **Capacidade:** histórico de métricas, limites de memória por container, limpeza de bancos de teste, rotação de imagens de rollback e do cache de build. Tudo isso depende de autorização.
 7. Domínios próprios (Nginx e certificados), mantido da 10.2.
 
@@ -392,3 +392,27 @@ O banco `controle`, sem alteração desde 18/09, não tem nome de teste e foi ma
 - **Depois:** `mysql.db` tem só uma permissão por usuário de aplicação, cada uma no próprio banco: `abrasilsistemas`, `desgarrados`, `vetorleads`, `vetoros`, `vetorpet`, `vetorsales` e `vetorsmart`.
 - **Verificação:** o VetorOS acessa o banco (194 migrations lidas, `/login` com 200) e não houve erro de acesso nos logs do web, do worker e do scheduler. Os cinco sites responderam 200 e os containers ficaram saudáveis.
 - **Segurança:** saíram duas contas que aceitavam login de qualquer host na rede interna sem ter uso.
+
+## 18. Complemento: VetorSales levado para a main da infraestrutura (autorizado pelo proprietário em 17/11/2026)
+
+**Merge** `11ac9f0` (`merge/vetorsales-main` → `main`):
+
+- Pais: `5b9eba5` (`main`) e `c3b6906` (`feat/vetorsales-infra`). Toda a história das duas branches foi preservada.
+- 7 arquivos em conflito: `.env.example`, `.gitignore`, `.gitmodules`, `docker-compose.yml`, `mysql-init/01-databases.sh`, `nginx/conf.d/apps.conf` e `scripts/init-letsencrypt.sh`. Todos vinham do VetorSmart, adicionado nas duas branches em posições diferentes. Uma resolução automática poderia duplicar blocos, então a árvore foi definida como a de produção inteira (`git read-tree` da `feat/vetorsales-infra`), mais o bloco VetorSmart do `.env.example`, que só a `main` tinha.
+- Verificações:
+  - `git diff feat/vetorsales-infra 11ac9f0` mostra só o `.env.example` (6 linhas);
+  - nenhum arquivo da `main` anterior foi removido;
+  - o commit descende da `origin/main` (fast-forward) e da `feat/vetorsales-infra`;
+  - os arquivos novos na `main` (`.claude/settings.json` só com permissões de leitura, documentação, `scripts/backup-mysql.sh`) não têm segredos e já estavam publicados na branch de produção.
+
+**O que a `main` passa a ter:** o VetorSales (serviço, Nginx, MySQL, certificado e submódulo); o VetorPet fora do compose e redirecionado ao VetorSales; o backup diário do MySQL; a correção do cron de certificados; as versões fixadas no override; os ponteiros atuais dos submódulos; e tudo do VetorSmart.
+
+**Servidor:** o checkout `/opt/infra-abrasil` passou de `feat/vetorsales-infra` para `main` (`git switch`). Comparação antes e depois:
+
+- `docker-compose.yml`, `docker-compose.override.yml`, `nginx/` e `.env` idênticos (`md5sum`);
+- `git submodule status` idêntico;
+- alterações locais de outros SaaS preservadas (`correio.md`, `executed.md`, `gateway/correio.md`, `gateway/executed.md`, `gateway/abrasilsistemas`, `gateway/vetorsales`, `gateway/vetoros`);
+- `docker compose config` válido, e os 24 containers seguiram saudáveis;
+- o *dry-run* de `docker compose up -d` mostra só a recriação do Nginx que já estava pendente (seção 15).
+
+**A partir de agora:** os commits de infraestrutura e os avanços do submódulo vão para a `main`. As branches `feat/vetorsales-infra` e `feat/vetorsmart-infra` ficam no remoto, sem uso, e a remoção delas depende de autorização.

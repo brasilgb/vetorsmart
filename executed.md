@@ -115,6 +115,14 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - Antes, conferi que nenhuma configuração ou script usava esses usuários e que não havia conexões abertas. As permissões anteriores, sem hashes de senha, estão em `backups/mysql_usuarios_orfaos_pre_remocao_20261117_114554/`.
 - Depois: cada usuário de aplicação tem permissão só no próprio banco. O VetorOS acessa o banco normalmente (194 migrations lidas, `/login` com 200, sem erro de acesso). Os sites responderam 200.
 
+## 12. Complemento: VetorSales levado para a main da infraestrutura (autorizado em 17/11/2026)
+
+- Merge `11ac9f0` na `main`: contém toda a `feat/vetorsales-infra` (44 commits) e toda a `main` anterior. A árvore resultante é a de produção, mais o bloco VetorSmart do `.env.example`.
+- Os 7 conflitos vinham do VetorSmart adicionado nas duas branches, em posições diferentes. Resolvi tomando a árvore de produção inteira, para não duplicar blocos no compose e no Nginx.
+- Publicado por fast-forward, sem força.
+- **O servidor passou para a `main`.** Compose, Nginx, `.env`, submódulos e as alterações locais dos outros SaaS ficaram idênticos, e os 24 containers seguiram saudáveis.
+- A partir de agora, os commits de infraestrutura vão para a `main`. As branches `feat/vetorsales-infra` e `feat/vetorsmart-infra` continuam no remoto, sem uso; removê-las depende de autorização.
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
