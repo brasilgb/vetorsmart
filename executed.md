@@ -83,6 +83,14 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - Disco: de 78 GB para **65 GB (35%)**. Imagens: de 46,4 GB para 28,2 GB. Os 24 containers seguiram saudáveis e os cinco sites responderam 200.
 - Não foram tocados os 6,6 GB recuperáveis restantes: imagens do VetorPet (desativado), Playwright (usada na homologação) e certbot (usada na renovação de certificados).
 
+## 8. Complemento: remoção das imagens do VetorPet e do Playwright (autorizada em 17/11/2026)
+
+- Removidos os 3 containers parados do VetorPet (eram eles que prendiam as imagens) e as imagens `infra-abrasil-vetorpet{,-worker,-scheduler}:latest`, além de `mcr.microsoft.com/playwright:v1.49.1-noble`.
+- Antes, os logs e a configuração dos containers foram copiados para `backups/vetorpet_containers_pre_remocao_20261117_112758/`, sem variáveis de ambiente.
+- Os dados do VetorPet ficaram intactos: `volumes/vetorpet`, volume `vetorpet-build` e banco no MySQL.
+- Disco: de 65 GB para **61 GB (33%)**. Os 24 containers seguiram saudáveis; os cinco sites responderam 200 e o `vetorpet.com.br` continua redirecionando para o VetorSales (302).
+- Atenção: o compose ainda declara o VetorPet, e o Nginx depende dele. Um `docker compose up -d` sem nome de serviço, ou sem `--no-deps`, vai reconstruir e subir o VetorPet a partir do código-fonte. Tirá-lo do compose é uma decisão à parte.
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.

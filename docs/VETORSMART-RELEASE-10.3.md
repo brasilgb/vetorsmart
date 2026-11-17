@@ -316,3 +316,16 @@ As entradas de teste nos logs estão identificadas: `teste-persistencia-logs` e 
 - Só o VetorSmart tinha tags de rollback. Os outros SaaS não foram tocados.
 - Os 6,6 GB recuperáveis restantes não fazem parte desta autorização: imagens do VetorPet (desativado, 3 × 1,43 GB), Playwright (3,47 GB, usada na homologação em navegador) e certbot (usada na renovação de certificados).
 - **Política sugerida para os próximos deploys:** depois de um deploy estável, manter só as 2 últimas gerações de rollback.
+
+## 14. Complemento: remoção das imagens do VetorPet e do Playwright (autorizada pelo proprietário em 17/11/2026)
+
+| Item | Antes | Depois |
+|---|---|---|
+| Imagens | 31 imagens, 28,2 GB | 27 imagens, 24,0 GB |
+| Disco `/` | 65 GB (35%) | **61 GB (33%)** |
+
+- **VetorPet**, desativado desde 15/11 (o Nginx redireciona para o VetorSales): os 3 containers parados (`infra-abrasil-vetorpet-1`, `-worker-1`, `-scheduler-1`) foram removidos, porque eram eles que prendiam as imagens. Depois saíram as 3 imagens `latest`. Os logs e o `docker inspect` (sem variáveis de ambiente) ficaram em `backups/vetorpet_containers_pre_remocao_20261117_112758/`. Os dados ficaram intactos: `volumes/vetorpet`, volume `vetorpet-build` e banco `vetorpet` no MySQL.
+- **Playwright** (`mcr.microsoft.com/playwright:v1.49.1-noble`, 3,47 GB): removida. Para uma nova homologação em navegador, basta baixá-la de novo com `docker pull`.
+- Verificação: os 24 containers seguiram saudáveis; VetorSmart, VetorOS, VetorSales, VetorLeads e abrasilsistemas responderam 200; `vetorpet.com.br` respondeu 302 para o VetorSales, como antes.
+- **Atenção:** o `docker-compose.yml` ainda declara o serviço `vetorpet`, que está em `depends_on` do Nginx. Um `docker compose up -d` sem nome de serviço, ou o Nginx recriado sem `--no-deps`, vai reconstruir a imagem a partir de `gateway/vetorpet` e subir o VetorPet de novo. Para evitar isso, o VetorPet precisaria sair do compose e do `depends_on` do Nginx, o que fica para uma decisão à parte.
+- Os 3,2 GB recuperáveis restantes são imagens mantidas de propósito: as gerações de rollback do VetorSmart e a `latest` do web.
