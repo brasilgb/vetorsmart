@@ -426,4 +426,4 @@ O banco `controle`, sem alteração desde 18/09, não tem nome de teste e foi ma
 
 - Antes, `git fetch --prune` e `git merge-base --is-ancestor` contra a `origin/main` confirmaram que nenhum trabalho se perderia. A remoção usou `--force-with-lease`, que recusaria apagar uma branch alterada depois da verificação.
 - No remoto restam `main`, `abrasil-auth-ux-01` e `abrasil-auth-ux-03`, que não são desta release e não foram tocadas.
-- As cópias locais das duas branches permanecem no checkout do servidor, sem uso.
+- As cópias locais também foram removidas, depois de autorização, com `git branch -d`, que recusa apagar branch não integrada. O checkout do servidor tem apenas a `main`, sincronizada com a `origin/main`.

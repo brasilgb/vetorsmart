@@ -127,7 +127,7 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 
 - Apagadas de `brasilgb/infraabrasil`: `feat/vetorsales-infra` (`c3b6906`) e `feat/vetorsmart-infra` (`5b9eba5`). Antes, conferi que as duas estavam inteiramente contidas na `main`, sem nenhum commit fora dela. A remoção foi feita com `--force-with-lease`, para só acontecer se as branches ainda estivessem nesses commits.
 - No remoto ficaram `main`, `abrasil-auth-ux-01` e `abrasil-auth-ux-03`, que não foram tocadas.
-- As cópias locais das duas branches continuam no servidor; não têm efeito e podem ser removidas com `git branch -d`.
+- As cópias locais também foram removidas (`git branch -d`, que só apaga branch já integrada). O checkout do servidor tem apenas a `main`.
 
 ## Restrições cumpridas
 
