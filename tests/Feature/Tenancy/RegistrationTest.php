@@ -117,3 +117,22 @@ test('repeated registrations from one address are rate limited', function () {
     $response->assertSessionHasErrors('email');
     expect(Tenant::query()->where('name', 'Bloqueada')->exists())->toBeFalse();
 });
+
+test('a registration still succeeds when a simultaneous one takes the same slug first', function () {
+    $raced = false;
+
+    // Another registration commits the same slug between the availability check and this insert.
+    Tenant::creating(function (Tenant $tenant) use (&$raced) {
+        if (! $raced) {
+            $raced = true;
+            Tenant::factory()->create(['name' => 'Concorrente', 'slug' => $tenant->slug]);
+        }
+    });
+
+    $this->post(route('register.store'), registrationPayload())->assertRedirect(route('dashboard', absolute: false));
+
+    $tenant = Tenant::query()->where('name', 'Clean Pro Ltda')->sole();
+
+    // The rival row lives inside the failed savepoint and is rolled back with it; what matters is the retry.
+    expect($tenant->slug)->toStartWith('clean-pro-ltda-');
+});

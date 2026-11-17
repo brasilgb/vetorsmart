@@ -11,6 +11,7 @@ use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Websites\TenantSubdomainService;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -35,14 +36,7 @@ final class TenantRegistrationService
                 'status' => UserStatus::Active,
             ]);
 
-            $tenant = Tenant::create([
-                'uuid' => (string) Str::uuid(),
-                'name' => $data['company_name'],
-                'slug' => $this->uniqueSlug($data['company_name']),
-                'segment_id' => $data['segment_id'],
-                'status' => TenantStatus::Active,
-                'timezone' => 'America/Sao_Paulo',
-            ]);
+            $tenant = $this->createTenant($data);
 
             TenantUser::create([
                 'tenant_id' => $tenant->getKey(),
@@ -74,14 +68,45 @@ final class TenantRegistrationService
     }
 
     /**
-     * Build a slug unique across tenants, appending a short suffix on collision.
+     * Create the company with a slug unique across tenants. Two registrations with the same name at the same moment
+     * both see the slug as free; the unique index rejects the second insert, which then retries (inside a savepoint,
+     * so the registration transaction survives) with a suffixed slug.
+     *
+     * @param  array{company_name: string, segment_id: int}  $data
      */
-    private function uniqueSlug(string $companyName): string
+    private function createTenant(array $data): Tenant
     {
-        $base = Str::slug($companyName) ?: 'empresa';
+        $base = Str::slug($data['company_name']) ?: 'empresa';
+
+        for ($attempt = 0; ; $attempt++) {
+            $slug = $this->freeSlug($base, $attempt > 0);
+
+            try {
+                return DB::transaction(fn (): Tenant => Tenant::create([
+                    'uuid' => (string) Str::uuid(),
+                    'name' => $data['company_name'],
+                    'slug' => $slug,
+                    'segment_id' => $data['segment_id'],
+                    'status' => TenantStatus::Active,
+                    'timezone' => 'America/Sao_Paulo',
+                ]));
+            } catch (UniqueConstraintViolationException $exception) {
+                if ($attempt >= 5) {
+                    throw $exception;
+                }
+            }
+        }
+    }
+
+    /**
+     * The base slug when it is free and no suffix is forced, otherwise the base with a short random suffix.
+     */
+    private function freeSlug(string $base, bool $forceSuffix): string
+    {
         $slug = $base;
 
-        while (Tenant::query()->where('slug', $slug)->exists()) {
+        while ($forceSuffix || Tenant::query()->where('slug', $slug)->exists()) {
+            $forceSuffix = false;
             $slug = $base.'-'.Str::lower(Str::random(4));
         }
 
