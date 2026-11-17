@@ -416,3 +416,14 @@ O banco `controle`, sem alteração desde 18/09, não tem nome de teste e foi ma
 - o *dry-run* de `docker compose up -d` mostra só a recriação do Nginx que já estava pendente (seção 15).
 
 **A partir de agora:** os commits de infraestrutura e os avanços do submódulo vão para a `main`. As branches `feat/vetorsales-infra` e `feat/vetorsmart-infra` ficam no remoto, sem uso, e a remoção delas depende de autorização.
+
+## 19. Complemento: branches feat antigas apagadas do GitHub (autorizado pelo proprietário em 17/11/2026)
+
+| Branch | Último commit | Commits fora da `main` | Ação |
+|---|---|---|---|
+| `feat/vetorsales-infra` | `c3b6906` | 0 | Apagada do remoto |
+| `feat/vetorsmart-infra` | `5b9eba5` | 0 | Apagada do remoto |
+
+- Antes, `git fetch --prune` e `git merge-base --is-ancestor` contra a `origin/main` confirmaram que nenhum trabalho se perderia. A remoção usou `--force-with-lease`, que recusaria apagar uma branch alterada depois da verificação.
+- No remoto restam `main`, `abrasil-auth-ux-01` e `abrasil-auth-ux-03`, que não são desta release e não foram tocadas.
+- As cópias locais das duas branches permanecem no checkout do servidor, sem uso.

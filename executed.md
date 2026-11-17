@@ -123,6 +123,12 @@ Evidências: `/opt/infra-abrasil/backups/vetorsmart_release10.3_evidencias/` (so
 - **O servidor passou para a `main`.** Compose, Nginx, `.env`, submódulos e as alterações locais dos outros SaaS ficaram idênticos, e os 24 containers seguiram saudáveis.
 - A partir de agora, os commits de infraestrutura vão para a `main`. As branches `feat/vetorsales-infra` e `feat/vetorsmart-infra` continuam no remoto, sem uso; removê-las depende de autorização.
 
+## 13. Complemento: branches feat antigas apagadas do GitHub (autorizado em 17/11/2026)
+
+- Apagadas de `brasilgb/infraabrasil`: `feat/vetorsales-infra` (`c3b6906`) e `feat/vetorsmart-infra` (`5b9eba5`). Antes, conferi que as duas estavam inteiramente contidas na `main`, sem nenhum commit fora dela. A remoção foi feita com `--force-with-lease`, para só acontecer se as branches ainda estivessem nesses commits.
+- No remoto ficaram `main`, `abrasil-auth-ux-01` e `abrasil-auth-ux-03`, que não foram tocadas.
+- As cópias locais das duas branches continuam no servidor; não têm efeito e podem ser removidas com `git branch -d`.
+
 ## Restrições cumpridas
 
 - VetorOS, VetorSales e VetorLeads sem alteração.
