@@ -1,171 +1,54 @@
-# VETORSMART-WILDCARD-01.1 — Homologação, Git e preparação SSL
+# VETORSMART-WILDCARD-01.4 — Validação DNS e SSL
 
-**Projeto:** VetorSmart  
-**Ambiente:** Desenvolvimento WSL e VPS Hostinger KVM 4  
-**Diretório:** `gateway/vetorsmart/`  
-**Domínio:** `vetorsmart.com.br`
+**Ambiente:** VPS Hostinger KVM 4  
+**Diretório:** `gateway/vetorsmart/`
 
-## 1. Objetivo
+## 1. Verificar DNS
 
-Consolidar a implementação WILDCARD-01, homologar os sites públicos por subdomínio e preparar a infraestrutura HTTPS wildcard com renovação automática.
+Consultar servidores autoritativos e resolvedores públicos para:
 
-Preservar os sistemas VetorOS, VetorSales, VetorLeads e ABrasilSistemas.
+- `vetorsmart.com.br`
+- `www.vetorsmart.com.br`
+- `teste.vetorsmart.com.br`
 
-Não ativar subdomínios em produção antes da validação DNS e SSL.
+Confirmar resolução para `2.25.235.159`.
 
-## 2. Auditoria inicial
+Verificar também eventuais registros AAAA conflitantes.
 
-Antes de qualquer alteração:
+Se houver divergências, registrar os resultados e interromper antes de alterar certificados ou aplicações.
 
-- Ler `correio.md`, `executed.md` e `docs/VETORSMART-WILDCARD-01.md`.
-- Verificar Git, branch, HEAD e arquivos modificados.
-- Confirmar o estado dos testes e migrations.
-- Verificar se a infraestrutura já contém suporte parcial ao wildcard.
-- Identificar conflitos e alterações de outros projetos.
-- Não executar `reset --hard`, `clean`, operações destrutivas nem resolver conflitos fora do VetorSmart.
+## 2. Sincronizar Git
 
-## 3. Homologação funcional e visual
+Preservar os arquivos locais `correio.md` e `executed.md`.
 
-Validar em Chromium, Firefox e WebKit:
+Sincronizar os commits pendentes do VetorSmart sem alterar outros projetos.
 
-- Desktop e mobile.
-- Aparência clara e escura.
-- Painel Meu Site → Domínios.
-- Cadastro automático de subdomínios.
-- Alteração do subdomínio.
-- Subdomínios reservados.
-- Redirecionamento dos nomes anteriores.
-- Domínio próprio prioritário.
-- Atendimento IA.
-- Agendamento.
-- SEO, canônica e sitemap.
-- Isolamento multi-tenant.
+Executar os testes automatizados e validar o build.
 
-Corrigir problemas encontrados e registrar evidências.
+## 3. Preparar certificado SSL
 
-## 4. Segurança e concorrência
+Verificar a configuração atual do Certbot e do Nginx.
+
+Validar o hook DNS-01 da Hostinger e a disponibilidade do token de API.
+
+Não emitir certificado até que o desafio DNS-01 esteja validado.
+
+Após a emissão, testar a renovação automática.
+
+## 4. Homologação
 
 Verificar:
 
-- Unicidade dos subdomínios no MySQL.
-- Cadastro simultâneo de empresas com nomes iguais.
-- Resolução correta por hostname.
-- Isolamento dos dados.
-- Tratamento de hosts desconhecidos.
-- Cookies e sessões administrativas.
-- CSRF, CORS e TrustedHosts.
-- Ausência de exposição de rotas administrativas nos subdomínios.
+- HTTPS no domínio principal.
+- HTTPS em subdomínio de teste.
+- Isolamento entre tenants.
+- Funcionamento de serviços, chat e agendamento.
+- Continuidade operacional dos demais SaaS.
 
-Manter `SESSION_DOMAIN` vazio para sessões host-only, salvo necessidade técnica comprovada.
+Ativar `PLATFORM_SUBDOMAIN_SITES=true` somente após aprovação completa.
 
-## 5. SSL wildcard — Hostinger
+## 5. Relatório
 
-Investigar a integração do Certbot com a API DNS da Hostinger.
+Registrar em `docs/VETORSMART-WILDCARD-01.4.md` os resultados, alterações, testes, bloqueios e parecer final.
 
-Objetivo:
-
-- Certificado para `vetorsmart.com.br`.
-- Certificado para `*.vetorsmart.com.br`.
-- Validação DNS-01.
-- Renovação automática.
-- Credenciais protegidas.
-- Não expor tokens em código, logs ou relatórios.
-- Não depender de procedimentos manuais recorrentes.
-
-Utilizar integração oficial ou solução compatível e auditável.
-
-Validar previamente permissões, disponibilidade da API e comportamento da renovação.
-
-Não instalar plugins comunitários sem avaliação de segurança e compatibilidade.
-
-Se a automação não for comprovadamente viável, documentar alternativas e não habilitar o wildcard em produção.
-
-## 6. Preparação do Nginx
-
-Preparar configuração específica do VetorSmart para aceitar:
-
-`vetorsmart.com.br`
-
-`*.vetorsmart.com.br`
-
-Requisitos:
-
-- Compartilhar a aplicação Laravel existente.
-- Não criar containers por tenant.
-- Não modificar os vhosts dos outros sistemas.
-- Preservar HTTPS do domínio principal.
-- Manter rotas administrativas centralizadas.
-- Validar `nginx -t` antes de qualquer aplicação.
-- Preparar rollback da configuração.
-
-Não aplicar alterações no Nginx de produção nesta fase sem autorização explícita.
-
-## 7. Consolidação Git
-
-No repositório da aplicação VetorSmart:
-
-- Revisar todas as alterações da WILDCARD-01.
-- Verificar arquivos sensíveis.
-- Executar testes.
-- Criar commits organizados.
-- Publicar somente commits aprovados e relacionados ao VetorSmart.
-- Confirmar sincronização com `origin/main`.
-
-Não alterar o repositório de infraestrutura que apresenta conflito no VetorLeads.
-
-## 8. Testes finais
-
-Executar:
-
-- Suíte Laravel.
-- Concorrência com MySQL real e isolado.
-- PHPStan.
-- Pint.
-- TypeScript.
-- Build frontend.
-- Testes de navegador.
-- Verificações de acessibilidade.
-- Verificação de credenciais.
-
-Não considerar testes pulados como aprovados.
-
-## 9. Implantação
-
-Manter inicialmente:
-
-`PLATFORM_SUBDOMAIN_SITES=false`
-
-A ativação depende de:
-
-1. Delegação DNS concluída.
-2. Registro wildcard respondendo corretamente.
-3. Certificado wildcard válido.
-4. Renovação automática comprovada.
-5. Homologação de tenant de teste em HTTPS.
-6. Aprovação explícita para implantação.
-
-Não executar migrations de produção nem ativar flags nesta etapa sem autorização.
-
-## 10. Relatório
-
-Criar:
-
-`docs/VETORSMART-WILDCARD-01.1.md`
-
-Documentar:
-
-- Diagnóstico inicial.
-- Arquivos modificados.
-- Commits criados.
-- Testes realizados.
-- Resultado da homologação visual.
-- Estratégia de SSL e renovação.
-- Situação do DNS.
-- Riscos e pendências.
-- Procedimento de implantação e rollback.
-
-Atualizar `executed.md`.
-
-**Parecer esperado:** APROVADO, APROVADO COM RESTRIÇÕES ou REPROVADO, conforme evidências reais.
-
-Não declarar implantação ou homologação de produção sem execução efetiva.
+Não realizar alterações destrutivas nem modificar sistemas fora do escopo.
