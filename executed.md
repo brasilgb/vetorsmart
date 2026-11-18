@@ -1,45 +1,61 @@
-# Execução: VETORSMART-PANELS-03 — Homologação do RootAdmin e consolidação administrativa
+# Execução: VETORSMART-PANELS-04 — E-mail operacional e notificações
 
 Data: 18/11/2026. Local: desenvolvimento (WSL), `gateway/vetorsmart/`. Nada foi feito na VPS.
 
 ## Análise do correio
 
-O `correio.md` mudou: este arquivo registrava a PANELS-02, e o correio atual é a **PANELS-03**. A etapa foi executada e o conteúdo anterior deste arquivo foi substituído.
+O `correio.md` mudou: este arquivo registrava a PANELS-03, e o correio atual é a **PANELS-04**. A etapa foi executada e o conteúdo anterior deste arquivo foi substituído.
 
 ## Parecer
 
-**APROVADO COM RESTRIÇÕES.** Relatório completo: `docs/VETORSMART-PANELS-03.md`.
+**APROVADO COM RESTRIÇÕES.** Relatório completo: `docs/VETORSMART-PANELS-04.md`.
 
-## Resultado
+## Implementações
 
-1. **PANELS-02 consolidada:** commits `b1b1bfd` (código) e `4424cb1` (relatórios), com push na `origin/main`. Sem deploy.
-2. **RootAdmin:**
-   - A criação da conta local foi **bloqueada** pela política de permissões da sessão, e não foi contornada.
-   - Ficou preparado um script que só roda localmente e um roteiro com Chromium e Firefox, desktop e celular, claro e escuro e axe.
-   - Defeito corrigido: um RootAdmin novo ficava preso na confirmação de e-mail.
-3. **Auditoria da console:**
-   - Funcionais: Visão Geral, empresas (lista, suspensão e ativação), segmentos e auditoria.
-   - Parciais: detalhe da empresa (não edita), usuários (só leitura e sem administradores), sites, agendamentos e IA.
-   - Indisponíveis e sinalizados como "Em breve": Assinaturas, IA e Créditos, Sites e Domínios, Crescimento, Suporte e Configurações Globais.
-   - Nenhum módulo fictício.
-   - Defeito corrigido: o detalhe da empresa mostrava códigos internos.
-4. **Especificação administrativa:** planos, assinaturas com período de teste, transições, cobranças, suspensão por origem, custo e créditos de IA, notificações administrativas e métricas diárias. Nada implementado.
-5. **E-mail:**
-   - Os relatórios indicam `MAIL_MAILER=log` em produção. Isso **bloqueia o deploy**, porque o cadastro agora exige confirmação.
-   - Defeito corrigido: com o SMTP fora do ar, o cadastro, a recuperação de senha e o reenvio davam erro 500. Agora os envios vão pela fila, com 3 tentativas.
+1. **PANELS-03 consolidada:** commits `32daf42` e `58da0e0`, com push na `origin/main`. Sem deploy.
+2. **E-mail:**
+   - tudo pela fila, com os e-mails operacionais entrando só após o commit;
+   - 3 tentativas, depois `failed_jobs`;
+   - tema VetorSmart (logo, cores e rodapé);
+   - e-mails de autenticação em português (antes saíam em inglês);
+   - links sempre no domínio da plataforma.
+3. **Notificações:**
+   - nova solicitação, agendamento confirmado ou remarcado, agendamento cancelado, conversa aguardando atendimento e aviso administrativo (suspensão ou reativação) para a equipe;
+   - confirmação de solicitação, confirmação e cancelamento de agendamento e conclusão do serviço para o cliente com e-mail;
+   - sem duplicidade (chave única por evento), sem aviso ao autor da ação, nada em rollback, sem WhatsApp.
+4. **Central:** sino com o número de não lidas, `/notificacoes` paginada, "Abrir" (marca como lida e vai ao registro), marcar como lida e marcar todas. Isolada por empresa e por pessoa (404 para avisos alheios).
+5. **Preferências:**
+   - e-mail por categoria, para cada pessoa;
+   - avisos administrativos obrigatórios;
+   - e-mails aos clientes ligados e desligados pela empresa (só proprietário e administrador);
+   - nenhuma comunicação comercial.
 
-## Verificações
+## Testes
 
-- Pest: **520 de 520**, 3304 asserções.
+- Pest: **552 de 552** (3426 asserções), incluindo:
+  - rollback, duplicidade, isolamento e permissões;
+  - escape de HTML;
+  - falha e recuperação do SMTP com fila e worker reais.
 - PHPStan: 0 erros. Pint: ok. `tsc`: ok. Build: ok.
-- Homologação visual do RootAdmin: **pendente**.
+- Navegador: funcional **9 de 9**. Visual **32 de 32** (Chromium e Firefox × desktop e celular × claro e escuro × proprietário e operador), com 0 violações de axe.
 
-## Git
+## Defeitos encontrados
 
-As alterações da PANELS-03 estão sem commit, aguardando autorização. O `pnpm-lock.yaml` não foi tocado.
+- E-mails de autenticação em inglês: corrigido.
+- Risco de links de e-mail apontando para o host da empresa: evitado.
+- Função auxiliar de teste com nome duplicado: corrigido.
 
-## Para destravar (proprietário)
+## Pendências de produção
 
-1. Rodar o script de criação do RootAdmin local (instruções na resposta da sessão). Depois, a homologação visual é concluída e este arquivo é atualizado.
-2. Configurar o SMTP de produção, SPF/DKIM/DMARC e `APP_URL` antes de qualquer deploy.
-3. Autorizar commit e push da PANELS-03.
+1. Configurar o SMTP (`MAIL_*`) e `MAIL_FROM_ADDRESS` em `@vetorsmart.com.br`.
+2. Configurar SPF, DKIM e DMARC.
+3. Definir `APP_URL` e `PLATFORM_PUBLIC_URL` como `https://vetorsmart.com.br`.
+4. Conferir o worker: reinício automático, `queue:restart` no deploy e acompanhamento de `failed_jobs`.
+5. Executar no deploy as 5 migrations (2 da PANELS-02 e 3 da PANELS-04). Depois, enviar um e-mail de teste.
+
+## Restrições
+
+- RootAdmin sem homologação visual (a conta local não foi criada).
+- Mudanças da PANELS-04 sem commit, aguardando autorização.
+- As migrations novas foram aplicadas só no banco local.
+- O `pnpm-lock.yaml` não foi tocado.
