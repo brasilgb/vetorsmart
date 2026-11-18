@@ -6,7 +6,7 @@ use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 
-test('a user without verified email can sign in and reach the dashboard', function () {
+test('a user without verified email can sign in but is sent to confirm the e-mail before the dashboard', function () {
     $unverified = User::factory()->unverified()->create([
         'email' => 'sem-verificacao@example.com',
     ]);
@@ -21,7 +21,7 @@ test('a user without verified email can sign in and reach the dashboard', functi
     ])->assertRedirect();
 
     $this->assertAuthenticated();
-    $this->get(route('dashboard'))->assertOk();
+    $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
 });
 
 test('a suspended user cannot sign in', function () {

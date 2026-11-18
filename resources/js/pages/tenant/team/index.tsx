@@ -62,7 +62,7 @@ export default function TeamIndex({ memberships, roles }: Props) {
                                 ))}
                             </select>
                         </Field>
-                        <Field id="invite-password" label="Senha inicial" error={invite.errors.password} hint="Entregue ao usuário por um canal seguro. Não há envio de e-mail.">
+                        <Field id="invite-password" label="Senha inicial" error={invite.errors.password} hint="Entregue ao usuário por um canal seguro. Ele recebe um e-mail para confirmar o endereço antes do primeiro acesso.">
                             <Input id="invite-password" type="password" value={invite.data.password} onChange={(e) => invite.setData('password', e.target.value)} required autoComplete="new-password" className="h-10" />
                         </Field>
                         <Field id="invite-password-confirmation" label="Confirmar senha">

@@ -12,6 +12,7 @@ use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
     $this->tenant = Tenant::factory()->create();
@@ -152,4 +153,40 @@ test('non-members cannot reach the operational screens', function () {
     $this->actingAs($stranger)->get(route('tenant.requests.index'))->assertForbidden();
     $this->actingAs($stranger)->get(route('tenant.agenda.index'))->assertForbidden();
     $this->actingAs($stranger)->post(route('tenant.requests.cancel', $request), ['reason' => 'x'])->assertForbidden();
+});
+
+test('the new request form lists a capped set of active customers and finds the others by search', function () {
+    Customer::factory()->count(55)->sequence(fn ($sequence) => ['name' => sprintf('Cliente %03d', $sequence->index)])->create(['tenant_id' => $this->tenant->id]);
+    $far = Customer::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Zuleica Prado']);
+    $inactive = Customer::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'Zuleica Inativa', 'status' => 'inactive']);
+
+    $this->actingAs($this->owner)->get('/solicitacoes/nova')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('tenant/requests/create')
+            ->has('customers', 50)
+            ->where('hasMoreCustomers', true)
+            ->where('hasCustomers', true));
+
+    $this->actingAs($this->owner)->get('/solicitacoes/nova?q=zuleica')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('customers', [['id' => $far->id, 'name' => 'Zuleica Prado']])
+            ->where('hasMoreCustomers', false)
+            ->where('filters.q', 'zuleica'));
+});
+
+test('the customer search of the new request form never lists another company', function () {
+    $other = Tenant::factory()->create();
+    Customer::factory()->create(['tenant_id' => $other->id, 'name' => 'Cliente de Outra Empresa']);
+
+    $this->actingAs($this->owner)->get('/solicitacoes/nova?q=outra')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('customers', [])
+            ->where('hasCustomers', true));
+});
+
+test('the new request form tells when the company has no active customer', function () {
+    $this->customer->update(['status' => 'inactive']);
+
+    $this->actingAs($this->owner)->get('/solicitacoes/nova?q=qualquer')
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('hasCustomers', false));
 });

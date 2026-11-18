@@ -1,16 +1,44 @@
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
+import { useEffect, useRef, useState } from 'react';
 import { Field, selectClass } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { index as requestsIndex, store } from '@/routes/tenant/requests';
 
+type CustomerOption = { id: number; name: string };
+
 type Props = {
-    customers: { id: number; name: string }[];
+    filters: { q: string };
+    customers: CustomerOption[];
+    hasMoreCustomers: boolean;
+    hasCustomers: boolean;
 };
 
-export default function RequestCreate({ customers }: Props) {
+export default function RequestCreate({ filters, customers, hasMoreCustomers, hasCustomers }: Props) {
     const form = useForm({ customer_id: '', description: '', priority: 'normal' });
+    const [search, setSearch] = useState(filters.q);
+    const [selected, setSelected] = useState<CustomerOption | null>(null);
+    const firstRender = useRef(true);
+
+    // The list is searched on the server; only the customer props are reloaded, after a short pause in typing.
+    useEffect(() => {
+        if (firstRender.current) {
+            firstRender.current = false;
+
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            router.reload({ only: ['customers', 'hasMoreCustomers', 'filters'], data: { q: search } });
+        }, 300);
+
+        return () => window.clearTimeout(timer);
+    }, [search]);
+
+    // The chosen customer stays selectable even when a new search no longer lists it.
+    const options = selected !== null && !customers.some((customer) => customer.id === selected.id) ? [selected, ...customers] : customers;
 
     return (
         <>
@@ -26,10 +54,35 @@ export default function RequestCreate({ customers }: Props) {
                     }}
                     className="grid max-w-2xl gap-5"
                 >
+                    <Field
+                        id="customer_search"
+                        label="Buscar cliente"
+                        hint={hasMoreCustomers ? 'Mostrando os 50 primeiros. Digite o nome, o e-mail ou o telefone para encontrar outro cliente.' : 'Nome, e-mail ou telefone.'}
+                    >
+                        <Input
+                            id="customer_search"
+                            type="search"
+                            value={search}
+                            onChange={(event) => setSearch(event.target.value)}
+                            placeholder="Ex.: Maria ou 11 98888"
+                            autoComplete="off"
+                            className="h-10"
+                        />
+                    </Field>
+
                     <Field id="customer_id" label="Cliente" error={form.errors.customer_id}>
-                        <select id="customer_id" value={form.data.customer_id} onChange={(event) => form.setData('customer_id', event.target.value)} className={selectClass} required>
-                            <option value="">Selecione um cliente</option>
-                            {customers.map((customer) => (
+                        <select
+                            id="customer_id"
+                            value={form.data.customer_id}
+                            onChange={(event) => {
+                                form.setData('customer_id', event.target.value);
+                                setSelected(options.find((customer) => String(customer.id) === event.target.value) ?? null);
+                            }}
+                            className={selectClass}
+                            required
+                        >
+                            <option value="">{options.length === 0 && search !== '' ? 'Nenhum cliente encontrado' : 'Selecione um cliente'}</option>
+                            {options.map((customer) => (
                                 <option key={customer.id} value={customer.id}>{customer.name}</option>
                             ))}
                         </select>
@@ -61,7 +114,7 @@ export default function RequestCreate({ customers }: Props) {
                     </Card>
                 </form>
 
-                {customers.length === 0 && (
+                {!hasCustomers && (
                     <p className="text-sm text-vs-muted">Cadastre um cliente antes de registrar uma solicitação.</p>
                 )}
             </div>

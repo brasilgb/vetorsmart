@@ -20,11 +20,11 @@ class TenantUserService
     public function __construct(private AuditLogger $auditLogger) {}
 
     /**
-     * Create a user and attach them to the tenant.
+     * Create a user and attach them to the tenant. The account starts unverified and receives the confirmation link.
      */
     public function create(Tenant $tenant, string $name, string $email, string $password, TenantRole $role, User $actor): TenantUser
     {
-        return DB::transaction(function () use ($tenant, $name, $email, $password, $role, $actor): TenantUser {
+        $membership = DB::transaction(function () use ($tenant, $name, $email, $password, $role, $actor): TenantUser {
             $user = User::create([
                 'name' => $name,
                 'email' => $email,
@@ -46,6 +46,11 @@ class TenantUserService
 
             return $membership;
         });
+
+        // The new user confirms the e-mail before the private areas open. Sent after the commit, never for a rollback.
+        $membership->user?->sendEmailVerificationNotification();
+
+        return $membership;
     }
 
     /**

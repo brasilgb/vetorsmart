@@ -10,6 +10,8 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
@@ -232,4 +234,23 @@ test('owners and admins can read and update company settings', function () {
         ->assertRedirect('/configuracoes');
 
     expect(TenantSetting::query()->forTenant($this->tenantA)->value('business_name'))->toBe('Alfa Administrada');
+});
+
+test('a user added by the team receives the confirmation link and reaches the panel only after confirming', function () {
+    Notification::fake();
+
+    $this->actingAs($this->owner)->post('/equipe', [
+        'name' => 'Operador Novo',
+        'email' => 'operador.novo@example.com',
+        'password' => 'Senha-Forte-2026',
+        'password_confirmation' => 'Senha-Forte-2026',
+        'role' => 'operator',
+    ])->assertRedirect('/equipe');
+
+    $created = User::query()->where('email', 'operador.novo@example.com')->firstOrFail();
+
+    expect($created->hasVerifiedEmail())->toBeFalse();
+    Notification::assertSentTo($created, VerifyEmail::class);
+
+    $this->actingAs($created)->get('/clientes')->assertRedirect(route('verification.notice'));
 });

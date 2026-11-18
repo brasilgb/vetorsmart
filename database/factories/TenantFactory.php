@@ -43,4 +43,14 @@ class TenantFactory extends Factory
             'status' => TenantStatus::Suspended,
         ]);
     }
+
+    /**
+     * Indicate that the tenant is a homologation company (internal mark, as set by homolog:mark).
+     */
+    public function homolog(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_homolog' => true,
+        ]);
+    }
 }

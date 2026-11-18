@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware(['auth', 'tenant.resolve'])->group(function () {
+Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
     Route::get('clientes', [CustomerController::class, 'index'])->name('tenant.customers.index');
     Route::get('clientes/novo', [CustomerController::class, 'create'])->name('tenant.customers.create');
     Route::post('clientes', [CustomerController::class, 'store'])->name('tenant.customers.store');

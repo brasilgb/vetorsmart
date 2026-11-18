@@ -2,11 +2,19 @@
 
 use App\Models\User;
 use Illuminate\Support\Facades\RateLimiter;
+use Inertia\Testing\AssertableInertia as Assert;
 
 test('login screen can be rendered', function () {
     $response = $this->get(route('login'));
 
     $response->assertOk();
+});
+
+test('the login screen offers password recovery', function () {
+    $this->get(route('login'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('auth/login')
+            ->where('canResetPassword', true));
 });
 
 test('users can authenticate using the login screen', function () {

@@ -10,6 +10,10 @@ use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\TenantRegistrationService;
 use Database\Seeders\SegmentSeeder;
+use Illuminate\Auth\Notifications\VerifyEmail;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Mockery\MockInterface;
 
 beforeEach(function () {
@@ -54,12 +58,90 @@ test('a company and its owner are created and the owner is signed in', function 
         ->toBe('Clean Pro Ltda');
 });
 
-test('registration does not require email verification', function () {
+test('registration sends the confirmation link and keeps the panel closed until the e-mail is verified', function () {
+    Notification::fake();
+
     $this->post(route('register.store'), registrationPayload());
 
-    expect(User::query()->where('email', 'ana@example.com')->value('email_verified_at'))->toBeNull();
+    $user = User::query()->where('email', 'ana@example.com')->firstOrFail();
 
+    expect($user->email_verified_at)->toBeNull();
+    Notification::assertSentTo($user, VerifyEmail::class);
+
+    $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
+    $this->get(route('tenant.customers.index'))->assertRedirect(route('verification.notice'));
+    $this->get(route('verification.notice'))->assertOk();
+});
+
+test('the confirmation link opens the panel', function () {
+    $this->post(route('register.store'), registrationPayload());
+
+    $user = User::query()->where('email', 'ana@example.com')->firstOrFail();
+    $link = URL::temporarySignedRoute('verification.verify', now()->addHour(), ['id' => $user->id, 'hash' => sha1($user->email)]);
+
+    $this->get($link)->assertRedirect();
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeTrue();
     $this->get(route('dashboard'))->assertOk();
+});
+
+test('a confirmation link for another account is refused', function () {
+    $this->post(route('register.store'), registrationPayload());
+
+    $user = User::query()->where('email', 'ana@example.com')->firstOrFail();
+    $other = User::factory()->unverified()->create();
+    $link = URL::temporarySignedRoute('verification.verify', now()->addHour(), ['id' => $other->id, 'hash' => sha1($other->email)]);
+
+    $this->get($link)->assertForbidden();
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse()
+        ->and($other->fresh()->hasVerifiedEmail())->toBeFalse();
+});
+
+test('an unverified account cannot use the tenant API', function () {
+    $this->post(route('register.store'), registrationPayload());
+
+    $this->getJson('/api/v1/tenant/customers')->assertForbidden();
+});
+
+test('registration refuses the reserved homologation prefix', function (string $name) {
+    $response = $this->post(route('register.store'), registrationPayload(['company_name' => $name]));
+
+    $response->assertSessionHasErrors(['company_name' => 'Este nome é reservado. Escolha outro nome para a empresa.']);
+    expect(Tenant::query()->count())->toBe(0);
+})->with(['[HOMOLOG] Empresa', '[homolog] empresa', '  [ Homolog-SRV ] Empresa']);
+
+test('a name that only mentions homologation elsewhere is accepted', function () {
+    $this->post(route('register.store'), registrationPayload(['company_name' => 'Homologação Técnica Ltda']))
+        ->assertSessionHasNoErrors();
+
+    expect(Tenant::query()->value('is_homolog'))->toBeFalse();
+});
+
+test('a filled hidden field marks the submission as automated and creates nothing', function () {
+    $response = $this->post(route('register.store'), registrationPayload(['website' => 'https://spam.example']));
+
+    $response->assertSessionHasErrors(['email' => 'Não foi possível concluir o cadastro. Tente novamente.']);
+    expect(Tenant::query()->count())->toBe(0)
+        ->and(User::query()->count())->toBe(0);
+});
+
+test('a burst of registrations from one network is limited per minute', function () {
+    RateLimiter::increment('register:127.0.0.1', 60, 5);
+
+    $response = $this->post(route('register.store'), registrationPayload());
+
+    $response->assertSessionHasErrors(['email' => 'Muitas tentativas de cadastro. Aguarde um minuto e tente novamente.']);
+    expect(Tenant::query()->count())->toBe(0);
+});
+
+test('one network is limited per hour even when the attempts are spread over minutes', function () {
+    RateLimiter::increment('register-hour:127.0.0.1', 3600, 20);
+
+    $response = $this->post(route('register.store'), registrationPayload());
+
+    $response->assertSessionHasErrors(['email' => 'Muitas tentativas de cadastro a partir desta rede. Tente novamente mais tarde.']);
+    expect(Tenant::query()->count())->toBe(0);
 });
 
 test('registration rejects an inactive segment', function () {

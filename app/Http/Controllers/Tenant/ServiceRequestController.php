@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\CustomerStatus;
 use App\Enums\RequestStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Operations\ReasonRequest;
@@ -22,6 +23,11 @@ use Inertia\Response;
 
 class ServiceRequestController extends Controller
 {
+    /**
+     * Customers offered at once in the new request form. A larger list is reached by searching.
+     */
+    private const int CUSTOMER_OPTIONS = 50;
+
     public function index(Request $request, TenantContext $context): Response
     {
         $this->authorize('viewAny', ServiceRequest::class);
@@ -44,14 +50,30 @@ class ServiceRequestController extends Controller
         ]);
     }
 
-    public function create(TenantContext $context): Response
+    /**
+     * The customer list is searched on the server and capped, so the page stays small for a company with many
+     * customers. The search reloads only the customer props.
+     */
+    public function create(Request $request, TenantContext $context): Response
     {
         $this->authorize('create', ServiceRequest::class);
 
         $tenant = $context->requireTenant();
+        $term = $request->string('q')->trim()->limit(100, '')->value();
+
+        $query = Customer::query()->forTenant($tenant)->where('status', CustomerStatus::Active->value)->orderBy('name')->orderBy('id');
+
+        if ($term !== '') {
+            $query->search($term);
+        }
+
+        $customers = $query->limit(self::CUSTOMER_OPTIONS + 1)->get(['id', 'name']);
 
         return Inertia::render('tenant/requests/create', [
-            'customers' => Customer::query()->forTenant($tenant)->where('status', 'active')->orderBy('name')->get(['id', 'name'])->all(),
+            'filters' => ['q' => $term],
+            'customers' => $customers->take(self::CUSTOMER_OPTIONS)->map(fn (Customer $customer): array => ['id' => $customer->id, 'name' => $customer->name])->values()->all(),
+            'hasMoreCustomers' => $customers->count() > self::CUSTOMER_OPTIONS,
+            'hasCustomers' => $term === '' ? $customers->isNotEmpty() : Customer::query()->forTenant($tenant)->where('status', CustomerStatus::Active->value)->exists(),
         ]);
     }
 

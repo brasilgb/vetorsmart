@@ -24,12 +24,12 @@ class DashboardController extends Controller
      * Indicators that depend on modules not implemented yet are returned as `pending`, so the
      * console states they are unavailable instead of showing invented numbers.
      *
-     * Homologation companies (name starting with "[HOMOLOG]") and their users stay out of every indicator, so test
+     * Homologation companies (internal is_homolog mark) and their users stay out of every indicator, so test
      * activity never inflates the commercial numbers. They remain visible in the company list, under their own name.
      */
     public function __invoke(): Response
     {
-        $homologIds = Tenant::query()->where('name', 'like', HomologPurgeService::NAME_PREFIX.'%')->pluck('id')->all();
+        $homologIds = Tenant::query()->where('is_homolog', true)->pluck('id')->all();
 
         $byStatus = Tenant::query()
             ->whereKeyNot($homologIds)
@@ -49,7 +49,7 @@ class DashboardController extends Controller
             ->with('segment:id,name')
             ->latest('id')
             ->limit(5)
-            ->get(['id', 'name', 'slug', 'status', 'segment_id', 'created_at'])
+            ->get(['id', 'name', 'slug', 'status', 'is_homolog', 'segment_id', 'created_at'])
             ->map(fn (Tenant $tenant): array => [
                 'id' => $tenant->id,
                 'name' => $tenant->name,

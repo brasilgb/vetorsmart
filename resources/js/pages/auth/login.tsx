@@ -11,8 +11,10 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { register } from '@/routes';
 import { store } from '@/routes/login';
+import { request } from '@/routes/password';
 
 type Props = {
+    canResetPassword: boolean;
     status?: string;
 };
 
@@ -20,7 +22,7 @@ type Props = {
  * Universal sign-in for RootAdmin, owners, admins and operators. The server decides
  * the destination by profile, so the same form serves every role.
  */
-export default function Login({ status }: Props) {
+export default function Login({ canResetPassword, status }: Props) {
     return (
         <AuthShell subtitle="Atendimento inteligente para empresas de serviços.">
             <Head title="Entrar" />
@@ -57,9 +59,16 @@ export default function Login({ status }: Props) {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password" className="text-vs-text">
-                                Senha
-                            </Label>
+                            <div className="flex items-center justify-between gap-3">
+                                <Label htmlFor="password" className="text-vs-text">
+                                    Senha
+                                </Label>
+                                {canResetPassword && (
+                                    <TextLink href={request()} className="text-sm font-medium text-vs-blue" data-test="forgot-password-link">
+                                        Esqueci minha senha
+                                    </TextLink>
+                                )}
+                            </div>
                             <PasswordInput
                                 id="password"
                                 name="password"

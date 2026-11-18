@@ -34,7 +34,7 @@ Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
     Route::post('auth/switch-tenant', [AuthController::class, 'switchTenant'])->name('api.v1.auth.switch-tenant');
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
 
-    Route::prefix('tenant')->middleware('tenant.resolve')->group(function () {
+    Route::prefix('tenant')->middleware(['verified', 'tenant.resolve'])->group(function () {
         Route::get('settings', [TenantSettingsController::class, 'show'])->name('api.v1.tenant.settings.show');
         Route::patch('settings', [TenantSettingsController::class, 'update'])->name('api.v1.tenant.settings.update');
 
@@ -83,7 +83,7 @@ Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
             ->name('api.v1.tenant.professionals.services.sync');
     });
 
-    Route::prefix('admin')->middleware('can:platform-admin')->group(function () {
+    Route::prefix('admin')->middleware(['verified', 'can:platform-admin'])->group(function () {
         Route::get('tenants', [AdminTenantController::class, 'index'])->name('api.v1.admin.tenants.index');
         Route::get('tenants/{tenant}', [AdminTenantController::class, 'show'])->name('api.v1.admin.tenants.show');
         Route::post('tenants/{tenant}/activate', [AdminTenantController::class, 'activate'])->name('api.v1.admin.tenants.activate');

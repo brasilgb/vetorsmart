@@ -232,7 +232,7 @@ test('a verified custom domain stays canonical while the subdomain remains an al
 });
 
 test('a homologation company is never indexable on its subdomain', function () {
-    $this->tenant->forceFill(['name' => '[HOMOLOG] Clima Total'])->save();
+    $this->tenant->forceFill(['name' => '[HOMOLOG] Clima Total', 'is_homolog' => true])->save();
     publishSubdomainSite('Site da Clima Total');
 
     onSubdomain('climatotal.vetorsmart.test')->assertOk()->assertHeader('X-Robots-Tag', 'noindex, nofollow');

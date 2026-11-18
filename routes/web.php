@@ -36,7 +36,7 @@ Route::get('/', LandingController::class)->name('home');
 Route::get('/sitemap.xml', [SiteController::class, 'sitemap'])->name('site.sitemap');
 Route::get('/robots.txt', [SiteController::class, 'robots'])->name('site.robots');
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)
         ->middleware('tenant.resolve')
         ->name('dashboard');

@@ -2,8 +2,11 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Tenancy\TenantContext;
 use App\Services\Tenancy\TenantResolver;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -53,27 +56,23 @@ class HandleInertiaRequests extends Middleware
     }
 
     /**
+     * The company the request runs for. A route with tenant.resolve has already bound it to the TenantContext, so it
+     * is reused; elsewhere it is picked from the accessible memberships the same way TenantResolver::resolve() does.
+     *
      * @return array{id: int, name: string, role: string}|null
      */
     private function activeTenant(Request $request): ?array
     {
-        $user = $request->user();
-
-        if (! $user instanceof User) {
-            return null;
-        }
-
-        $membership = app(TenantResolver::class)->resolve($user, $request->session()->get('current_tenant_id'));
+        $membership = app(TenantContext::class)->membership();
 
         if ($membership === null) {
-            return null;
+            $memberships = $this->accessibleMemberships($request);
+            $preferred = $request->session()->get('current_tenant_id');
+
+            $membership = ($preferred === null ? null : $memberships->firstWhere('tenant_id', (int) $preferred)) ?? $memberships->first();
         }
 
-        return [
-            'id' => $membership->tenant_id,
-            'name' => $membership->tenant->name,
-            'role' => $membership->role->value,
-        ];
+        return $membership === null ? null : $this->tenantSummary($membership);
     }
 
     /**
@@ -81,20 +80,38 @@ class HandleInertiaRequests extends Middleware
      */
     private function switchableTenants(Request $request): array
     {
+        return $this->accessibleMemberships($request)
+            ->map(fn (TenantUser $membership): array => $this->tenantSummary($membership))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Active memberships of the signed-in user in active companies, loaded once per request for both shared props.
+     *
+     * @return Collection<int, TenantUser>
+     */
+    private function accessibleMemberships(Request $request): Collection
+    {
         $user = $request->user();
 
         if (! $user instanceof User) {
-            return [];
+            return new Collection;
         }
 
-        return app(TenantResolver::class)
-            ->accessibleFor($user)
-            ->map(fn ($membership): array => [
-                'id' => $membership->tenant_id,
-                'name' => $membership->tenant->name,
-                'role' => $membership->role->value,
-            ])
-            ->values()
-            ->all();
+        return $request->attributes->get('vs.accessible_memberships')
+            ?? tap(app(TenantResolver::class)->accessibleFor($user), fn (Collection $memberships) => $request->attributes->set('vs.accessible_memberships', $memberships));
+    }
+
+    /**
+     * @return array{id: int, name: string, role: string}
+     */
+    private function tenantSummary(TenantUser $membership): array
+    {
+        return [
+            'id' => $membership->tenant_id,
+            'name' => $membership->tenant->name,
+            'role' => $membership->role->value,
+        ];
     }
 }

@@ -27,12 +27,14 @@ final class VisitorSite
     /**
      * A company with a published site, an active service, a professional available every day, and the assistant enabled.
      *
+     * A homologation company is marked internally, as homolog:mark does.
+     *
      * @return array{tenant: Tenant, owner: User, service: Service, professional: Professional, site: string}
      */
-    public static function publish(TestCase $test, string $name, string $slug): array
+    public static function publish(TestCase $test, string $name, string $slug, bool $homolog = false): array
     {
         $segment = Segment::query()->firstOrCreate(['slug' => 'climatizacao'], ['name' => 'Climatização', 'active' => true]);
-        $tenant = Tenant::factory()->create(['name' => $name, 'slug' => $slug, 'segment_id' => $segment->id]);
+        $tenant = Tenant::factory()->state(['is_homolog' => $homolog])->create(['name' => $name, 'slug' => $slug, 'segment_id' => $segment->id]);
         TenantSetting::factory()->create(['tenant_id' => $tenant->id, 'business_name' => $name.' Ltda', 'city' => 'Campinas', 'state' => 'SP']);
 
         $owner = User::factory()->create();

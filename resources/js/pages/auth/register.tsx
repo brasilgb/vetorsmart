@@ -40,6 +40,12 @@ export default function Register({ passwordRules, segments }: Props) {
             >
                 {({ processing, errors }) => (
                     <>
+                        {/* Field for automated submissions only: hidden from people and assistive technology. */}
+                        <div aria-hidden="true" className="absolute -left-[9999px] h-px w-px overflow-hidden">
+                            <label htmlFor="website">Site</label>
+                            <input id="website" name="website" type="text" tabIndex={-1} autoComplete="off" defaultValue="" />
+                        </div>
+
                         <div className="grid gap-1.5">
                             <Label htmlFor="company_name" className="text-vs-text">
                                 Nome da empresa

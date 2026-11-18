@@ -41,7 +41,7 @@ function expiredConversation(Tenant $tenant, string $key, ConversationStatus $st
 }
 
 test('a homologation site is never indexable, stays out of the sitemap and tells the visitor it is a test', function () {
-    $homolog = VisitorSite::publish($this, '[HOMOLOG] Empresa de Teste', 'homolog-empresa-de-teste');
+    $homolog = VisitorSite::publish($this, '[HOMOLOG] Empresa de Teste', 'homolog-empresa-de-teste', homolog: true);
     $real = VisitorSite::publish($this, 'Clima Real', 'clima-real');
 
     $this->get('/'.$homolog['site'])
@@ -79,7 +79,7 @@ test('the home page shows the company text once', function () {
 });
 
 test('the console labels homologation companies', function () {
-    $homolog = Tenant::factory()->create(['name' => '[HOMOLOG] Empresa de Teste']);
+    $homolog = Tenant::factory()->homolog()->create(['name' => '[HOMOLOG] Empresa de Teste']);
     $real = Tenant::factory()->create(['name' => 'Empresa Real']);
 
     $this->actingAs(User::factory()->rootAdmin()->create());

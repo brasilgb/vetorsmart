@@ -74,7 +74,11 @@ class AssistantController extends Controller
         $selected = null;
 
         if ($request->filled('conversation')) {
-            $found = AssistantConversation::query()->forTenant($tenant)->whereKey($request->integer('conversation'))->first();
+            $found = AssistantConversation::query()
+                ->forTenant($tenant)
+                ->with(['customer:id,name', 'service:id,name', 'handledBy:id,name'])
+                ->whereKey($request->integer('conversation'))
+                ->first();
 
             if ($found === null) {
                 abort(404);

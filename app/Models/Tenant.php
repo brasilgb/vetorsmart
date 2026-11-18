@@ -4,7 +4,6 @@ namespace App\Models;
 
 use App\Enums\TenantRole;
 use App\Enums\TenantStatus;
-use App\Services\HomologPurgeService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Database\Factories\TenantFactory;
@@ -27,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $phone
  * @property int|null $segment_id
  * @property TenantStatus $status
+ * @property bool $is_homolog
  * @property string $timezone
  */
 #[Fillable(['uuid', 'name', 'slug', 'document', 'email', 'phone', 'segment_id', 'status', 'timezone'])]
@@ -44,12 +44,13 @@ class Tenant extends Model
     }
 
     /**
-     * Whether this is a homologation company (name starting with "[HOMOLOG]"): test data kept in production for
-     * regression checks. Its site is never indexable and it stays out of the commercial indicators.
+     * Whether this is a homologation company: test data kept in production for regression checks. Its site is never
+     * indexable and it stays out of the commercial indicators. The internal mark decides it, never the name: the mark
+     * is not fillable and is set only by the homolog:mark command.
      */
     public function isHomolog(): bool
     {
-        return str_starts_with((string) $this->name, HomologPurgeService::NAME_PREFIX);
+        return $this->is_homolog;
     }
 
     /**
@@ -128,6 +129,7 @@ class Tenant extends Model
     {
         return [
             'status' => TenantStatus::class,
+            'is_homolog' => 'boolean',
         ];
     }
 }
