@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\RootAdmin;
 
 use App\Enums\MembershipStatus;
+use App\Enums\ServiceMode;
 use App\Enums\TenantStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RootAdmin\UpdateTenantStatusRequest;
@@ -124,9 +125,12 @@ class TenantController extends Controller
             'settings' => $tenant->settings === null ? null : [
                 'business_name' => $tenant->settings->business_name,
                 'description' => $tenant->settings->description,
-                'locale' => $tenant->settings->locale,
-                'service_modes' => $tenant->settings->service_modes ?? [],
-                'confirmation_policy' => $tenant->settings->confirmation_policy->value,
+                'locale' => $tenant->settings->locale === 'pt_BR' ? 'Português (Brasil)' : $tenant->settings->locale,
+                'service_modes' => collect($tenant->settings->service_modes ?? [])
+                    ->map(fn (string $mode): string => ServiceMode::tryFrom($mode)?->label() ?? $mode)
+                    ->values()
+                    ->all(),
+                'confirmation_policy' => $tenant->settings->confirmation_policy->label(),
             ],
             'users' => $memberships->through(fn (TenantUser $membership): array => [
                 'id' => $membership->id,

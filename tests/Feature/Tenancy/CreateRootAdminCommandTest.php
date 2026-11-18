@@ -19,6 +19,26 @@ test('the command provisions a root admin with a hidden password', function () {
         ->and($root->isRootAdmin())->toBeTrue();
 });
 
+test('a root admin created by the command reaches the console without the e-mail confirmation', function () {
+    $this->artisan('platform:root-admin', ['email' => 'root.novo@abrasil.test', '--name' => 'Root Novo'])
+        ->expectsQuestion('Senha (mínimo 8 caracteres)', 'senha-muito-segura-123')
+        ->assertSuccessful();
+
+    $root = User::query()->where('email', 'root.novo@abrasil.test')->firstOrFail();
+
+    expect($root->hasVerifiedEmail())->toBeTrue();
+    $this->actingAs($root)->get('/rootadmin')->assertOk();
+});
+
+test('promoting an existing unverified user keeps the confirmation pending', function () {
+    $user = User::factory()->unverified()->create(['email' => 'pendente@abrasil.test']);
+
+    $this->artisan('platform:root-admin', ['email' => 'pendente@abrasil.test'])->assertSuccessful();
+
+    expect($user->fresh()->hasVerifiedEmail())->toBeFalse();
+    $this->actingAs($user->fresh())->get('/rootadmin')->assertRedirect(route('verification.notice'));
+});
+
 test('the command never writes the password to the audit log', function () {
     $this->artisan('platform:root-admin', ['email' => 'root2@abrasil.test', '--name' => 'Root'])
         ->expectsQuestion('Senha (mínimo 8 caracteres)', 'senha-muito-segura-123')

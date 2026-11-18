@@ -5,6 +5,7 @@ use App\Models\AssistantUsage;
 use App\Models\AuditLog;
 use App\Models\Segment;
 use App\Models\Tenant;
+use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
 use Database\Seeders\SegmentSeeder;
@@ -234,4 +235,20 @@ test('the company detail shows operational state and its administrative history'
             ->has('history', 1)
             ->where('history.0.action', 'tenant.suspended')
             ->where('history.0.user', 'Root ABrasil'));
+});
+
+test('the company detail shows the attendance settings in words, not internal codes', function () {
+    TenantSetting::factory()->create([
+        'tenant_id' => $this->active->id,
+        'locale' => 'pt_BR',
+        'service_modes' => ['in_person', 'customer_location'],
+        'confirmation_policy' => 'customer_confirmation',
+    ]);
+
+    $this->actingAs($this->root)
+        ->get("/rootadmin/tenants/{$this->active->id}")
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('settings.locale', 'Português (Brasil)')
+            ->where('settings.service_modes', ['Presencial', 'No local do cliente'])
+            ->where('settings.confirmation_policy', 'Cliente confirma'));
 });

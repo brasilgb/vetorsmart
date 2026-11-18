@@ -7,10 +7,10 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Notifications\VerifyEmailNotification;
 use App\Services\AuditLogger;
 use App\Services\TenantRegistrationService;
 use Database\Seeders\SegmentSeeder;
-use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
@@ -66,7 +66,7 @@ test('registration sends the confirmation link and keeps the panel closed until 
     $user = User::query()->where('email', 'ana@example.com')->firstOrFail();
 
     expect($user->email_verified_at)->toBeNull();
-    Notification::assertSentTo($user, VerifyEmail::class);
+    Notification::assertSentTo($user, VerifyEmailNotification::class);
 
     $this->get(route('dashboard'))->assertRedirect(route('verification.notice'));
     $this->get(route('tenant.customers.index'))->assertRedirect(route('verification.notice'));

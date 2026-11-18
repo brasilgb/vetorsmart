@@ -10,7 +10,7 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
-use Illuminate\Auth\Notifications\VerifyEmail;
+use App\Notifications\VerifyEmailNotification;
 use Illuminate\Support\Facades\Notification;
 use Inertia\Testing\AssertableInertia;
 
@@ -250,7 +250,7 @@ test('a user added by the team receives the confirmation link and reaches the pa
     $created = User::query()->where('email', 'operador.novo@example.com')->firstOrFail();
 
     expect($created->hasVerifiedEmail())->toBeFalse();
-    Notification::assertSentTo($created, VerifyEmail::class);
+    Notification::assertSentTo($created, VerifyEmailNotification::class);
 
     $this->actingAs($created)->get('/clientes')->assertRedirect(route('verification.notice'));
 });
