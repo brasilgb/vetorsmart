@@ -3,6 +3,7 @@
 use App\Http\Controllers\Tenant\AgendaController;
 use App\Http\Controllers\Tenant\AssistantController;
 use App\Http\Controllers\Tenant\CustomerController;
+use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\ProfessionalController;
 use App\Http\Controllers\Tenant\ServiceController;
 use App\Http\Controllers\Tenant\ServiceRequestController;
@@ -85,6 +86,12 @@ Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
     Route::post('meu-site/dominios/{domain}/verificar', [WebsiteDomainController::class, 'verify'])->whereNumber('domain')->name('tenant.website.domains.verify');
     Route::post('meu-site/dominios/{domain}/principal', [WebsiteDomainController::class, 'primary'])->whereNumber('domain')->name('tenant.website.domains.primary');
     Route::delete('meu-site/dominios/{domain}', [WebsiteDomainController::class, 'destroy'])->whereNumber('domain')->name('tenant.website.domains.destroy');
+
+    Route::get('notificacoes', [NotificationController::class, 'index'])->name('tenant.notifications.index');
+    Route::post('notificacoes/lidas', [NotificationController::class, 'readAll'])->name('tenant.notifications.read-all');
+    Route::patch('notificacoes/preferencias', [NotificationController::class, 'preferences'])->name('tenant.notifications.preferences');
+    Route::post('notificacoes/{notification}/abrir', [NotificationController::class, 'open'])->whereNumber('notification')->name('tenant.notifications.open');
+    Route::post('notificacoes/{notification}/lida', [NotificationController::class, 'read'])->whereNumber('notification')->name('tenant.notifications.read');
 
     Route::get('atendimento-ia', [AssistantController::class, 'index'])->name('tenant.assistant.index');
     Route::patch('atendimento-ia/configuracoes', [AssistantController::class, 'update'])->name('tenant.assistant.update');

@@ -1,4 +1,5 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
+import { NotificationBell } from '@/components/vetor-smart/notification-bell';
 import { TenantSwitcher } from '@/components/vetor-smart/tenant-switcher';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import type { BreadcrumbItem as BreadcrumbItemType } from '@/types';
@@ -14,7 +15,8 @@ export function AppSidebarHeader({
                 <SidebarTrigger className="-ml-1" />
                 <Breadcrumbs breadcrumbs={breadcrumbs} />
             </div>
-            <div className="ml-auto flex min-w-0 items-center">
+            <div className="ml-auto flex min-w-0 items-center gap-2">
+                <NotificationBell />
                 <TenantSwitcher />
             </div>
         </header>

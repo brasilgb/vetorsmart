@@ -12,6 +12,7 @@ use App\Models\AssistantSetting;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\OperationalNotifier;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -25,7 +26,10 @@ class AssistantConversations
 {
     private const int MAX_BODY_CHARS = 2000;
 
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private OperationalNotifier $notifier,
+    ) {}
 
     /**
      * Start a conversation, or resume the one matching the visitor's token. Returns the new token
@@ -144,16 +148,23 @@ class AssistantConversations
     }
 
     /**
-     * Stop the automatic assistant and register the reason, with a summary for the human who continues.
+     * Stop the automatic assistant and register the reason, with a summary for the human who continues. The team is
+     * notified when the conversation starts waiting, not again while it keeps waiting.
      */
     public function handoff(AssistantConversation $conversation, string $reason): void
     {
+        $wasWaiting = $conversation->status === ConversationStatus::AwaitingHuman;
+
         $conversation->forceFill([
             'status' => ConversationStatus::AwaitingHuman,
             'state' => AssistantState::Human,
             'handoff_reason' => Str::limit($reason, 250, ''),
             'collected' => [...($conversation->collected ?? []), 'summary' => $this->summarize($conversation, $reason)],
         ])->save();
+
+        if (! $wasWaiting) {
+            $this->notifier->awaitingAttendance($conversation);
+        }
     }
 
     /**

@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { Bot, Briefcase, Building2, CalendarDays, ClipboardList, Contact, CreditCard, Globe, KeyRound, LayoutDashboard, LayoutGrid, LifeBuoy, MessageSquare, ScrollText, Settings, Tag, TrendingUp, UsersRound } from 'lucide-react';
+import { Bell, Bot, Briefcase, Building2, CalendarDays, ClipboardList, Contact, CreditCard, Globe, KeyRound, LayoutDashboard, LayoutGrid, LifeBuoy, MessageSquare, ScrollText, Settings, Tag, TrendingUp, UsersRound } from 'lucide-react';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -23,6 +23,7 @@ import { index as tenantAgenda } from '@/routes/tenant/agenda';
 import { index as tenantServices } from '@/routes/tenant/services';
 import { index as tenantProfessionals } from '@/routes/tenant/professionals';
 import { index as tenantTeam } from '@/routes/tenant/team';
+import { index as tenantNotifications } from '@/routes/tenant/notifications';
 import { show as tenantSettings } from '@/routes/tenant/settings';
 import { index as tenantWebsite } from '@/routes/tenant/website';
 import { index as auditIndex } from '@/routes/rootadmin/audit';
@@ -33,6 +34,7 @@ const tenantNavItems: NavItem[] = [
     { title: 'Clientes', href: tenantCustomers(), icon: Contact },
     { title: 'Solicitações', href: tenantRequests(), icon: ClipboardList },
     { title: 'Atendimento IA', href: tenantAssistant(), icon: MessageSquare },
+    { title: 'Notificações', href: tenantNotifications(), icon: Bell },
     { title: 'Agenda', href: tenantAgenda(), icon: CalendarDays },
     { title: 'Serviços', href: tenantServices(), icon: Briefcase },
     { title: 'Profissionais', href: tenantProfessionals(), icon: UsersRound },

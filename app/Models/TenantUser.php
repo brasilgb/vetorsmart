@@ -17,6 +17,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
  * @property int $user_id
  * @property TenantRole $role
  * @property MembershipStatus $status
+ * @property array<string, bool>|null $notification_preferences
  */
 #[Fillable(['tenant_id', 'user_id', 'role', 'status'])]
 class TenantUser extends Pivot
@@ -64,6 +65,7 @@ class TenantUser extends Pivot
         return [
             'role' => TenantRole::class,
             'status' => MembershipStatus::class,
+            'notification_preferences' => 'array',
         ];
     }
 }

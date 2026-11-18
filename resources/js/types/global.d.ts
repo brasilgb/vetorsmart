@@ -15,6 +15,7 @@ declare module '@inertiajs/core' {
             auth: Auth;
             tenant: TenantSummary | null;
             tenants: TenantSummary[];
+            unreadNotifications: number;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

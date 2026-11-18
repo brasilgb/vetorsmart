@@ -21,7 +21,10 @@ use Illuminate\Validation\ValidationException;
  */
 class ServiceRequestService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private OperationalNotifier $notifier,
+    ) {}
 
     /**
      * @param  array<string, mixed>  $attributes
@@ -50,6 +53,8 @@ class ServiceRequestService
             $this->auditLogger->record('service_request.created', $tenant, $request, [
                 'origin' => $origin->value,
             ], $actor);
+
+            $this->notifier->requestReceived($request, $actor);
 
             return $request;
         });
@@ -147,17 +152,27 @@ class ServiceRequestService
                     ->where('service_request_id', $request->getKey())
                     ->where('status', AppointmentStatus::Scheduled->value)
                     ->get()
-                    ->each(fn (Appointment $appointment) => $appointment->forceFill([
-                        'status' => $appointmentStatus,
-                        'cancelling_reason' => $appointmentStatus === AppointmentStatus::Cancelled ? $closingReason : null,
-                        'cancelled_at' => $appointmentStatus === AppointmentStatus::Cancelled ? now() : null,
-                        'cancelled_by_user_id' => $appointmentStatus === AppointmentStatus::Cancelled ? $actor->getKey() : null,
-                    ])->save());
+                    ->each(function (Appointment $appointment) use ($appointmentStatus, $closingReason, $actor): void {
+                        $appointment->forceFill([
+                            'status' => $appointmentStatus,
+                            'cancelling_reason' => $appointmentStatus === AppointmentStatus::Cancelled ? $closingReason : null,
+                            'cancelled_at' => $appointmentStatus === AppointmentStatus::Cancelled ? now() : null,
+                            'cancelled_by_user_id' => $appointmentStatus === AppointmentStatus::Cancelled ? $actor->getKey() : null,
+                        ])->save();
+
+                        if ($appointmentStatus === AppointmentStatus::Cancelled) {
+                            $this->notifier->appointmentCancelled($appointment, $actor);
+                        }
+                    });
             }
 
             $this->auditLogger->record('service_request.'.$target->value, $request->tenant, $request, [
                 'to' => $target->value,
             ], $actor);
+
+            if ($target === RequestStatus::Completed) {
+                $this->notifier->serviceCompleted($request);
+            }
 
             return $request;
         });

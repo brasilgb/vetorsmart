@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\TenantNotification;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Tenancy\TenantContext;
@@ -51,6 +52,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'tenant' => fn () => $this->activeTenant($request),
             'tenants' => fn () => $this->switchableTenants($request),
+            'unreadNotifications' => fn () => $this->unreadNotifications($request),
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }
@@ -101,6 +103,21 @@ class HandleInertiaRequests extends Middleware
 
         return $request->attributes->get('vs.accessible_memberships')
             ?? tap(app(TenantResolver::class)->accessibleFor($user), fn (Collection $memberships) => $request->attributes->set('vs.accessible_memberships', $memberships));
+    }
+
+    /**
+     * Unread notices of the signed-in person in the active company, for the badge in the header.
+     */
+    private function unreadNotifications(Request $request): int
+    {
+        $user = $request->user();
+        $tenant = $this->activeTenant($request);
+
+        if (! $user instanceof User || $tenant === null) {
+            return 0;
+        }
+
+        return TenantNotification::query()->ownedBy($tenant['id'], $user)->whereNull('read_at')->count();
     }
 
     /**

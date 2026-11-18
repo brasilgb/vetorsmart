@@ -48,6 +48,8 @@ class HomologPurgeService
         'service_categories',
         'customers',
         'growth_events',
+        'tenant_notifications',
+        'notification_deliveries',
         'tenant_settings',
         'tenant_users',
     ];

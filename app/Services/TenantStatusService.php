@@ -8,10 +8,13 @@ use App\Models\User;
 
 final class TenantStatusService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private OperationalNotifier $notifier,
+    ) {}
 
     /**
-     * Activate or suspend a tenant. Suspended tenants lose access for every member.
+     * Activate or suspend a tenant. Suspended tenants lose access for every member. The owners are told by e-mail.
      */
     public function change(Tenant $tenant, TenantStatus $status, User $actor): Tenant
     {
@@ -30,6 +33,8 @@ final class TenantStatusService
             ['from' => $previousStatus->value, 'to' => $status->value],
             $actor,
         );
+
+        $this->notifier->tenantStatusChanged($tenant, $status === TenantStatus::Active);
 
         return $tenant;
     }

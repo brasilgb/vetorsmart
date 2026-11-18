@@ -27,7 +27,10 @@ class AppointmentScheduler
     /** Interval between suggested start times, in minutes. */
     private const int SLOT_STEP_MINUTES = 30;
 
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private OperationalNotifier $notifier,
+    ) {}
 
     /**
      * Book a triaged request with a professional at a given start time.
@@ -79,6 +82,8 @@ class AppointmentScheduler
                 'professional_id' => $professional->getKey(),
             ], $actor);
 
+            $this->notifier->appointmentConfirmed($appointment, $actor);
+
             return $appointment;
         });
     }
@@ -112,6 +117,8 @@ class AppointmentScheduler
                 'to' => $startsAt->toIso8601String(),
             ], $actor);
 
+            $this->notifier->appointmentConfirmed($appointment, $actor);
+
             return $appointment;
         });
     }
@@ -141,6 +148,8 @@ class AppointmentScheduler
             $this->auditLogger->record('appointment.cancelled', $appointment->tenant, $appointment, [
                 'service_request_id' => $request->getKey(),
             ], $actor);
+
+            $this->notifier->appointmentCancelled($appointment, $actor);
 
             return $appointment;
         });
