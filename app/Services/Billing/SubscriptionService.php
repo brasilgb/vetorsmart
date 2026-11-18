@@ -2,7 +2,9 @@
 
 namespace App\Services\Billing;
 
+use App\Enums\BillingInterval;
 use App\Enums\BillingSource;
+use App\Enums\ChargeStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionStatus;
 use App\Models\BillingCharge;
@@ -104,7 +106,7 @@ class SubscriptionService
             // A late payment for a period that already ended (regularization after the grace or the suspension)
             // buys a full period from the payment date, so the company is not reactivated into an expired period.
             [$start, $end] = $charge->period_end->isPast()
-                ? [now(), now()->addMonths($subscription->plan->interval_months)]
+                ? [now(), now()->addMonths($charge->billing_interval->months())]
                 : [$charge->period_start, $charge->period_end];
 
             $changes = $extends
@@ -141,6 +143,98 @@ class SubscriptionService
 
             return $subscription;
         });
+    }
+
+    /**
+     * Change of billing cycle requested by the company. Rules (no proportional charge or credit is ever generated):
+     *
+     * - nothing paid yet and no open charge (trial, or contracting again): the new cycle applies at once;
+     * - a charge is open: refused, the company pays or waits for it to expire first, so two charges never overlap;
+     * - a paid period is running: the change is scheduled and applies to the next period, when its charge is created.
+     *
+     * Choosing the current cycle again withdraws a scheduled change.
+     */
+    public function changeInterval(Subscription $subscription, BillingInterval $interval, User $actor): Subscription
+    {
+        return DB::transaction(function () use ($subscription, $interval, $actor): Subscription {
+            $subscription = $this->locked($subscription);
+
+            if ($subscription->plan->priceFor($interval) === null) {
+                throw ValidationException::withMessages(['interval' => ["O ciclo {$interval->label()} ainda não tem valor definido."]]);
+            }
+
+            if ($interval === $subscription->billing_interval) {
+                if ($subscription->scheduled_interval !== null) {
+                    $subscription->forceFill(['scheduled_interval' => null])->save();
+                    $this->record($subscription, 'interval_change_withdrawn', $subscription->status, $subscription->status, BillingSource::Company, $actor, "Mantido o ciclo {$interval->label()}.");
+                }
+
+                return $subscription;
+            }
+
+            $hasOpenCharge = BillingCharge::query()->where('subscription_id', $subscription->getKey())
+                ->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Waiting->value])
+                ->exists();
+
+            if ($hasOpenCharge) {
+                throw ValidationException::withMessages(['interval' => ['Há uma cobrança em aberto. Pague-a ou aguarde o vencimento antes de trocar o ciclo.']]);
+            }
+
+            $periodRunning = $subscription->status === SubscriptionStatus::Active && $subscription->current_period_end?->isFuture();
+
+            if ($periodRunning) {
+                $subscription->forceFill(['scheduled_interval' => $interval])->save();
+                $this->record($subscription, 'interval_scheduled', $subscription->status, $subscription->status, BillingSource::Company, $actor, "Ciclo {$interval->label()} a partir do próximo período.");
+            } else {
+                $subscription->forceFill(['billing_interval' => $interval, 'scheduled_interval' => null, 'price_cents' => null, 'extra_user_price_cents' => null])->save();
+                $this->record($subscription, 'interval_changed', $subscription->status, $subscription->status, BillingSource::Company, $actor, "Ciclo {$interval->label()}.");
+            }
+
+            $this->auditLogger->record('subscription.interval_changed', $subscription->tenant, $subscription, ['interval' => $interval->value, 'scheduled' => $periodRunning], $actor);
+
+            return $subscription;
+        });
+    }
+
+    /**
+     * Prepare a subscription, already locked by the caller, for the charge of its next period: apply a scheduled
+     * cycle change and freeze the contract terms that are still open (cycle price, extra-user price and the plan
+     * promotion valid today). Later changes of the plan never alter frozen terms.
+     */
+    public function prepareForCharge(Subscription $subscription): Subscription
+    {
+        $plan = $subscription->plan;
+        $changes = [];
+        $notes = [];
+
+        if ($subscription->scheduled_interval !== null) {
+            $changes += ['billing_interval' => $subscription->scheduled_interval, 'scheduled_interval' => null, 'price_cents' => null, 'extra_user_price_cents' => null];
+            $notes[] = "Ciclo {$subscription->scheduled_interval->label()} aplicado.";
+            $subscription->forceFill($changes);
+        }
+
+        if ($subscription->price_cents === null && ($price = $plan->priceFor($subscription->billing_interval)) !== null) {
+            $changes['price_cents'] = $price;
+            $notes[] = 'Valor '.$subscription->billing_interval->label().' congelado: '.$this->money($price).'.';
+
+            if ($subscription->discount_percent === 0 && ($promotion = $plan->activePromotionPercent()) > 0) {
+                $changes += ['discount_percent' => $promotion, 'discount_until' => $plan->promotional_until];
+                $notes[] = "Promoção de {$promotion}%.";
+            }
+        }
+
+        if ($subscription->extra_user_price_cents === null && $plan->extra_user_price_cents !== null) {
+            $changes['extra_user_price_cents'] = $plan->extra_user_price_cents;
+        }
+
+        if ($changes === []) {
+            return $subscription;
+        }
+
+        $subscription->forceFill($changes)->save();
+        $this->record($subscription, 'terms_frozen', $subscription->status, $subscription->status, BillingSource::System, null, implode(' ', $notes) ?: 'Condições do contrato registradas.');
+
+        return $subscription;
     }
 
     /**
@@ -203,7 +297,7 @@ class SubscriptionService
             $subscription = $this->locked($subscription);
 
             $subscription->forceFill(['price_cents' => $priceCents, 'discount_percent' => $discountPercent, 'discount_until' => $discountUntil])->save();
-            $this->record($subscription, 'terms_changed', $subscription->status, $subscription->status, BillingSource::RootAdmin, $actor, sprintf('Valor: %s; desconto: %d%%%s.', $priceCents === null ? 'do plano' : number_format($priceCents / 100, 2, ',', '.'), $discountPercent, $discountUntil ? ' até '.$discountUntil->format('d/m/Y') : ''));
+            $this->record($subscription, 'terms_changed', $subscription->status, $subscription->status, BillingSource::RootAdmin, $actor, sprintf('Valor: %s; desconto: %d%%%s.', $priceCents === null ? 'do plano' : $this->money($priceCents), $discountPercent, $discountUntil ? ' até '.$discountUntil->format('d/m/Y') : ''));
             $this->auditLogger->record('subscription.terms_changed', $subscription->tenant, $subscription, ['price_cents' => $priceCents, 'discount_percent' => $discountPercent], $actor);
 
             return $subscription;
@@ -224,6 +318,11 @@ class SubscriptionService
     public function graceFrom(CarbonInterface $from): CarbonInterface
     {
         return $from->copy()->addDays(BillingSetting::current()->grace_days);
+    }
+
+    private function money(int $cents): string
+    {
+        return 'R$ '.number_format($cents / 100, 2, ',', '.');
     }
 
     private function locked(Subscription $subscription): Subscription

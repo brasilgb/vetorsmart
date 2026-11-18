@@ -31,6 +31,12 @@ return [
 
     'max_history_messages_for_provider' => 6,
 
+    /*
+    | Estimated cost of each model, in cents of real per million tokens, keyed by the provider name recorded in the
+    | AI credit ledger. Empty: the cost is not estimated. Filled only with the price contracted with the provider.
+    */
+    'cost_per_million_tokens_cents' => [],
+
     'default_retention_days' => 30,
 
     /*

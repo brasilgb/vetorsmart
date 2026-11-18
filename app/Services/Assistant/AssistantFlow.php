@@ -9,6 +9,7 @@ use App\Models\AssistantSetting;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Models\Tenant;
+use App\Services\Billing\AiCreditService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,7 @@ class AssistantFlow
         private AssistantConversations $conversations,
         private AssistantBudget $budget,
         private AssistantProvider $provider,
+        private AiCreditService $credits,
     ) {}
 
     /**
@@ -541,7 +543,8 @@ class AssistantFlow
      */
     private function classifyWithProvider(Tenant $tenant, AssistantConversation $conversation, string $body, Collection $services): ?Service
     {
-        if ($this->provider->name() === 'none' || ! $this->budget->providerAllowed($tenant)) {
+        // Without AI credits only this paid call is skipped: the deterministic flow and the human attendance go on.
+        if ($this->provider->name() === 'none' || ! $this->budget->providerAllowed($tenant) || ! $this->credits->canSpend($tenant)) {
             return null;
         }
 
@@ -560,7 +563,9 @@ class AssistantFlow
             return null;
         }
 
-        $this->budget->recordProviderCall($tenant, intdiv(mb_strlen($body), 4) + 40);
+        $tokens = intdiv(mb_strlen($body), 4) + 40;
+        $this->budget->recordProviderCall($tenant, $tokens);
+        $this->credits->recordConsumption($tenant, "assistant:{$conversation->getKey()}:".(int) $conversation->messages()->max('id'), 'classify_service', $this->provider->name(), $tokens);
 
         if (($answer['intent'] ?? null) !== 'select_service' || ! is_int($answer['service_index'] ?? null)) {
             return null;

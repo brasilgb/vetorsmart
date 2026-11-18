@@ -304,7 +304,7 @@ test('company users cannot reach the RootAdmin billing actions', function () {
 
     $this->actingAs($this->owner)->get('/rootadmin/assinaturas')->assertForbidden();
     $this->actingAs($this->owner)->post("/rootadmin/cobrancas/{$charge->id}/baixa-manual", ['reason' => 'Tentativa indevida'])->assertForbidden();
-    $this->actingAs($this->owner)->patch('/rootadmin/financeiro/plano', ['name' => 'X', 'interval_months' => 1, 'trial_days' => 1])->assertForbidden();
+    $this->actingAs($this->owner)->patch('/rootadmin/financeiro/plano', ['name' => 'X', 'trial_days' => 1, 'promotional_discount_percent' => 0])->assertForbidden();
 
     expect($charge->fresh()->status)->toBe(ChargeStatus::Waiting);
 });
@@ -332,7 +332,7 @@ test('the settings screen never sends a credential back and keeps a secret when 
         ->and($content)->not->toContain('charges-secret-teste');
 
     $this->actingAs($root)->patch('/rootadmin/financeiro/efi', [
-        'efi_environment' => 'homologation', 'efi_pix_client_secret' => '', 'grace_days' => 3, 'renewal_days_before' => 7, 'billet_due_days' => 5,
+        'efi_environment' => 'homologation', 'efi_pix_client_secret' => '', 'grace_days' => 3, 'renewal_days_before' => 7, 'billet_due_days' => 5, 'ai_tokens_per_credit' => 1000, 'ai_low_balance_percent' => 20,
     ])->assertRedirect();
 
     expect(BillingSetting::current()->efi_pix_client_secret)->toBe('client-secret-teste')

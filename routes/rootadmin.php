@@ -51,4 +51,9 @@ Route::prefix('rootadmin')
         Route::patch('financeiro/plano', [BillingSettingsController::class, 'updatePlan'])->name('billing.plan');
         Route::patch('financeiro/efi', [BillingSettingsController::class, 'updateSettings'])->name('billing.settings');
         Route::post('financeiro/efi/testar', [BillingSettingsController::class, 'test'])->middleware('throttle:6,1')->name('billing.test');
+        Route::post('financeiro/pacotes-ia', [BillingSettingsController::class, 'storePackage'])->name('billing.packages.store');
+        Route::patch('financeiro/pacotes-ia/{package}', [BillingSettingsController::class, 'updatePackage'])->name('billing.packages.update');
+        Route::post('creditos-ia/compras/{purchase}/confirmar', [SubscriptionController::class, 'confirmPurchase'])->name('credits.purchases.confirm');
+        Route::post('creditos-ia/compras/{purchase}/cancelar', [SubscriptionController::class, 'cancelPurchase'])->name('credits.purchases.cancel');
+        Route::post('creditos-ia/compras/{purchase}/estornar', [SubscriptionController::class, 'refundPurchase'])->name('credits.purchases.refund');
     });

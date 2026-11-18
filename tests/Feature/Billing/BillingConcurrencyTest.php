@@ -4,11 +4,14 @@ use App\Enums\BillingSource;
 use App\Enums\ChargeStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionStatus;
+use App\Models\AiCreditAccount;
+use App\Models\AiCreditEntry;
 use App\Models\BillingCharge;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Services\Billing\AiCreditService;
 use App\Services\Billing\ChargeService;
 use App\Services\Billing\SubscriptionService;
 use Illuminate\Database\QueryException;
@@ -87,7 +90,7 @@ afterEach(function () {
     DB::setDefaultConnection('mysql_second');
 
     if (isset($this->tenant)) {
-        foreach (['billing_charges', 'subscription_events', 'subscriptions', 'notification_deliveries', 'tenant_notifications', 'audit_logs'] as $table) {
+        foreach (['ai_credit_entries', 'ai_credit_purchases', 'ai_credit_accounts', 'billing_charges', 'subscription_events', 'subscriptions', 'notification_deliveries', 'tenant_notifications', 'audit_logs'] as $table) {
             DB::table($table)->where('tenant_id', $this->tenant->id)->delete();
         }
 
@@ -99,7 +102,7 @@ afterEach(function () {
     }
 
     if (isset($this->plan)) {
-        $this->plan->forceFill(['price_cents' => $this->originalPrice])->save();
+        $this->plan->forceFill(['price_cents' => $this->originalPrice, 'ai_monthly_credits' => null])->save();
     }
 
     DB::table('billing_settings')->update(['efi_pix_client_id' => null, 'efi_pix_client_secret' => null, 'efi_pix_certificate' => null, 'efi_pix_key' => null]);
@@ -147,4 +150,25 @@ test('two confirmations of the same payment at the same time settle it once', fu
     expect($charge->fresh()->status)->toBe(ChargeStatus::Paid)
         ->and($this->subscription->fresh()->status)->toBe(SubscriptionStatus::Active)
         ->and(DB::table('subscription_events')->where('subscription_id', $this->subscription->id)->where('to_status', 'active')->where('type', 'status_changed')->count())->toBe(1);
+});
+
+test('an AI credit debit waits for the account lock, and concurrent consumptions never debit more than once each', function () {
+    $this->plan->forceFill(['ai_monthly_credits' => 10])->save();
+    $credits = app(AiCreditService::class);
+    $account = billingSessionB(fn () => $credits->account($this->tenant));
+
+    billingSessionA(function () use ($account, $credits) {
+        AiCreditAccount::query()->whereKey($account->id)->lockForUpdate()->firstOrFail();
+
+        expect(fn () => billingSessionB(fn () => $credits->recordConsumption($this->tenant, 'concorrencia-1', 'classify_service', 'fake', 3000)))
+            ->toThrow(QueryException::class, 'Lock wait timeout');
+    });
+
+    billingSessionB(fn () => $credits->recordConsumption($this->tenant, 'concorrencia-1', 'classify_service', 'fake', 3000));
+    billingSessionB(fn () => $credits->recordConsumption($this->tenant, 'concorrencia-1', 'classify_service', 'fake', 3000));
+    billingSessionB(fn () => $credits->recordConsumption($this->tenant, 'concorrencia-2', 'classify_service', 'fake', 3000));
+
+    expect($account->fresh()->included_balance)->toBe(4)
+        ->and(AiCreditEntry::query()->where('tenant_id', $this->tenant->id)->where('kind', 'consumption')->count())->toBe(2)
+        ->and($credits->reconcile($this->tenant)['consistent'])->toBeTrue();
 });

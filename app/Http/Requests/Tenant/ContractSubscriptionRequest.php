@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Tenant;
 
+use App\Enums\BillingInterval;
 use App\Enums\PaymentMethod;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,6 +20,7 @@ class ContractSubscriptionRequest extends FormRequest
     {
         return [
             'method' => ['required', Rule::enum(PaymentMethod::class)],
+            'interval' => ['nullable', Rule::enum(BillingInterval::class)],
             'document' => ['nullable', 'string', 'max:20', 'regex:/^[\d.\-\/\s]+$/'],
         ];
     }
@@ -31,6 +33,7 @@ class ContractSubscriptionRequest extends FormRequest
         return [
             'method.required' => 'Escolha a forma de pagamento.',
             'method.enum' => 'Forma de pagamento inválida.',
+            'interval.enum' => 'Escolha um ciclo válido.',
             'document.regex' => 'Informe o CPF ou CNPJ só com números, pontos, traços e barra.',
         ];
     }

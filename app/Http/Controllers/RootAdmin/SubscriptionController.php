@@ -6,11 +6,15 @@ use App\Enums\BillingSource;
 use App\Enums\ChargeStatus;
 use App\Enums\SubscriptionStatus;
 use App\Http\Controllers\Controller;
+use App\Models\AiCreditEntry;
+use App\Models\AiCreditPurchase;
 use App\Models\BillingCharge;
 use App\Models\BillingWebhookEvent;
 use App\Models\Subscription;
 use App\Models\SubscriptionEvent;
 use App\Models\Tenant;
+use App\Services\Billing\AiCreditPurchaseService;
+use App\Services\Billing\AiCreditService;
 use App\Services\Billing\ChargeService;
 use App\Services\Billing\Efi\EfiException;
 use App\Services\Billing\SubscriptionService;
@@ -71,7 +75,7 @@ class SubscriptionController extends Controller
         ]);
     }
 
-    public function show(Subscription $subscription): Response
+    public function show(Subscription $subscription, AiCreditService $credits): Response
     {
         $subscription->load(['tenant', 'plan']);
         $amount = $subscription->periodAmountCents();
@@ -86,6 +90,9 @@ class SubscriptionController extends Controller
                 'status' => $subscription->status->value,
                 'status_label' => $subscription->status->label(),
                 'payment_method' => $subscription->payment_method?->label(),
+                'interval' => $subscription->billing_interval->label(),
+                'scheduled_interval' => $subscription->scheduled_interval?->label(),
+                'extra_user_price' => $subscription->extra_user_price_cents === null ? null : number_format($subscription->extra_user_price_cents / 100, 2, ',', '.'),
                 'amount' => $amount === null ? null : number_format($amount / 100, 2, ',', '.'),
                 'price' => $subscription->price_cents === null ? '' : number_format($subscription->price_cents / 100, 2, '.', ''),
                 'discount_percent' => $subscription->discount_percent,
@@ -99,6 +106,8 @@ class SubscriptionController extends Controller
                 'id' => $charge->id,
                 'period' => PlatformTime::date($charge->period_start).' a '.PlatformTime::date($charge->period_end),
                 'amount' => number_format($charge->amount_cents / 100, 2, ',', '.'),
+                'interval' => $charge->billing_interval->label(),
+                'extra_users' => $charge->extra_users,
                 'due_date' => $charge->due_date->format('d/m/Y'),
                 'method' => $charge->method->label(),
                 'status' => $charge->status->value,
@@ -109,6 +118,7 @@ class SubscriptionController extends Controller
                 'attempts' => $charge->issue_attempts,
                 'error' => $charge->last_error,
             ])->all(),
+            'credits' => $this->credits($subscription, $credits),
             'events' => SubscriptionEvent::query()->where('subscription_id', $subscription->id)->with('user:id,name')->latest('id')->limit(100)->get()->map(fn (SubscriptionEvent $event): array => [
                 'id' => $event->id,
                 'type' => $event->type,
@@ -183,6 +193,84 @@ class SubscriptionController extends Controller
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Pagamento registrado manualmente.']);
 
         return back();
+    }
+
+    /**
+     * Payment of an AI credit purchase confirmed by the platform (homologation: no gateway charge yet).
+     */
+    public function confirmPurchase(Request $request, AiCreditPurchase $purchase, AiCreditPurchaseService $purchases): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:300']], ['reason.*' => 'Informe como o pagamento foi confirmado (5 a 300 caracteres).']);
+
+        $purchases->confirmPayment($purchase, $this->actor($request), $data['reason']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Pagamento confirmado. Os créditos entraram no saldo.']);
+
+        return back();
+    }
+
+    public function cancelPurchase(Request $request, AiCreditPurchase $purchase, AiCreditPurchaseService $purchases): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:300']], ['reason.*' => 'Informe o motivo (5 a 300 caracteres).']);
+
+        $purchases->cancel($purchase, $this->actor($request), $data['reason']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Compra cancelada.']);
+
+        return back();
+    }
+
+    public function refundPurchase(Request $request, AiCreditPurchase $purchase, AiCreditPurchaseService $purchases): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:300']], ['reason.*' => 'Informe o motivo do estorno (5 a 300 caracteres).']);
+
+        $purchase = $purchases->refund($purchase, $this->actor($request), $data['reason']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => "Estorno registrado: {$purchase->refunded_credits} crédito(s), R$ ".number_format($purchase->refunded_cents / 100, 2, ',', '.').'. Devolva o valor ao cliente pelo meio de pagamento original.']);
+
+        return back();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function credits(Subscription $subscription, AiCreditService $credits): array
+    {
+        $tenant = $subscription->tenant;
+        $account = $credits->account($tenant);
+
+        return [
+            'franchise' => $credits->franchise($tenant),
+            'enforced' => $credits->enforced($tenant),
+            'included_balance' => $account->included_balance,
+            'purchased_balance' => $account->purchased_balance,
+            'period' => $account->included_period,
+            'reconciliation' => $credits->reconcile($tenant),
+            'entries' => AiCreditEntry::query()->forTenant($tenant)->with('user:id,name')->latest('id')->limit(50)->get()->map(fn (AiCreditEntry $entry): array => [
+                'id' => $entry->id,
+                'kind_label' => $entry->kindLabel(),
+                'included_delta' => $entry->included_delta,
+                'purchased_delta' => $entry->purchased_delta,
+                'credits' => $entry->credits,
+                'uncovered' => $entry->uncovered_credits,
+                'operation' => $entry->operation,
+                'model' => $entry->model,
+                'tokens' => $entry->tokens,
+                'cost' => $entry->estimated_cost_micros === null ? null : 'R$ '.number_format($entry->estimated_cost_micros / 1_000_000, 4, ',', '.'),
+                'note' => $entry->note,
+                'user' => $entry->user?->name,
+                'at' => PlatformTime::dateTime($entry->created_at),
+            ])->all(),
+            'purchases' => AiCreditPurchase::query()->forTenant($tenant)->latest('id')->limit(20)->get()->map(fn (AiCreditPurchase $purchase): array => [
+                'id' => $purchase->id,
+                'package' => $purchase->package_name,
+                'credits' => $purchase->credits,
+                'price' => number_format($purchase->price_cents / 100, 2, ',', '.'),
+                'status' => $purchase->status->value,
+                'status_label' => $purchase->status->label(),
+                'refunded_credits' => $purchase->refunded_credits,
+                'refunded' => number_format($purchase->refunded_cents / 100, 2, ',', '.'),
+                'note' => $purchase->note,
+                'at' => PlatformTime::dateTime($purchase->created_at),
+            ])->all(),
+        ];
     }
 
     /**

@@ -2,10 +2,12 @@
 
 use App\Enums\AppointmentStatus;
 use App\Enums\AssistantState;
+use App\Enums\BillingSource;
 use App\Enums\ConversationStatus;
 use App\Enums\PriceType;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestStatus;
+use App\Models\AiCreditEntry;
 use App\Models\Appointment;
 use App\Models\AssistantConversation;
 use App\Models\AssistantOperation;
@@ -13,6 +15,7 @@ use App\Models\AssistantSetting;
 use App\Models\AssistantUsage;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\Plan;
 use App\Models\Professional;
 use App\Models\ProfessionalAvailability;
 use App\Models\ProfessionalBlock;
@@ -28,6 +31,7 @@ use App\Services\AppointmentScheduler;
 use App\Services\Assistant\AssistantConversations;
 use App\Services\Assistant\AssistantOperations;
 use App\Services\Assistant\AssistantProvider;
+use App\Services\Billing\SubscriptionService;
 use App\Services\Websites\TrustedHosts;
 use Carbon\CarbonImmutable;
 use Illuminate\Cookie\CookieValuePrefix;
@@ -1008,4 +1012,32 @@ test('on the company own domain the assistant answers at /atendimento with a coo
 
 test('the panel shows the standard address of the assistant when the company has no domain of its own', function () {
     $this->actingAs($this->owner)->get('/atendimento-ia')->assertInertia(fn ($page) => $page->where('publicUrl', 'https://vetorsmart.com.br/climatizacao/clima-total/atendimento'));
+});
+
+test('a provider classification consumes AI credits of the company', function () {
+    Plan::main()->forceFill(['ai_monthly_credits' => 100])->save();
+    app(SubscriptionService::class)->startTrial($this->tenant, BillingSource::System);
+    fakeAssistantProvider(['intent' => 'select_service', 'service_index' => 1]);
+    startAssistant();
+
+    sayToAssistant('quero algo para o ar');
+
+    $entry = AiCreditEntry::query()->where('kind', 'consumption')->sole();
+
+    expect($entry->tenant_id)->toBe($this->tenant->id)
+        ->and($entry->model)->toBe('fake')
+        ->and($entry->included_delta)->toBe(-1);
+});
+
+test('without AI credits the provider is not called and the conventional flow goes on', function () {
+    Plan::main()->forceFill(['ai_monthly_credits' => 0])->save();
+    app(SubscriptionService::class)->startTrial($this->tenant, BillingSource::System);
+    $provider = Mockery::mock(AssistantProvider::class);
+    $provider->shouldReceive('name')->andReturn('fake');
+    $provider->shouldNotReceive('classify');
+    app()->instance(AssistantProvider::class, $provider);
+    startAssistant();
+
+    expect(lastAssistantText(sayToAssistant('quero algo para o ar')))->toContain('Não encontrei esse serviço')
+        ->and(lastAssistantText(sayToAssistant('quero limpeza de ar-condicionado')))->toContain('nome e o telefone');
 });

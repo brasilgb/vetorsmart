@@ -9,30 +9,71 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { cancel, contract, resume } from '@/routes/tenant/subscription';
+import { cancel, contract, credits as buyCredits, interval as changeInterval, resume } from '@/routes/tenant/subscription';
 import type { Paginator } from '@/types';
+
+type NextCharge = {
+    interval_label: string;
+    base: string;
+    discount: string | null;
+    extra_users: number;
+    extra_user_price: string;
+    extra_users_amount: string | null;
+    total: string;
+    months: number;
+    open: boolean;
+};
 
 type Summary = {
     plan: string;
     plan_description: string | null;
     status: string;
     status_label: string;
-    amount: string | null;
-    interval_months: number;
+    interval: string;
+    interval_label: string;
+    scheduled_interval: string | null;
+    scheduled_interval_label: string | null;
+    next_charge: NextCharge | null;
+    price_frozen: boolean;
     discount_percent: number;
+    discount_until: string | null;
     next_due: string | null;
     trial_days_left: number | null;
     payment_method: string | null;
     cancel_at_period_end: boolean;
     included_users: number | null;
+    active_users: number | null;
     can_contract: boolean;
     can_cancel: boolean;
+};
+
+type Cycle = {
+    interval: string;
+    label: string;
+    months: number;
+    total: string;
+    monthly_equivalent: string;
+    savings_percent: number;
+};
+
+type Offer = {
+    name: string;
+    trial_days: number;
+    included_users: number | null;
+    extra_user_price: string | null;
+    ai_monthly_credits: number | null;
+    promotion_percent: number;
+    promotion_until: string | null;
+    cycles: Cycle[];
+    benefits: string[];
 };
 
 type Charge = {
     id: number;
     period: string;
+    interval_label: string;
     amount: string;
+    breakdown: string[];
     due_date: string;
     status: string;
     status_label: string;
@@ -44,9 +85,25 @@ type Charge = {
     issue_failed: boolean;
 };
 
+type Credits = {
+    enforced: boolean;
+    franchise: number | null;
+    included_balance: number;
+    purchased_balance: number;
+    total_balance: number;
+    used_this_month: number;
+    entries: { id: number; kind: string; kind_label: string; credits: number; consumed: number | null; operation: string | null; at: string | null }[];
+    purchases_enabled: boolean;
+    packages: { id: number; name: string; credits: number; price: string }[];
+    purchases: { id: number; package: string; credits: number; price: string; status: string; status_label: string; at: string | null }[];
+    has_open_purchase: boolean;
+};
+
 type Props = {
     subscription: Summary | null;
+    offer: Offer | null;
     charges: Paginator<Charge> | null;
+    credits: Credits | null;
     methods: { value: string; label: string }[];
     hasDocument: boolean;
     canManage: boolean;
@@ -59,6 +116,8 @@ const statusTone: Record<string, string> = {
     suspended: 'border-vs-danger text-vs-danger',
     cancelled: 'border-vs-border text-vs-muted',
 };
+
+const number = new Intl.NumberFormat('pt-BR');
 
 function CopyButton({ text }: { text: string }) {
     const [copied, setCopied] = useState(false);
@@ -77,15 +136,49 @@ function CopyButton({ text }: { text: string }) {
     );
 }
 
-export default function SubscriptionIndex({ subscription, charges, methods, hasDocument, canManage }: Props) {
-    const form = useForm({ method: subscription?.payment_method ?? 'pix', document: '' });
+function CyclePicker({ cycles, value, onChange, disabled }: { cycles: Cycle[]; value: string; onChange: (value: string) => void; disabled?: boolean }) {
+    return (
+        <fieldset className="grid gap-3 sm:grid-cols-3" disabled={disabled}>
+            <legend className="mb-2 text-sm font-medium text-vs-text">Ciclo de cobrança</legend>
+            {cycles.map((cycle) => {
+                const selected = value === cycle.interval;
+
+                return (
+                    <label
+                        key={cycle.interval}
+                        className={`flex cursor-pointer flex-col gap-1 rounded-lg border p-4 text-sm transition-colors focus-within:ring-2 focus-within:ring-vs-blue ${selected ? 'border-vs-blue bg-vs-blue/5 dark:bg-sky-400/10' : 'border-vs-border hover:border-vs-blue/60'}`}
+                    >
+                        <span className="flex items-center justify-between gap-2">
+                            <span className="flex items-center gap-2 font-medium text-vs-text">
+                                <input type="radio" name="interval" value={cycle.interval} checked={selected} onChange={() => onChange(cycle.interval)} className="accent-vs-blue" />
+                                {cycle.label}
+                            </span>
+                            {cycle.savings_percent > 0 && (
+                                <Badge variant="outline" className="border-emerald-600 text-emerald-700 dark:text-emerald-400">−{cycle.savings_percent}%</Badge>
+                            )}
+                        </span>
+                        <span className="text-lg font-semibold text-vs-text">{cycle.total}</span>
+                        <span className="text-vs-muted">
+                            {cycle.months === 1 ? 'por mês' : `a cada ${cycle.months} meses · equivale a ${cycle.monthly_equivalent}/mês`}
+                        </span>
+                    </label>
+                );
+            })}
+        </fieldset>
+    );
+}
+
+export default function SubscriptionIndex({ subscription, offer, charges, credits, methods, hasDocument, canManage }: Props) {
+    const form = useForm({ method: subscription?.payment_method ?? 'pix', document: '', interval: subscription?.scheduled_interval ?? subscription?.interval ?? 'monthly' });
+    const errors = form.errors as Record<string, string>;
+    const intervalChanged = subscription !== null && form.data.interval !== (subscription.scheduled_interval ?? subscription.interval);
 
     return (
         <>
             <Head title="Minha Assinatura" />
 
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <PageHeader title="Minha Assinatura" description="Plano, situação financeira, cobranças e documentos de pagamento da sua empresa." />
+                <PageHeader title="Minha Assinatura" description="Plano, ciclo, cobranças, usuários e créditos de inteligência artificial da sua empresa." />
 
                 {subscription === null ? (
                     <EmptyState>Sua empresa ainda não tem assinatura registrada. A equipe VetorSmart vai ativá-la e avisar você.</EmptyState>
@@ -96,16 +189,16 @@ export default function SubscriptionIndex({ subscription, charges, methods, hasD
                                 <div className="flex flex-wrap items-center gap-3">
                                     <CardTitle className="text-vs-text">{subscription.plan}</CardTitle>
                                     <Badge variant="outline" className={statusTone[subscription.status] ?? ''}>{subscription.status_label}</Badge>
+                                    <Badge variant="outline" className="border-vs-border text-vs-text">Ciclo {subscription.interval_label}</Badge>
                                 </div>
                                 {subscription.plan_description && <CardDescription>{subscription.plan_description}</CardDescription>}
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="grid gap-4">
                                 <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                                     <div>
-                                        <dt className="text-vs-muted">Valor</dt>
+                                        <dt className="text-vs-muted">Próxima cobrança</dt>
                                         <dd className="font-medium text-vs-text">
-                                            {subscription.amount === null ? 'A definir' : `${subscription.amount} ${subscription.interval_months === 1 ? 'por mês' : `a cada ${subscription.interval_months} meses`}`}
-                                            {subscription.discount_percent > 0 && <span className="ml-1 text-vs-muted">({subscription.discount_percent}% de desconto)</span>}
+                                            {subscription.next_charge === null ? 'A definir' : `${subscription.next_charge.total} (${subscription.next_charge.interval_label})`}
                                         </dd>
                                     </div>
                                     <div>
@@ -119,18 +212,47 @@ export default function SubscriptionIndex({ subscription, charges, methods, hasD
                                         </div>
                                     )}
                                     <div>
-                                        <dt className="text-vs-muted">Usuários incluídos</dt>
-                                        <dd className="font-medium text-vs-text">{subscription.included_users ?? 'Sem limite definido'}</dd>
+                                        <dt className="text-vs-muted">Usuários</dt>
+                                        <dd className="font-medium text-vs-text">
+                                            {subscription.active_users ?? '—'} ativo(s) · {subscription.included_users === null ? 'sem limite definido' : `${subscription.included_users} incluído(s)`}
+                                        </dd>
                                     </div>
                                 </dl>
 
+                                {subscription.next_charge && (
+                                    <div className="rounded-md border border-vs-border/70 p-3 text-sm">
+                                        <p className="mb-2 font-medium text-vs-text">{subscription.next_charge.open ? 'Composição da cobrança em aberto' : 'Composição da próxima cobrança'}</p>
+                                        <ul className="grid gap-1 text-vs-text">
+                                            <li className="flex justify-between gap-4"><span>Plano {subscription.next_charge.interval_label}</span><span>{subscription.next_charge.base}</span></li>
+                                            {subscription.next_charge.discount && (
+                                                <li className="flex justify-between gap-4">
+                                                    <span>Desconto de {subscription.discount_percent}%{subscription.discount_until && ` até ${subscription.discount_until}`}</span>
+                                                    <span>−{subscription.next_charge.discount}</span>
+                                                </li>
+                                            )}
+                                            {subscription.next_charge.extra_users > 0 && (
+                                                <li className="flex justify-between gap-4">
+                                                    <span>{subscription.next_charge.extra_users} usuário(s) adicional(is) × {subscription.next_charge.extra_user_price}/mês{subscription.next_charge.months > 1 && ` × ${subscription.next_charge.months} meses`}</span>
+                                                    <span>{subscription.next_charge.extra_users_amount}</span>
+                                                </li>
+                                            )}
+                                            <li className="mt-1 flex justify-between gap-4 border-t border-vs-border/70 pt-1 font-semibold"><span>Total</span><span>{subscription.next_charge.total}</span></li>
+                                        </ul>
+                                    </div>
+                                )}
+
+                                {subscription.scheduled_interval_label && (
+                                    <p role="status" className="rounded-md bg-vs-surface px-3 py-2 text-sm text-vs-text">
+                                        Troca para o ciclo {subscription.scheduled_interval_label} agendada: vale a partir do próximo período.
+                                    </p>
+                                )}
                                 {subscription.cancel_at_period_end && (
-                                    <p role="status" className="mt-4 rounded-md bg-vs-surface px-3 py-2 text-sm text-vs-text">
-                                        O cancelamento está agendado para o fim do período atual.
+                                    <p role="status" className="rounded-md bg-vs-surface px-3 py-2 text-sm text-vs-text">
+                                        O cancelamento está agendado para o fim do período atual. O acesso continua até lá.
                                     </p>
                                 )}
                                 {subscription.status === 'suspended' && (
-                                    <p role="alert" className="mt-4 rounded-md bg-vs-danger-soft px-3 py-2 text-sm text-vs-danger">
+                                    <p role="alert" className="rounded-md bg-vs-danger-soft px-3 py-2 text-sm text-vs-danger">
                                         O painel está bloqueado por falta de pagamento. Pague a cobrança em aberto para liberar o acesso.
                                     </p>
                                 )}
@@ -140,39 +262,48 @@ export default function SubscriptionIndex({ subscription, charges, methods, hasD
                         {canManage && (
                             <Card className="border-vs-border/70 shadow-sm">
                                 <CardHeader>
-                                    <CardTitle className="text-vs-text">Pagamento</CardTitle>
+                                    <CardTitle className="text-vs-text">Gerenciar assinatura</CardTitle>
                                     <CardDescription>
                                         {subscription.can_contract
-                                            ? 'Escolha a forma de pagamento e gere a cobrança do período. Ela fica disponível abaixo, com o código Pix ou o boleto.'
+                                            ? 'Escolha o ciclo e a forma de pagamento e gere a cobrança do período. Ela fica disponível abaixo, com o código Pix ou o boleto.'
                                             : 'O valor do plano ainda está sendo definido. A contratação será liberada em breve; o seu teste continua normalmente.'}
                                     </CardDescription>
                                 </CardHeader>
-                                {subscription.can_contract && (
+                                {subscription.can_contract && offer && (
                                     <CardContent>
                                         <form
                                             onSubmit={(event) => {
                                                 event.preventDefault();
                                                 form.post(contract.url(), { preserveScroll: true });
                                             }}
-                                            className="grid max-w-xl gap-4"
+                                            className="grid gap-4"
                                         >
-                                            <Field id="method" label="Forma de pagamento" error={form.errors.method}>
-                                                <select id="method" value={form.data.method} onChange={(event) => form.setData('method', event.target.value)} className={selectClass}>
-                                                    {methods.map((method) => (
-                                                        <option key={method.value} value={method.value}>{method.label}</option>
-                                                    ))}
-                                                </select>
-                                            </Field>
-                                            {form.data.method === 'boleto' && !hasDocument && (
-                                                <Field id="document" label="CPF ou CNPJ da empresa" error={form.errors.document} hint="Obrigatório no boleto.">
-                                                    <Input id="document" value={form.data.document} onChange={(event) => form.setData('document', event.target.value)} inputMode="numeric" autoComplete="off" className="h-10" />
+                                            <CyclePicker cycles={offer.cycles} value={form.data.interval} onChange={(value) => form.setData('interval', value)} />
+                                            {errors.interval && <p className="text-sm text-vs-danger">{errors.interval}</p>}
+                                            <div className="grid max-w-xl gap-4">
+                                                <Field id="method" label="Forma de pagamento" error={form.errors.method}>
+                                                    <select id="method" value={form.data.method} onChange={(event) => form.setData('method', event.target.value)} className={selectClass}>
+                                                        {methods.map((method) => (
+                                                            <option key={method.value} value={method.value}>{method.label}</option>
+                                                        ))}
+                                                    </select>
                                                 </Field>
-                                            )}
-                                            {'plan' in form.errors && <p className="text-sm text-vs-danger">{(form.errors as Record<string, string>).plan}</p>}
+                                                {form.data.method === 'boleto' && !hasDocument && (
+                                                    <Field id="document" label="CPF ou CNPJ da empresa" error={form.errors.document} hint="Obrigatório no boleto.">
+                                                        <Input id="document" value={form.data.document} onChange={(event) => form.setData('document', event.target.value)} inputMode="numeric" autoComplete="off" className="h-10" />
+                                                    </Field>
+                                                )}
+                                            </div>
+                                            {errors.plan && <p className="text-sm text-vs-danger">{errors.plan}</p>}
                                             <div className="flex flex-wrap gap-3">
                                                 <Button type="submit" disabled={form.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">
                                                     Gerar cobrança
                                                 </Button>
+                                                {intervalChanged && (
+                                                    <Button type="button" variant="outline" className="h-10" disabled={form.processing} onClick={() => router.post(changeInterval.url(), { interval: form.data.interval }, { preserveScroll: true })}>
+                                                        Só trocar o ciclo
+                                                    </Button>
+                                                )}
                                                 {subscription.can_cancel && (
                                                     <ConfirmAction
                                                         title="Cancelar a assinatura?"
@@ -194,6 +325,127 @@ export default function SubscriptionIndex({ subscription, charges, methods, hasD
                             </Card>
                         )}
 
+                        {offer && (
+                            <Card className="border-vs-border/70 shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="text-vs-text">Condições do plano</CardTitle>
+                                    <CardDescription>O que está incluído e como funcionam descontos, trocas e cancelamento.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid gap-4 text-sm text-vs-text md:grid-cols-2">
+                                    <ul className="grid list-disc gap-1 pl-5">
+                                        {offer.benefits.map((benefit) => <li key={benefit}>{benefit}</li>)}
+                                    </ul>
+                                    <ul className="grid list-disc gap-1 pl-5">
+                                        <li>{offer.trial_days} dias gratuitos para novas empresas.</li>
+                                        {offer.included_users !== null && <li>{offer.included_users} usuários incluídos em qualquer ciclo{offer.extra_user_price && `; cada usuário adicional custa ${offer.extra_user_price} por mês`}.</li>}
+                                        <li>Semestral e anual têm desconto sobre o mensal; o valor do ciclo é cobrado de uma vez.</li>
+                                        {offer.promotion_percent > 0 && <li>Promoção: {offer.promotion_percent}% de desconto{offer.promotion_until && ` para contratações até ${offer.promotion_until}`}.</li>}
+                                        <li>O valor contratado fica garantido: mudanças de preço não alteram cobranças já contratadas.</li>
+                                        <li>A troca de ciclo vale a partir do próximo período, sem cobrança proporcional.</li>
+                                        <li>No cancelamento, o acesso continua até o fim do período pago.</li>
+                                        {offer.ai_monthly_credits !== null && <li>{number.format(offer.ai_monthly_credits)} créditos de IA por mês, renovados mensalmente em todos os ciclos.</li>}
+                                    </ul>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {credits && (
+                            <Card className="border-vs-border/70 shadow-sm">
+                                <CardHeader>
+                                    <CardTitle className="text-vs-text">Créditos de inteligência artificial</CardTitle>
+                                    <CardDescription>
+                                        Usados pelas respostas automáticas com IA. Sem saldo, só elas pausam: o atendimento convencional continua normalmente.
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="grid gap-5">
+                                    <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                                        <div>
+                                            <dt className="text-vs-muted">Franquia mensal</dt>
+                                            <dd className="font-medium text-vs-text">{credits.franchise === null ? 'A definir' : number.format(credits.franchise)}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-vs-muted">Saldo da franquia</dt>
+                                            <dd className="font-medium text-vs-text">{number.format(credits.included_balance)}</dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-vs-muted">Créditos comprados</dt>
+                                            <dd className="font-medium text-vs-text">{number.format(credits.purchased_balance)} <span className="text-vs-muted">(não expiram)</span></dd>
+                                        </div>
+                                        <div>
+                                            <dt className="text-vs-muted">Consumo neste mês</dt>
+                                            <dd className="font-medium text-vs-text">{number.format(credits.used_this_month)}</dd>
+                                        </div>
+                                    </dl>
+
+                                    {credits.enforced && credits.total_balance <= 0 && (
+                                        <p role="alert" className="rounded-md bg-vs-danger-soft px-3 py-2 text-sm text-vs-danger">
+                                            Créditos esgotados: as respostas com IA estão pausadas até a renovação da franquia ou a compra de créditos.
+                                        </p>
+                                    )}
+
+                                    <div className="grid gap-2">
+                                        <h3 className="text-sm font-medium text-vs-text">Comprar créditos adicionais</h3>
+                                        {!credits.purchases_enabled ? (
+                                            <p className="text-sm text-vs-muted">A compra de créditos adicionais será liberada em breve.</p>
+                                        ) : credits.packages.length === 0 ? (
+                                            <p className="text-sm text-vs-muted">Nenhum pacote disponível no momento.</p>
+                                        ) : (
+                                            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                                {credits.packages.map((pack) => (
+                                                    <li key={pack.id} className="flex flex-col gap-2 rounded-lg border border-vs-border/70 p-3 text-sm">
+                                                        <span className="font-medium text-vs-text">{pack.name}</span>
+                                                        <span className="text-vs-muted">{number.format(pack.credits)} créditos · {pack.price}</span>
+                                                        {canManage && (
+                                                            <ConfirmAction
+                                                                title={`Comprar ${pack.name}?`}
+                                                                description={`${number.format(pack.credits)} créditos por ${pack.price}, cobrados à parte da assinatura. Os créditos entram no saldo após a confirmação do pagamento e não expiram.`}
+                                                                confirmLabel="Confirmar compra"
+                                                                onConfirm={() => router.post(buyCredits.url(), { package_id: pack.id }, { preserveScroll: true })}
+                                                                trigger={<Button type="button" size="sm" variant="outline" disabled={credits.has_open_purchase}>Comprar</Button>}
+                                                            />
+                                                        )}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                        {credits.has_open_purchase && <p className="text-sm text-vs-muted">Há uma compra aguardando pagamento.</p>}
+                                    </div>
+
+                                    {credits.purchases.length > 0 && (
+                                        <div className="grid gap-2">
+                                            <h3 className="text-sm font-medium text-vs-text">Compras de créditos</h3>
+                                            <ul className="grid gap-1 text-sm">
+                                                {credits.purchases.map((purchase) => (
+                                                    <li key={purchase.id} className="flex flex-wrap justify-between gap-2 border-b border-vs-border/50 py-1 text-vs-text">
+                                                        <span>{purchase.at} · {purchase.package} · {number.format(purchase.credits)} créditos · {purchase.price}</span>
+                                                        <span className="text-vs-muted">{purchase.status_label}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+
+                                    <div className="grid gap-2">
+                                        <h3 className="text-sm font-medium text-vs-text">Histórico de consumo</h3>
+                                        {credits.entries.length === 0 ? (
+                                            <p className="text-sm text-vs-muted">Nenhum movimento ainda.</p>
+                                        ) : (
+                                            <ul className="grid gap-1 text-sm">
+                                                {credits.entries.map((entry) => (
+                                                    <li key={entry.id} className="flex flex-wrap justify-between gap-2 border-b border-vs-border/50 py-1 text-vs-text">
+                                                        <span>{entry.at} · {entry.kind_label}</span>
+                                                        <span className={entry.credits < 0 ? 'text-vs-text' : 'text-emerald-700 dark:text-emerald-400'}>
+                                                            {entry.consumed !== null ? `−${number.format(entry.consumed)}` : `${entry.credits > 0 ? '+' : ''}${number.format(entry.credits)}`}
+                                                        </span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         <section aria-labelledby="historico" className="grid gap-3">
                             <h2 id="historico" className="text-lg font-semibold text-vs-text">Histórico de cobranças</h2>
                             {charges === null || charges.data.length === 0 ? (
@@ -205,8 +457,9 @@ export default function SubscriptionIndex({ subscription, charges, methods, hasD
                                             <Card className="border-vs-border/70 p-4 shadow-sm">
                                                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                                                     <div className="grid gap-1 text-sm">
-                                                        <p className="font-medium text-vs-text">{charge.amount} · {charge.method_label}</p>
+                                                        <p className="font-medium text-vs-text">{charge.amount} · {charge.interval_label} · {charge.method_label}</p>
                                                         <p className="text-vs-muted">Período {charge.period} · vencimento {charge.due_date}</p>
+                                                        {charge.breakdown.length > 0 && <p className="text-vs-muted">{charge.breakdown.join(' · ')}</p>}
                                                         <p className="text-vs-muted">
                                                             {charge.status_label}
                                                             {charge.paid_at && ` em ${charge.paid_at}`}

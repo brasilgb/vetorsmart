@@ -27,6 +27,9 @@ class UpdateBillingSettingsRequest extends FormRequest
             'renewal_days_before' => ['required', 'integer', 'min:1', 'max:30'],
             'billet_due_days' => ['required', 'integer', 'min:1', 'max:30'],
             'confirm_production' => ['accepted_if:efi_environment,production'],
+            'ai_tokens_per_credit' => ['required', 'integer', 'min:1', 'max:10000000'],
+            'ai_low_balance_percent' => ['required', 'integer', 'min:0', 'max:100'],
+            'ai_credit_purchases_enabled' => ['boolean'],
         ];
     }
 

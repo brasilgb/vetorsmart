@@ -110,6 +110,8 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
 Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
     Route::get('assinatura', [SubscriptionController::class, 'show'])->name('tenant.subscription.show');
     Route::post('assinatura/contratar', [SubscriptionController::class, 'contract'])->middleware('throttle:10,1')->name('tenant.subscription.contract');
+    Route::post('assinatura/ciclo', [SubscriptionController::class, 'interval'])->middleware('throttle:10,1')->name('tenant.subscription.interval');
+    Route::post('assinatura/creditos-ia', [SubscriptionController::class, 'buyCredits'])->middleware('throttle:10,1')->name('tenant.subscription.credits');
     Route::post('assinatura/cancelar', [SubscriptionController::class, 'cancel'])->name('tenant.subscription.cancel');
     Route::post('assinatura/retomar', [SubscriptionController::class, 'resume'])->name('tenant.subscription.resume');
 });

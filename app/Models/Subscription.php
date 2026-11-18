@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Concerns\BelongsToTenant;
+use App\Enums\BillingInterval;
+use App\Enums\MembershipStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionStatus;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +21,10 @@ use Illuminate\Support\Carbon;
  * @property int $plan_id
  * @property SubscriptionStatus $status
  * @property PaymentMethod|null $payment_method
+ * @property BillingInterval $billing_interval
+ * @property BillingInterval|null $scheduled_interval
  * @property int|null $price_cents
+ * @property int|null $extra_user_price_cents
  * @property int $discount_percent
  * @property Carbon|null $discount_until
  * @property Carbon|null $trial_ends_at
@@ -67,19 +72,50 @@ class Subscription extends Model
     }
 
     /**
-     * Amount of one period: the contracted price (or the plan's current price), less the discount while it lasts.
+     * Amount of one period of a cycle: the contracted price (frozen at contracting; while empty, the plan's current
+     * price for the cycle), less the discount while it lasts, plus the active users beyond the included ones, each at
+     * the contracted monthly extra-user price times the months of the cycle. Null when the cycle has no price.
+     *
+     * @return array{interval: BillingInterval, months: int, base_cents: int, discount_cents: int, active_users: int, included_users: int|null, extra_users: int, extra_user_price_cents: int, extra_users_cents: int, total_cents: int}|null
      */
-    public function periodAmountCents(): ?int
+    public function quote(?BillingInterval $interval = null): ?array
     {
-        $price = $this->price_cents ?? $this->plan->currentPriceCents();
+        $interval ??= $this->billing_interval;
+        $base = $interval === $this->billing_interval && $this->price_cents !== null ? $this->price_cents : $this->plan->priceFor($interval);
 
-        if ($price === null || $price <= 0) {
+        if ($base === null || $base <= 0) {
             return null;
         }
 
         $discountActive = $this->discount_percent > 0 && ($this->discount_until === null || now()->startOfDay()->lte($this->discount_until));
+        $discount = $discountActive ? (int) round($base * $this->discount_percent / 100) : 0;
 
-        return $discountActive ? (int) round($price * (100 - $this->discount_percent) / 100) : $price;
+        $activeUsers = TenantUser::query()->where('tenant_id', $this->tenant_id)->where('status', MembershipStatus::Active->value)->count();
+        $included = $this->plan->included_users;
+        $extraUsers = $included === null ? 0 : max(0, $activeUsers - $included);
+        $extraPrice = $this->extra_user_price_cents ?? $this->plan->extra_user_price_cents ?? 0;
+        $extraAmount = $extraUsers * $extraPrice * $interval->months();
+
+        return [
+            'interval' => $interval,
+            'months' => $interval->months(),
+            'base_cents' => $base,
+            'discount_cents' => $discount,
+            'active_users' => $activeUsers,
+            'included_users' => $included,
+            'extra_users' => $extraUsers,
+            'extra_user_price_cents' => $extraPrice,
+            'extra_users_cents' => $extraAmount,
+            'total_cents' => $base - $discount + $extraAmount,
+        ];
+    }
+
+    /**
+     * Total of the next period of the current cycle, or null when the cycle has no price.
+     */
+    public function periodAmountCents(): ?int
+    {
+        return $this->quote()['total_cents'] ?? null;
     }
 
     public function trialDaysLeft(): ?int
@@ -99,6 +135,8 @@ class Subscription extends Model
         return [
             'status' => SubscriptionStatus::class,
             'payment_method' => PaymentMethod::class,
+            'billing_interval' => BillingInterval::class,
+            'scheduled_interval' => BillingInterval::class,
             'discount_until' => 'date',
             'trial_ends_at' => 'datetime',
             'current_period_start' => 'datetime',

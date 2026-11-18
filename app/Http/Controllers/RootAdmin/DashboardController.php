@@ -126,7 +126,7 @@ class DashboardController extends Controller
 
         $mrrCents = $subscriptions
             ->filter(fn (Subscription $subscription): bool => $subscription->status === SubscriptionStatus::Active)
-            ->sum(fn (Subscription $subscription): float => ($subscription->periodAmountCents() ?? 0) / max(1, $subscription->plan->interval_months));
+            ->sum(fn (Subscription $subscription): float => ($subscription->periodAmountCents() ?? 0) / $subscription->billing_interval->months());
 
         return [
             'trialing' => (int) ($byStatus[SubscriptionStatus::Trialing->value] ?? 0),

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Concerns\BelongsToTenant;
+use App\Enums\BillingInterval;
 use App\Enums\ChargeStatus;
 use App\Enums\PaymentMethod;
 use Illuminate\Database\Eloquent\Model;
@@ -17,7 +18,12 @@ use Illuminate\Support\Carbon;
  * @property int $subscription_id
  * @property Carbon $period_start
  * @property Carbon $period_end
+ * @property BillingInterval $billing_interval
  * @property int $amount_cents
+ * @property int|null $base_amount_cents
+ * @property int $discount_cents
+ * @property int $extra_users
+ * @property int $extra_users_amount_cents
  * @property Carbon $due_date
  * @property ChargeStatus $status
  * @property PaymentMethod $method
@@ -69,6 +75,7 @@ class BillingCharge extends Model
         return [
             'status' => ChargeStatus::class,
             'method' => PaymentMethod::class,
+            'billing_interval' => BillingInterval::class,
             'period_start' => 'datetime',
             'period_end' => 'datetime',
             'due_date' => 'date',

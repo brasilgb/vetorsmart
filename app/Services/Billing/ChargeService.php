@@ -8,6 +8,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\SubscriptionStatus;
 use App\Models\BillingCharge;
 use App\Models\BillingSetting;
+use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -52,12 +53,6 @@ class ChargeService
                 return $open;
             }
 
-            $amount = $subscription->periodAmountCents();
-
-            if ($amount === null) {
-                throw ValidationException::withMessages(['plan' => ['O valor do plano ainda não foi definido pela VetorSmart. A contratação será liberada em breve.']]);
-            }
-
             $start = $this->nextPeriodStart($subscription);
             $charge = BillingCharge::query()->where('subscription_id', $subscription->getKey())->where('period_start', $start)->first();
 
@@ -65,13 +60,25 @@ class ChargeService
                 return $charge;
             }
 
+            $subscription = $this->subscriptions->prepareForCharge($subscription);
+            $quote = $subscription->quote();
+
+            if ($quote === null) {
+                throw ValidationException::withMessages(['plan' => ['O valor do plano ainda não foi definido pela VetorSmart. A contratação será liberada em breve.']]);
+            }
+
             $charge = new BillingCharge;
             $charge->forceFill([
                 'tenant_id' => $subscription->tenant_id,
                 'subscription_id' => $subscription->getKey(),
                 'period_start' => $start,
-                'period_end' => $start->copy()->addMonths($subscription->plan->interval_months),
-                'amount_cents' => $amount,
+                'period_end' => $start->copy()->addMonths($quote['months']),
+                'billing_interval' => $quote['interval'],
+                'amount_cents' => $quote['total_cents'],
+                'base_amount_cents' => $quote['base_cents'],
+                'discount_cents' => $quote['discount_cents'],
+                'extra_users' => $quote['extra_users'],
+                'extra_users_amount_cents' => $quote['extra_users_cents'],
                 'due_date' => $start->isPast() ? now()->addDays(BillingSetting::current()->billet_due_days) : $start,
                 'status' => ChargeStatus::Pending,
                 'method' => $method,
@@ -89,6 +96,12 @@ class ChargeService
     public function issue(BillingCharge $charge): BillingCharge
     {
         if ($charge->status !== ChargeStatus::Pending) {
+            return $charge;
+        }
+
+        if (BillingSetting::current()->isProduction() && ! Plan::main()->pricesApproved()) {
+            $charge->forceFill(['last_error' => 'Valores comerciais ainda não aprovados: nenhuma cobrança real é emitida.'])->save();
+
             return $charge;
         }
 
