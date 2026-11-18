@@ -38,7 +38,7 @@ Route::get('/robots.txt', [SiteController::class, 'robots'])->name('site.robots'
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)
-        ->middleware('tenant.resolve')
+        ->middleware(['tenant.resolve', 'subscription.access'])
         ->name('dashboard');
 });
 

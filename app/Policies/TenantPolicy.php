@@ -29,6 +29,22 @@ class TenantPolicy
     }
 
     /**
+     * Owners and admins see the subscription, its charges and the billing documents.
+     */
+    public function viewBilling(User $user, Tenant $tenant): bool
+    {
+        return $this->isActiveTenant($tenant) && $this->hasRoleIn([TenantRole::Owner, TenantRole::Admin]);
+    }
+
+    /**
+     * Only owners contract, choose how to pay and cancel the subscription.
+     */
+    public function manageBilling(User $user, Tenant $tenant): bool
+    {
+        return $this->isActiveTenant($tenant) && $this->hasRoleIn([TenantRole::Owner]);
+    }
+
+    /**
      * Owners and admins configure the visitor assistant.
      */
     public function manageAssistant(User $user, Tenant $tenant): bool

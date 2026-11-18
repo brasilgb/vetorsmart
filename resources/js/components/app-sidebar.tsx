@@ -24,9 +24,11 @@ import { index as tenantServices } from '@/routes/tenant/services';
 import { index as tenantProfessionals } from '@/routes/tenant/professionals';
 import { index as tenantTeam } from '@/routes/tenant/team';
 import { index as tenantNotifications } from '@/routes/tenant/notifications';
+import { show as tenantSubscription } from '@/routes/tenant/subscription';
 import { show as tenantSettings } from '@/routes/tenant/settings';
 import { index as tenantWebsite } from '@/routes/tenant/website';
 import { index as auditIndex } from '@/routes/rootadmin/audit';
+import { index as rootadminSubscriptions } from '@/routes/rootadmin/subscriptions';
 import type { NavItem } from '@/types';
 
 const tenantNavItems: NavItem[] = [
@@ -41,6 +43,7 @@ const tenantNavItems: NavItem[] = [
     { title: 'Usuários e permissões', href: tenantTeam(), icon: KeyRound },
     { title: 'Meu Site', href: tenantWebsite(), icon: Globe },
     { title: 'Configurações', href: tenantSettings(), icon: Settings },
+    { title: 'Minha Assinatura', href: tenantSubscription(), icon: CreditCard },
 ];
 
 /**
@@ -53,7 +56,7 @@ const tenantNavItems: NavItem[] = [
 const rootadminNavItems: NavItem[] = [
     { title: 'Visão Geral', href: rootadminDashboard(), icon: LayoutDashboard },
     { title: 'Empresas', href: tenantsIndex(), icon: Building2 },
-    { title: 'Assinaturas e Financeiro', href: rootadminDashboard(), icon: CreditCard, disabled: true },
+    { title: 'Assinaturas e Financeiro', href: rootadminSubscriptions(), icon: CreditCard },
     { title: 'IA e Créditos', href: rootadminDashboard(), icon: Bot, disabled: true },
     { title: 'Sites e Domínios', href: rootadminDashboard(), icon: Globe, disabled: true },
     { title: 'Segmentos', href: segmentsIndex(), icon: Tag },
@@ -68,7 +71,7 @@ export function AppSidebar() {
     const { auth, tenant } = usePage().props;
     const isRootAdmin = Boolean(auth.user.is_root_admin);
     const canManageTeam = tenant?.role === 'owner' || tenant?.role === 'admin';
-    const items = isRootAdmin ? rootadminNavItems : tenantNavItems.filter((item) => item.title !== 'Usuários e permissões' || canManageTeam);
+    const items = isRootAdmin ? rootadminNavItems : tenantNavItems.filter((item) => !['Usuários e permissões', 'Minha Assinatura'].includes(item.title) || canManageTeam);
 
     return (
         <Sidebar collapsible="icon" variant="inset">

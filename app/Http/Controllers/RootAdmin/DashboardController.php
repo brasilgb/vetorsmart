@@ -3,10 +3,14 @@
 namespace App\Http\Controllers\RootAdmin;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\ChargeStatus;
+use App\Enums\SubscriptionStatus;
 use App\Enums\WebsiteStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\AssistantUsage;
+use App\Models\BillingCharge;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantWebsite;
 use App\Models\User;
@@ -95,10 +99,8 @@ class DashboardController extends Controller
                 'provider_failures' => (int) $aiUsage->provider_failures,
                 'tokens' => (int) $aiUsage->tokens,
             ],
+            'billing' => $this->billing($homologIds),
             'pending' => [
-                ['label' => 'Receita mensal recorrente', 'reason' => 'Assinaturas e cobrança ainda não estão implementadas.'],
-                ['label' => 'Pagamentos pendentes', 'reason' => 'Integração financeira ainda não está implementada.'],
-                ['label' => 'Empresas em teste', 'reason' => 'O cadastro ainda não possui situação de teste.'],
                 ['label' => 'Custo estimado de IA', 'reason' => 'Não há tabela de preços do provedor cadastrada.'],
                 ['label' => 'Incidentes operacionais', 'reason' => 'Registro de incidentes ainda não está implementado.'],
             ],
@@ -108,5 +110,31 @@ class DashboardController extends Controller
             ])->values(),
             'recent' => $recent,
         ]);
+    }
+
+    /**
+     * Real billing figures, without homologation companies. The recurring revenue is the monthly equivalent of the
+     * active subscriptions (contracted price less discount); companies on trial add nothing.
+     *
+     * @param  array<int, mixed>  $homologIds
+     * @return array{trialing: int, active: int, past_due: int, suspended: int, open_charges: int, mrr: string}
+     */
+    private function billing(array $homologIds): array
+    {
+        $subscriptions = Subscription::query()->with('plan')->whereNotIn('tenant_id', $homologIds)->get();
+        $byStatus = $subscriptions->countBy(fn (Subscription $subscription): string => $subscription->status->value);
+
+        $mrrCents = $subscriptions
+            ->filter(fn (Subscription $subscription): bool => $subscription->status === SubscriptionStatus::Active)
+            ->sum(fn (Subscription $subscription): float => ($subscription->periodAmountCents() ?? 0) / max(1, $subscription->plan->interval_months));
+
+        return [
+            'trialing' => (int) ($byStatus[SubscriptionStatus::Trialing->value] ?? 0),
+            'active' => (int) ($byStatus[SubscriptionStatus::Active->value] ?? 0),
+            'past_due' => (int) ($byStatus[SubscriptionStatus::PastDue->value] ?? 0),
+            'suspended' => (int) ($byStatus[SubscriptionStatus::Suspended->value] ?? 0),
+            'open_charges' => BillingCharge::query()->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Waiting->value])->whereNotIn('tenant_id', $homologIds)->count(),
+            'mrr' => 'R$ '.number_format($mrrCents / 100, 2, ',', '.'),
+        ];
     }
 }

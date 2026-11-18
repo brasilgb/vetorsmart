@@ -7,13 +7,14 @@ type Props = {
     totals: { tenants: number; active: number; suspended: number; users: number };
     sites: { published: number };
     appointments: { upcoming: number };
+    billing: { trialing: number; active: number; past_due: number; suspended: number; open_charges: number; mrr: string };
     ai: { period: string; messages: number; provider_calls: number; provider_failures: number; tokens: number };
     pending: { label: string; reason: string }[];
     distribution: { name: string; total: number }[];
     recent: { id: number; name: string; is_homolog: boolean; segment: string | null; status: string; created_at: string | null }[];
 };
 
-export default function RootadminDashboard({ totals, sites, appointments, ai, pending, distribution, recent }: Props) {
+export default function RootadminDashboard({ totals, sites, appointments, billing, ai, pending, distribution, recent }: Props) {
     const maxDistribution = Math.max(1, ...distribution.map((item) => item.total));
 
     return (
@@ -35,6 +36,18 @@ export default function RootadminDashboard({ totals, sites, appointments, ai, pe
                         <Metric label="Usuários cadastrados" value={totals.users} />
                         <Metric label="Sites publicados" value={sites.published} />
                         <Metric label="Agendamentos futuros" value={appointments.upcoming} />
+                    </div>
+                </section>
+
+                <section aria-labelledby="indicadores-assinaturas" className="grid gap-4">
+                    <h2 id="indicadores-assinaturas" className="text-sm font-medium text-vs-muted">Assinaturas</h2>
+                    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                        <Metric label="Receita mensal recorrente" value={billing.mrr} />
+                        <Metric label="Assinaturas ativas" value={billing.active} />
+                        <Metric label="Empresas em teste" value={billing.trialing} />
+                        <Metric label="Pagamento pendente (carência)" value={billing.past_due} />
+                        <Metric label="Suspensas por falta de pagamento" value={billing.suspended} />
+                        <Metric label="Cobranças em aberto" value={billing.open_charges} />
                     </div>
                 </section>
 
@@ -132,7 +145,7 @@ export default function RootadminDashboard({ totals, sites, appointments, ai, pe
     );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
+function Metric({ label, value }: { label: string; value: number | string }) {
     return (
         <Card className="border-vs-border/70 shadow-sm">
             <CardHeader>

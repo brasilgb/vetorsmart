@@ -18,3 +18,12 @@ Schedule::command('assistant:purge')
     ->dailyAt('06:30')
     ->withoutOverlapping()
     ->appendOutputTo(storage_path('logs/assistant-retention.log'));
+
+/*
+| Billing: trial end, renewal charges, grace period, financial suspension and reconciliation with Efí. Every step is
+| idempotent, so a missed day is caught up on the next run.
+*/
+Schedule::command('billing:run')
+    ->dailyAt('05:30')
+    ->withoutOverlapping()
+    ->appendOutputTo(storage_path('logs/billing.log'));

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\BillingSource;
 use App\Enums\MembershipStatus;
 use App\Enums\TenantRole;
 use App\Enums\TenantStatus;
@@ -10,6 +11,7 @@ use App\Models\Tenant;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Billing\SubscriptionService;
 use App\Services\Websites\TenantSubdomainService;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -21,7 +23,11 @@ use Illuminate\Support\Str;
  */
 final class TenantRegistrationService
 {
-    public function __construct(private AuditLogger $auditLogger, private TenantSubdomainService $subdomains) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private TenantSubdomainService $subdomains,
+        private SubscriptionService $subscriptions,
+    ) {}
 
     /**
      * @param  array{company_name: string, segment_id: int, name: string, email: string, password: string}  $data
@@ -54,6 +60,9 @@ final class TenantRegistrationService
 
             // The company's public subdomain, derived from its name and unique across the platform.
             $this->subdomains->assign($tenant);
+
+            // Every new company starts with the trial of the main plan.
+            $this->subscriptions->startTrial($tenant, BillingSource::Company, $user);
 
             $this->auditLogger->record('tenant.created', $tenant, $tenant, [
                 'segment_id' => $tenant->segment_id,

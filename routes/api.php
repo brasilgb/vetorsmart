@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Professionals\ProfessionalAvailabilityController
 use App\Http\Controllers\Api\V1\Professionals\ProfessionalController;
 use App\Http\Controllers\Api\V1\TenantSettingsController;
 use App\Http\Controllers\Api\V1\TenantUserController;
+use App\Http\Controllers\Billing\EfiWebhookController;
 use App\Http\Controllers\Security\CspReportController;
 use Illuminate\Support\Facades\Route;
 
@@ -28,13 +29,18 @@ use Illuminate\Support\Facades\Route;
 // Violation reports of the Content Security Policy, posted by browsers. Public, stateless and rate limited.
 Route::post('csp-report', CspReportController::class)->middleware('throttle:60,1')->name('csp.report');
 
+// Efí payment notices. Public and stateless; the secret in the path authenticates the origin, and each payment is
+// confirmed by querying Efí before any change (see EfiWebhookController).
+Route::post('webhooks/efi/{secret}/pix', [EfiWebhookController::class, 'pix'])->middleware('throttle:120,1')->name('billing.efi.pix');
+Route::post('webhooks/efi/{secret}/cobrancas', [EfiWebhookController::class, 'charges'])->middleware('throttle:120,1')->name('billing.efi.charges');
+
 Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
     Route::get('auth/user', [AuthController::class, 'user'])->name('api.v1.auth.user');
     Route::get('auth/tenants', [AuthController::class, 'tenants'])->name('api.v1.auth.tenants');
     Route::post('auth/switch-tenant', [AuthController::class, 'switchTenant'])->name('api.v1.auth.switch-tenant');
     Route::post('auth/logout', [AuthController::class, 'logout'])->name('api.v1.auth.logout');
 
-    Route::prefix('tenant')->middleware(['verified', 'tenant.resolve'])->group(function () {
+    Route::prefix('tenant')->middleware(['verified', 'tenant.resolve', 'subscription.access'])->group(function () {
         Route::get('settings', [TenantSettingsController::class, 'show'])->name('api.v1.tenant.settings.show');
         Route::patch('settings', [TenantSettingsController::class, 'update'])->name('api.v1.tenant.settings.update');
 

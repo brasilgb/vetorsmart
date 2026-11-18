@@ -1,14 +1,16 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Pagination } from '@/components/vetor-smart/pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { show as subscriptionShow, start as startSubscription } from '@/routes/rootadmin/subscriptions';
 import { status as tenantStatus } from '@/routes/rootadmin/tenants';
 import type { Paginator } from '@/types';
 
 type Props = {
+    subscription: { id: number; status_label: string } | null;
     tenant: {
         id: number;
         name: string;
@@ -54,7 +56,7 @@ const actionLabel: Record<string, string> = {
     'tenant.activated': 'Empresa ativada',
 };
 
-export default function TenantShow({ tenant, settings, operations, history, users }: Props) {
+export default function TenantShow({ tenant, settings, operations, history, users, subscription }: Props) {
     const isActive = tenant.status === 'active';
 
     const form = useForm({
@@ -126,6 +128,26 @@ export default function TenantShow({ tenant, settings, operations, history, user
                         </CardContent>
                     </Card>
                 </div>
+
+                <Card className="border-vs-border/70 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-vs-text">Assinatura</CardTitle>
+                        <CardDescription>
+                            {subscription === null
+                                ? 'Empresa cadastrada antes das assinaturas: sem cobrança e com acesso livre até o início do teste.'
+                                : `Situação financeira: ${subscription.status_label}. Independe da suspensão administrativa.`}
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {subscription === null ? (
+                            <Button type="button" variant="outline" className="h-10" onClick={() => router.post(startSubscription.url({ tenant: tenant.id }))}>
+                                Iniciar período de teste
+                            </Button>
+                        ) : (
+                            <Link href={subscriptionShow.url({ subscription: subscription.id })} className="font-medium text-vs-link hover:underline">Ver assinatura e cobranças</Link>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <Card className="border-vs-border/70 shadow-sm">
                     <CardHeader>

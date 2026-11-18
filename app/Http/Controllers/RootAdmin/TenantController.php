@@ -10,6 +10,7 @@ use App\Http\Requests\RootAdmin\UpdateTenantStatusRequest;
 use App\Models\AssistantSetting;
 use App\Models\AuditLog;
 use App\Models\Segment;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TenantUser;
@@ -115,6 +116,10 @@ class TenantController extends Controller
                     'status' => $website->status->value,
                 ],
                 'assistant_enabled' => (bool) ($assistant->enabled ?? false),
+            ],
+            'subscription' => ($subscription = Subscription::query()->forTenant($tenant)->first(['id', 'status'])) === null ? null : [
+                'id' => $subscription->id,
+                'status_label' => $subscription->status->label(),
             ],
             'history' => $history->map(fn (AuditLog $entry): array => [
                 'id' => $entry->id,

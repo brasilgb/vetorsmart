@@ -1,8 +1,10 @@
 <?php
 
 use App\Http\Controllers\RootAdmin\AuditLogController;
+use App\Http\Controllers\RootAdmin\BillingSettingsController;
 use App\Http\Controllers\RootAdmin\DashboardController;
 use App\Http\Controllers\RootAdmin\SegmentController;
+use App\Http\Controllers\RootAdmin\SubscriptionController;
 use App\Http\Controllers\RootAdmin\TenantController;
 use App\Http\Controllers\RootAdmin\UserController;
 use Illuminate\Support\Facades\Route;
@@ -35,4 +37,18 @@ Route::prefix('rootadmin')
         Route::get('users', [UserController::class, 'index'])->name('users.index');
 
         Route::get('audit', [AuditLogController::class, 'index'])->name('audit.index');
+
+        Route::get('assinaturas', [SubscriptionController::class, 'index'])->name('subscriptions.index');
+        Route::get('assinaturas/{subscription}', [SubscriptionController::class, 'show'])->name('subscriptions.show');
+        Route::post('tenants/{tenant}/assinatura', [SubscriptionController::class, 'start'])->name('subscriptions.start');
+        Route::post('assinaturas/{subscription}/prorrogar', [SubscriptionController::class, 'extendTrial'])->name('subscriptions.extend');
+        Route::patch('assinaturas/{subscription}/condicoes', [SubscriptionController::class, 'terms'])->name('subscriptions.terms');
+        Route::post('assinaturas/{subscription}/cancelar', [SubscriptionController::class, 'cancel'])->name('subscriptions.cancel');
+        Route::post('cobrancas/{charge}/baixa-manual', [SubscriptionController::class, 'settle'])->name('charges.settle');
+        Route::post('cobrancas/{charge}/sincronizar', [SubscriptionController::class, 'sync'])->middleware('throttle:20,1')->name('charges.sync');
+
+        Route::get('financeiro/configuracoes', [BillingSettingsController::class, 'edit'])->name('billing.edit');
+        Route::patch('financeiro/plano', [BillingSettingsController::class, 'updatePlan'])->name('billing.plan');
+        Route::patch('financeiro/efi', [BillingSettingsController::class, 'updateSettings'])->name('billing.settings');
+        Route::post('financeiro/efi/testar', [BillingSettingsController::class, 'test'])->middleware('throttle:6,1')->name('billing.test');
     });

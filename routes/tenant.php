@@ -8,6 +8,7 @@ use App\Http\Controllers\Tenant\ProfessionalController;
 use App\Http\Controllers\Tenant\ServiceController;
 use App\Http\Controllers\Tenant\ServiceRequestController;
 use App\Http\Controllers\Tenant\SettingsController;
+use App\Http\Controllers\Tenant\SubscriptionController;
 use App\Http\Controllers\Tenant\TeamController;
 use App\Http\Controllers\Tenant\WebsiteController;
 use App\Http\Controllers\Tenant\WebsiteDomainController;
@@ -25,7 +26,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
+Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])->group(function () {
     Route::get('clientes', [CustomerController::class, 'index'])->name('tenant.customers.index');
     Route::get('clientes/novo', [CustomerController::class, 'create'])->name('tenant.customers.create');
     Route::post('clientes', [CustomerController::class, 'store'])->name('tenant.customers.store');
@@ -100,4 +101,15 @@ Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
     Route::post('atendimento-ia/conversas/{conversation}/encerrar', [AssistantController::class, 'close'])->whereNumber('conversation')->name('tenant.assistant.close');
     Route::post('atendimento-ia/conversas/{conversation}/identificar', [AssistantController::class, 'identify'])->whereNumber('conversation')->name('tenant.assistant.identify');
     Route::post('atendimento-ia/conversas/{conversation}/responder', [AssistantController::class, 'reply'])->whereNumber('conversation')->name('tenant.assistant.reply');
+});
+
+/*
+| Minha Assinatura. Outside the subscription.access middleware on purpose: a company whose subscription is suspended
+| or cancelled must still reach this page to pay or contract again.
+*/
+Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
+    Route::get('assinatura', [SubscriptionController::class, 'show'])->name('tenant.subscription.show');
+    Route::post('assinatura/contratar', [SubscriptionController::class, 'contract'])->middleware('throttle:10,1')->name('tenant.subscription.contract');
+    Route::post('assinatura/cancelar', [SubscriptionController::class, 'cancel'])->name('tenant.subscription.cancel');
+    Route::post('assinatura/retomar', [SubscriptionController::class, 'resume'])->name('tenant.subscription.resume');
 });

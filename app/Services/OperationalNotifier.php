@@ -179,6 +179,24 @@ class OperationalNotifier
     }
 
     /**
+     * A billing notice to the company's owners (trial ending, payment pending, financial suspension, reactivation).
+     * Administrative and therefore always sent by e-mail. The key makes each notice happen once.
+     */
+    public function billingNotice(Tenant $tenant, string $key, string $title, string $body): void
+    {
+        $this->afterCommit('billing:'.$key, $tenant->getKey(), function () use ($tenant, $title, $body): void {
+            $tenant->loadMissing('settings');
+
+            $this->notifyTeam($tenant, NotificationCategory::AdminNotice, null,
+                title: $title,
+                body: $body,
+                path: route('tenant.subscription.show', [], false),
+                roles: [TenantRole::Owner],
+            );
+        });
+    }
+
+    /**
      * Claim the event key once the transaction commits, then run the notifier. A key already claimed is skipped.
      */
     private function afterCommit(string $key, ?int $tenantId, callable $notify): void

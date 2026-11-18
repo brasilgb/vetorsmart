@@ -217,7 +217,8 @@ test('the dashboard reports AI consumption of the current month and lists unavai
             ->where('ai.tokens', 900)
             ->where('sites.published', 0)
             ->where('appointments.upcoming', 0)
-            ->has('pending', 5));
+            ->has('pending', 2)
+            ->where('pending.0.label', 'Custo estimado de IA'));
 });
 
 test('the company detail shows operational state and its administrative history', function () {
