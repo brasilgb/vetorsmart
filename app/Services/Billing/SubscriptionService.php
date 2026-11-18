@@ -213,6 +213,12 @@ class SubscriptionService
             $subscription->forceFill($changes);
         }
 
+        if ($subscription->scheduled_extra_seats !== null) {
+            $changes += ['extra_seats' => $subscription->scheduled_extra_seats, 'scheduled_extra_seats' => null];
+            $notes[] = "Vagas adicionais: {$subscription->scheduled_extra_seats} a partir deste período.";
+            $subscription->forceFill(['extra_seats' => $subscription->scheduled_extra_seats, 'scheduled_extra_seats' => null]);
+        }
+
         if ($subscription->price_cents === null && ($price = $plan->priceFor($subscription->billing_interval)) !== null) {
             $changes['price_cents'] = $price;
             $notes[] = 'Valor '.$subscription->billing_interval->label().' congelado: '.$this->money($price).'.';

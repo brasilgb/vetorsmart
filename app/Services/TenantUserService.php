@@ -8,6 +8,7 @@ use App\Enums\UserStatus;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Billing\SeatService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -17,14 +18,20 @@ use Illuminate\Validation\ValidationException;
  */
 class TenantUserService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private SeatService $seats,
+    ) {}
 
     /**
      * Create a user and attach them to the tenant. The account starts unverified and receives the confirmation link.
+     * Refused when every user seat of the subscription is taken.
      */
     public function create(Tenant $tenant, string $name, string $email, string $password, TenantRole $role, User $actor): TenantUser
     {
         $membership = DB::transaction(function () use ($tenant, $name, $email, $password, $role, $actor): TenantUser {
+            $this->seats->ensureSeatAvailable($tenant);
+
             $user = User::create([
                 'name' => $name,
                 'email' => $email,
@@ -91,7 +98,7 @@ class TenantUserService
     }
 
     /**
-     * Reactivate a membership, restoring the user's access to this company.
+     * Reactivate a membership, restoring the user's access to this company. Refused when every user seat is taken.
      */
     public function activate(TenantUser $membership, User $actor): TenantUser
     {
@@ -99,14 +106,19 @@ class TenantUserService
             return $membership;
         }
 
-        $membership->status = MembershipStatus::Active;
-        $membership->save();
+        return DB::transaction(function () use ($membership, $actor): TenantUser {
+            $membership->loadMissing('tenant');
+            $this->seats->ensureSeatAvailable($membership->tenant);
 
-        $this->auditLogger->record('tenant_user.activated', $membership->tenant, $membership, [
-            'user_id' => $membership->user_id,
-        ], $actor);
+            $membership->status = MembershipStatus::Active;
+            $membership->save();
 
-        return $membership;
+            $this->auditLogger->record('tenant_user.activated', $membership->tenant, $membership, [
+                'user_id' => $membership->user_id,
+            ], $actor);
+
+            return $membership;
+        });
     }
 
     /**

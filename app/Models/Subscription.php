@@ -25,6 +25,8 @@ use Illuminate\Support\Carbon;
  * @property BillingInterval|null $scheduled_interval
  * @property int|null $price_cents
  * @property int|null $extra_user_price_cents
+ * @property int $extra_seats
+ * @property int|null $scheduled_extra_seats
  * @property int $discount_percent
  * @property Carbon|null $discount_until
  * @property Carbon|null $trial_ends_at
@@ -72,9 +74,10 @@ class Subscription extends Model
     }
 
     /**
-     * Amount of one period of a cycle: the contracted price (frozen at contracting; while empty, the plan's current
-     * price for the cycle), less the discount while it lasts, plus the active users beyond the included ones, each at
-     * the contracted monthly extra-user price times the months of the cycle. Null when the cycle has no price.
+     * Amount of the next period of a cycle: the contracted price (frozen at contracting; while empty, the plan's current
+     * price for the cycle), less the discount while it lasts, plus the additional seats contracted for that period (a
+     * scheduled reduction counts), each at the contracted monthly extra-user price times the months of the cycle.
+     * Registered users do not change the amount. Null when the cycle has no price.
      *
      * @return array{interval: BillingInterval, months: int, base_cents: int, discount_cents: int, active_users: int, included_users: int|null, extra_users: int, extra_user_price_cents: int, extra_users_cents: int, total_cents: int}|null
      */
@@ -92,7 +95,7 @@ class Subscription extends Model
 
         $activeUsers = TenantUser::query()->where('tenant_id', $this->tenant_id)->where('status', MembershipStatus::Active->value)->count();
         $included = $this->plan->included_users;
-        $extraUsers = $included === null ? 0 : max(0, $activeUsers - $included);
+        $extraUsers = $included === null ? 0 : ($this->scheduled_extra_seats ?? $this->extra_seats);
         $extraPrice = $this->extra_user_price_cents ?? $this->plan->extra_user_price_cents ?? 0;
         $extraAmount = $extraUsers * $extraPrice * $interval->months();
 

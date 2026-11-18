@@ -159,7 +159,14 @@ export default function BillingSettings({ plan, offer, packages, settings }: { p
                                 ))}
                             </ul>
                         )}
-                        <form onSubmit={(event) => { event.preventDefault(); planForm.patch(savePlan.url(), { preserveScroll: true }); }} className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                        <form
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                // The server may withdraw the approval (a price changed): show what it saved, not what was sent.
+                                planForm.patch(savePlan.url(), { preserveScroll: true, onSuccess: (page) => planForm.setData('prices_approved', (page.props as unknown as { plan: Plan }).plan.prices_approved) });
+                            }}
+                            className="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+                        >
                             <Field id="plan-name" label="Nome" error={planForm.errors.name}>
                                 <Input id="plan-name" value={planForm.data.name} onChange={(event) => planForm.setData('name', event.target.value)} className="h-10" />
                             </Field>

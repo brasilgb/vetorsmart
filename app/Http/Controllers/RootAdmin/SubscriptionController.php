@@ -4,6 +4,7 @@ namespace App\Http\Controllers\RootAdmin;
 
 use App\Enums\BillingSource;
 use App\Enums\ChargeStatus;
+use App\Enums\MembershipStatus;
 use App\Enums\SubscriptionStatus;
 use App\Http\Controllers\Controller;
 use App\Models\AiCreditEntry;
@@ -13,6 +14,7 @@ use App\Models\BillingWebhookEvent;
 use App\Models\Subscription;
 use App\Models\SubscriptionEvent;
 use App\Models\Tenant;
+use App\Models\TenantUser;
 use App\Services\Billing\AiCreditPurchaseService;
 use App\Services\Billing\AiCreditService;
 use App\Services\Billing\ChargeService;
@@ -92,6 +94,12 @@ class SubscriptionController extends Controller
                 'payment_method' => $subscription->payment_method?->label(),
                 'interval' => $subscription->billing_interval->label(),
                 'scheduled_interval' => $subscription->scheduled_interval?->label(),
+                'seats' => [
+                    'included' => $subscription->plan->included_users,
+                    'extra' => $subscription->extra_seats,
+                    'scheduled_extra' => $subscription->scheduled_extra_seats,
+                    'active' => TenantUser::query()->where('tenant_id', $subscription->tenant_id)->where('status', MembershipStatus::Active->value)->count(),
+                ],
                 'extra_user_price' => $subscription->extra_user_price_cents === null ? null : number_format($subscription->extra_user_price_cents / 100, 2, ',', '.'),
                 'amount' => $amount === null ? null : number_format($amount / 100, 2, ',', '.'),
                 'price' => $subscription->price_cents === null ? '' : number_format($subscription->price_cents / 100, 2, '.', ''),

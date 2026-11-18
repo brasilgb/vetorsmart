@@ -21,6 +21,7 @@ type Subscription = {
     payment_method: string | null;
     interval: string;
     scheduled_interval: string | null;
+    seats: { included: number | null; extra: number; scheduled_extra: number | null; active: number };
     extra_user_price: string | null;
     amount: string | null;
     price: string;
@@ -130,7 +131,7 @@ export default function SubscriptionShow({ subscription, charges, credits, event
                         {subscription.cancel_at_period_end && ' · cancelamento agendado'}
                         {subscription.tenant_status !== 'active' && ' · empresa suspensa pela administração'}
                         {' · '}
-                        <Link href={tenantShow.url({ tenant: subscription.tenant_id })} className="text-vs-link hover:underline">dados da empresa</Link>
+                        <Link href={tenantShow.url({ tenant: subscription.tenant_id })} className="text-vs-link underline underline-offset-2">dados da empresa</Link>
                     </p>
                 </div>
 
@@ -139,6 +140,15 @@ export default function SubscriptionShow({ subscription, charges, credits, event
                         <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
                             <div><dt className="text-vs-muted">Valor do período</dt><dd className="font-medium text-vs-text">{subscription.amount ? `R$ ${subscription.amount}` : 'Plano sem valor definido'}</dd></div>
                             <div><dt className="text-vs-muted">Ciclo</dt><dd className="font-medium text-vs-text">{subscription.interval}{subscription.scheduled_interval && ` → ${subscription.scheduled_interval} no próximo período`}</dd></div>
+                            <div>
+                                <dt className="text-vs-muted">Vagas de usuários</dt>
+                                <dd className="font-medium text-vs-text">
+                                    {subscription.seats.included === null
+                                        ? `${subscription.seats.active} ativo(s) · sem limite`
+                                        : `${subscription.seats.active} de ${subscription.seats.included + subscription.seats.extra} em uso · ${subscription.seats.included} incluída(s) + ${subscription.seats.extra} adicional(is)`}
+                                    {subscription.seats.scheduled_extra !== null && ` · ${subscription.seats.scheduled_extra} adicional(is) no próximo período`}
+                                </dd>
+                            </div>
                             <div><dt className="text-vs-muted">Usuário adicional contratado</dt><dd className="font-medium text-vs-text">{subscription.extra_user_price ? `R$ ${subscription.extra_user_price}/mês` : 'Segue o plano'}</dd></div>
                             <div><dt className="text-vs-muted">Forma de pagamento</dt><dd className="font-medium text-vs-text">{subscription.payment_method ?? 'Não escolhida'}</dd></div>
                             <div><dt className="text-vs-muted">Fim do teste</dt><dd className="font-medium text-vs-text">{subscription.trial_ends_at ?? '—'}</dd></div>
@@ -207,7 +217,7 @@ export default function SubscriptionShow({ subscription, charges, credits, event
                 <section aria-labelledby="cobrancas" className="grid gap-3">
                     <h2 id="cobrancas" className="text-lg font-semibold text-vs-text">Cobranças</h2>
                     <Card className="overflow-hidden border-vs-border/70 shadow-sm">
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela de cobranças">
                             <table className="w-full min-w-[760px] text-left text-sm">
                                 <thead className="bg-vs-surface text-vs-muted">
                                     <tr>
@@ -295,7 +305,7 @@ export default function SubscriptionShow({ subscription, charges, credits, event
 
                             <div className="grid gap-2">
                                 <h3 className="text-sm font-medium text-vs-text">Movimentos</h3>
-                                <div className="overflow-x-auto">
+                                <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Movimentos de créditos de IA">
                                     <table className="w-full min-w-[760px] text-left text-sm">
                                         <thead className="text-vs-muted">
                                             <tr>

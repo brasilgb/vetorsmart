@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { cancel, contract, credits as buyCredits, interval as changeInterval, resume } from '@/routes/tenant/subscription';
+import { cancel, contract, credits as buyCredits, interval as changeInterval, resume, seats as saveSeats } from '@/routes/tenant/subscription';
 import type { Paginator } from '@/types';
 
 type NextCharge = {
@@ -43,6 +43,10 @@ type Summary = {
     cancel_at_period_end: boolean;
     included_users: number | null;
     active_users: number | null;
+    extra_seats: number;
+    scheduled_extra_seats: number | null;
+    seat_limit: number | null;
+    extra_user_price: string | null;
     can_contract: boolean;
     can_cancel: boolean;
 };
@@ -133,6 +137,51 @@ function CopyButton({ text }: { text: string }) {
         >
             {copied ? 'Copiado' : 'Copiar código Pix'}
         </Button>
+    );
+}
+
+function SeatsCard({ subscription, canManage }: { subscription: Summary; canManage: boolean }) {
+    const form = useForm({ extra_seats: String(subscription.scheduled_extra_seats ?? subscription.extra_seats) });
+
+    if (subscription.included_users === null) {
+        return null;
+    }
+
+    return (
+        <Card className="border-vs-border/70 shadow-sm">
+            <CardHeader>
+                <CardTitle className="text-vs-text">Vagas de usuários</CardTitle>
+                <CardDescription>
+                    Cadastrar usuários e contratar vagas são ações separadas. Trocar um usuário por outro dentro das vagas não gera cobrança.
+                    Vagas a mais valem na hora e entram nas próximas cobranças geradas, sem valor proporcional; cobranças já abertas não mudam.
+                    Reduções valem no próximo período.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+                <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                    <div><dt className="text-vs-muted">Incluídas no plano</dt><dd className="font-medium text-vs-text">{subscription.included_users}</dd></div>
+                    <div><dt className="text-vs-muted">Adicionais contratadas</dt><dd className="font-medium text-vs-text">{subscription.extra_seats}{subscription.extra_user_price && ` × ${subscription.extra_user_price}/mês`}</dd></div>
+                    <div><dt className="text-vs-muted">Usuários ativos</dt><dd className="font-medium text-vs-text">{subscription.active_users} de {subscription.seat_limit}</dd></div>
+                    {subscription.scheduled_extra_seats !== null && (
+                        <div><dt className="text-vs-muted">A partir do próximo período</dt><dd className="font-medium text-vs-text">{subscription.scheduled_extra_seats} adicional(is)</dd></div>
+                    )}
+                </dl>
+                {canManage && (
+                    <form
+                        onSubmit={(event) => {
+                            event.preventDefault();
+                            form.post(saveSeats.url(), { preserveScroll: true });
+                        }}
+                        className="flex flex-wrap items-end gap-3"
+                    >
+                        <Field id="extra_seats" label="Vagas adicionais" error={form.errors.extra_seats}>
+                            <Input id="extra_seats" type="number" min={0} max={500} value={form.data.extra_seats} onChange={(event) => form.setData('extra_seats', event.target.value)} className="h-10 w-32" />
+                        </Field>
+                        <Button type="submit" variant="outline" disabled={form.processing} className="h-10">Atualizar vagas</Button>
+                    </form>
+                )}
+            </CardContent>
+        </Card>
     );
 }
 
@@ -232,7 +281,7 @@ export default function SubscriptionIndex({ subscription, offer, charges, credit
                                             )}
                                             {subscription.next_charge.extra_users > 0 && (
                                                 <li className="flex justify-between gap-4">
-                                                    <span>{subscription.next_charge.extra_users} usuário(s) adicional(is) × {subscription.next_charge.extra_user_price}/mês{subscription.next_charge.months > 1 && ` × ${subscription.next_charge.months} meses`}</span>
+                                                    <span>{subscription.next_charge.extra_users} vaga(s) adicional(is) × {subscription.next_charge.extra_user_price}/mês{subscription.next_charge.months > 1 && ` × ${subscription.next_charge.months} meses`}</span>
                                                     <span>{subscription.next_charge.extra_users_amount}</span>
                                                 </li>
                                             )}
@@ -324,6 +373,8 @@ export default function SubscriptionIndex({ subscription, offer, charges, credit
                                 )}
                             </Card>
                         )}
+
+                        <SeatsCard subscription={subscription} canManage={canManage} />
 
                         {offer && (
                             <Card className="border-vs-border/70 shadow-sm">

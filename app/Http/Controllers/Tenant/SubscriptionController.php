@@ -20,6 +20,7 @@ use App\Services\Billing\AiCreditPurchaseService;
 use App\Services\Billing\AiCreditService;
 use App\Services\Billing\ChargeService;
 use App\Services\Billing\PlanCatalog;
+use App\Services\Billing\SeatService;
 use App\Services\Billing\SubscriptionService;
 use App\Services\Tenancy\TenantContext;
 use Illuminate\Http\RedirectResponse;
@@ -120,6 +121,24 @@ class SubscriptionController extends Controller
         return to_route('tenant.subscription.show');
     }
 
+    /**
+     * Contract more or fewer additional user seats (see SeatService for when a change applies and is charged).
+     */
+    public function seats(Request $request, TenantContext $context, SeatService $seats): RedirectResponse
+    {
+        $tenant = $context->requireTenant();
+        Gate::authorize('manageBilling', $tenant);
+
+        $data = $request->validate(['extra_seats' => ['required', 'integer', 'min:0', 'max:500']], ['extra_seats.*' => 'Informe de 0 a 500 vagas adicionais.']);
+        $subscription = $seats->changeExtraSeats(Subscription::query()->forTenant($tenant)->firstOrFail(), (int) $data['extra_seats'], $this->actor($request));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $subscription->scheduled_extra_seats !== null
+            ? 'Redução de vagas agendada para o próximo período.'
+            : 'Vagas atualizadas. As adicionais entram nas próximas cobranças geradas.']);
+
+        return to_route('tenant.subscription.show');
+    }
+
     public function buyCredits(Request $request, TenantContext $context, AiCreditPurchaseService $purchases): RedirectResponse
     {
         $tenant = $context->requireTenant();
@@ -212,6 +231,10 @@ class SubscriptionController extends Controller
             'cancel_at_period_end' => $subscription->cancel_at_period_end,
             'included_users' => $subscription->plan->included_users,
             'active_users' => $quote['active_users'] ?? null,
+            'extra_seats' => $subscription->extra_seats,
+            'scheduled_extra_seats' => $subscription->scheduled_extra_seats,
+            'seat_limit' => $subscription->plan->included_users === null ? null : $subscription->plan->included_users + $subscription->extra_seats,
+            'extra_user_price' => ($price = $subscription->extra_user_price_cents ?? $subscription->plan->extra_user_price_cents) === null ? null : $this->money($price),
             'can_contract' => $quote !== null,
             'can_cancel' => in_array($subscription->status, [SubscriptionStatus::Trialing, SubscriptionStatus::Active], true) && ! $subscription->cancel_at_period_end,
         ];
@@ -306,7 +329,7 @@ class SubscriptionController extends Controller
         }
 
         if ($charge->extra_users > 0) {
-            $lines[] = "{$charge->extra_users} usuário(s) adicional(is): ".$this->money($charge->extra_users_amount_cents);
+            $lines[] = "{$charge->extra_users} vaga(s) adicional(is): ".$this->money($charge->extra_users_amount_cents);
         }
 
         return $lines;

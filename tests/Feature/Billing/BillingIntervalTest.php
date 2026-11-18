@@ -83,8 +83,8 @@ test('contracting a cycle charges its total for its number of months', function 
     'anual' => ['annual', 131880, 12],
 ]);
 
-test('active users beyond the three included are charged per month of the cycle; inactive users are not', function () {
-    addMembers($this->tenant, 4);
+test('contracted additional seats are charged per month of the cycle; registered users do not change the amount', function () {
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 2])->assertRedirect('/assinatura');
     addMembers($this->tenant, 2, MembershipStatus::Inactive);
 
     $this->actingAs($this->owner)->post('/assinatura/contratar', ['method' => 'pix', 'interval' => 'semiannual']);
@@ -209,8 +209,10 @@ test('the promotional discount is limited to 90 percent', function () {
 });
 
 test('with a charge open, Minha Assinatura shows its fixed amount as the next charge, not a new quote', function () {
-    app(ChargeService::class)->openFor($this->subscription, PaymentMethod::Pix);
-    addMembers($this->tenant, 3);
+    $charge = app(ChargeService::class)->openFor($this->subscription, PaymentMethod::Pix);
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 1]);
+
+    expect($charge->fresh()->amount_cents)->toBe(13990);
 
     $this->actingAs($this->owner)->get('/assinatura')
         ->assertInertia(fn (AssertableInertia $page) => $page

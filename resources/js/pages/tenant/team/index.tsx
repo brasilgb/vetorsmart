@@ -1,5 +1,5 @@
 import { emailValidationProps } from '@/lib/email-validation';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { ConfirmAction } from '@/components/vetor-smart/confirm-action';
 import { Field, selectClass } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
@@ -33,6 +33,8 @@ const roleLabel: Record<string, string> = { owner: 'Proprietário', admin: 'Admi
  */
 export default function TeamIndex({ memberships, roles }: Props) {
     const invite = useForm({ name: '', email: '', password: '', password_confirmation: '', role: 'operator' });
+    const pageErrors = usePage().props.errors as Record<string, string>;
+    const seatsError = (invite.errors as Record<string, string>).seats ?? pageErrors.seats;
 
     const submitInvite = (event: React.FormEvent) => {
         event.preventDefault();
@@ -45,6 +47,10 @@ export default function TeamIndex({ memberships, roles }: Props) {
 
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader title="Usuários e permissões" description="Quem acessa a empresa e o que cada perfil pode fazer." />
+
+                {seatsError && (
+                    <p role="alert" className="rounded-md bg-vs-danger-soft px-3 py-2 text-sm text-vs-danger">{seatsError}</p>
+                )}
 
                 <Card className="grid gap-4 border-vs-border/70 p-6 shadow-sm">
                     <h2 className="text-base font-semibold text-vs-text">Adicionar usuário</h2>
