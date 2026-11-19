@@ -45,7 +45,7 @@ type Summary = {
     active_users: number | null;
     extra_seats: number;
     scheduled_extra_seats: number | null;
-    seats_change_mode: 'now' | 'next_charge' | 'blocked';
+    seats_change_mode: 'now' | 'next_charge' | 'blocked' | 'not_in_force';
     seat_limit: number | null;
     extra_user_price: string | null;
     can_contract: boolean;
@@ -112,6 +112,7 @@ type Props = {
     methods: { value: string; label: string }[];
     hasDocument: boolean;
     canManage: boolean;
+    billingEnforced: boolean;
 };
 
 const statusTone: Record<string, string> = {
@@ -172,7 +173,9 @@ function SeatsCard({ subscription, canManage }: { subscription: Summary; canMana
                             ? 'Agora: a alteração vale na hora e as vagas entram na primeira cobrança.'
                             : subscription.seats_change_mode === 'next_charge'
                               ? 'Agora: a alteração entra na próxima cobrança gerada, e as novas vagas passam a valer quando ela for paga.'
-                              : 'Agora: as vagas não podem ser alteradas. Regularize a assinatura primeiro.'}
+                              : subscription.seats_change_mode === 'not_in_force'
+                                ? 'A contratação de vagas adicionais será liberada quando a cobrança entrar em vigor. Até lá, valem os usuários incluídos no plano.'
+                                : 'Agora: as vagas não podem ser alteradas. Regularize a assinatura primeiro.'}
                     </li>
                     <li>Não há cobrança proporcional, e cobranças já abertas não mudam.</li>
                     <li>Para reduzir, os usuários ativos precisam caber no novo total.</li>
@@ -228,7 +231,7 @@ function CyclePicker({ cycles, value, onChange, disabled }: { cycles: Cycle[]; v
     );
 }
 
-export default function SubscriptionIndex({ subscription, offer, charges, credits, methods, hasDocument, canManage }: Props) {
+export default function SubscriptionIndex({ subscription, offer, charges, credits, methods, hasDocument, canManage, billingEnforced }: Props) {
     const form = useForm({ method: subscription?.payment_method ?? 'pix', document: '', interval: subscription?.scheduled_interval ?? subscription?.interval ?? 'monthly' });
     const errors = form.errors as Record<string, string>;
     const intervalChanged = subscription !== null && form.data.interval !== (subscription.scheduled_interval ?? subscription.interval);
@@ -244,6 +247,14 @@ export default function SubscriptionIndex({ subscription, offer, charges, credit
                     <EmptyState>Sua empresa ainda não tem assinatura registrada. A equipe VetorSmart vai ativá-la e avisar você.</EmptyState>
                 ) : (
                     <>
+                        {!billingEnforced && (
+                            <p role="status" className="rounded-md border border-emerald-600/40 bg-emerald-50 px-4 py-3 text-sm text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100">
+                                <strong className="font-semibold">Período sem cobrança.</strong> O uso do VetorSmart está liberado e nenhuma cobrança será gerada.
+                                Antes de a cobrança começar, você receberá um aviso com a data de início e o prazo para escolher o ciclo e a forma de
+                                pagamento. Os valores abaixo são informativos.
+                            </p>
+                        )}
+
                         <Card className="border-vs-border/70 shadow-sm">
                             <CardHeader>
                                 <div className="flex flex-wrap items-center gap-3">
@@ -256,16 +267,18 @@ export default function SubscriptionIndex({ subscription, offer, charges, credit
                             <CardContent className="grid gap-4">
                                 <dl className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
                                     <div>
-                                        <dt className="text-vs-muted">Próxima cobrança</dt>
+                                        <dt className="text-vs-muted">{billingEnforced ? 'Próxima cobrança' : 'Valor previsto (informativo)'}</dt>
                                         <dd className="font-medium text-vs-text">
                                             {subscription.next_charge === null ? 'A definir' : `${subscription.next_charge.total} (${subscription.next_charge.interval_label})`}
                                         </dd>
                                     </div>
+                                    {billingEnforced && (
                                     <div>
                                         <dt className="text-vs-muted">{subscription.status === 'trialing' ? 'Fim do teste' : subscription.status === 'past_due' ? 'Prazo para regularizar' : 'Próximo vencimento'}</dt>
                                         <dd className="font-medium text-vs-text">{subscription.next_due ?? '—'}</dd>
                                     </div>
-                                    {subscription.trial_days_left !== null && (
+                                    )}
+                                    {billingEnforced && subscription.trial_days_left !== null && (
                                         <div>
                                             <dt className="text-vs-muted">Dias restantes do teste</dt>
                                             <dd className="font-medium text-vs-text">{subscription.trial_days_left}</dd>
@@ -319,7 +332,7 @@ export default function SubscriptionIndex({ subscription, offer, charges, credit
                             </CardContent>
                         </Card>
 
-                        {canManage && (
+                        {canManage && billingEnforced && (
                             <Card className="border-vs-border/70 shadow-sm">
                                 <CardHeader>
                                     <CardTitle className="text-vs-text">Gerenciar assinatura</CardTitle>
@@ -385,7 +398,7 @@ export default function SubscriptionIndex({ subscription, offer, charges, credit
                             </Card>
                         )}
 
-                        <SeatsCard subscription={subscription} canManage={canManage} />
+                        <SeatsCard subscription={subscription} canManage={canManage && billingEnforced} />
 
                         {offer && (
                             <Card className="border-vs-border/70 shadow-sm">

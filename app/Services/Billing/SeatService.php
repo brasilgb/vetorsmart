@@ -35,7 +35,10 @@ use Illuminate\Validation\ValidationException;
  */
 class SeatService
 {
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private BillingEnforcement $enforcement,
+    ) {}
 
     /**
      * Active users allowed now, or null when there is no limit.
@@ -77,6 +80,10 @@ class SeatService
      */
     public function changeExtraSeats(Subscription $subscription, int $target, User $actor): Subscription
     {
+        if (! $this->enforcement->active()) {
+            throw ValidationException::withMessages(['extra_seats' => ['A contratação de vagas adicionais será liberada quando a cobrança entrar em vigor.']]);
+        }
+
         return DB::transaction(function () use ($subscription, $target, $actor): Subscription {
             Tenant::query()->whereKey($subscription->tenant_id)->lockForUpdate()->first();
             $subscription = Subscription::query()->with(['plan', 'tenant'])->whereKey($subscription->getKey())->lockForUpdate()->firstOrFail();

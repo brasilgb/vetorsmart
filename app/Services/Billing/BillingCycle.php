@@ -23,6 +23,9 @@ use Throwable;
  * 3. grace period ended without payment: financial suspension;
  * 4. renewal window: open the charge of the next period for subscriptions with a payment method;
  * 5. warn the owners three days before the trial ends.
+ *
+ * While billing is not in force (BillingEnforcement), the routine changes nothing: no trial ends, no grace, no
+ * suspension, no charge, no notice. The decision is logged on every run, so the operator sees why nothing happened.
  */
 class BillingCycle
 {
@@ -33,6 +36,7 @@ class BillingCycle
         private SubscriptionService $subscriptions,
         private ChargeService $charges,
         private OperationalNotifier $notifier,
+        private BillingEnforcement $enforcement,
     ) {}
 
     /**
@@ -40,8 +44,18 @@ class BillingCycle
      */
     public function run(): array
     {
-        $report = ['issued' => 0, 'reconciled' => 0, 'gateway_errors' => 0, 'past_due' => 0, 'suspended' => 0, 'cancelled' => 0, 'renewals' => 0, 'trial_warnings' => 0];
+        $report = ['enforcement' => 0, 'issued' => 0, 'reconciled' => 0, 'gateway_errors' => 0, 'past_due' => 0, 'suspended' => 0, 'cancelled' => 0, 'renewals' => 0, 'trial_warnings' => 0];
 
+        if (! $this->enforcement->active()) {
+            Log::info('Rotina de assinaturas sem efeito: a cobrança não está em vigor.', [
+                'enabled_by_environment' => $this->enforcement->enabledByEnvironment(),
+                'subscriptions' => Subscription::query()->count(),
+            ]);
+
+            return $report;
+        }
+
+        $report['enforcement'] = 1;
         $this->retryCharges($report);
 
         Subscription::query()->with(['plan', 'tenant'])->orderBy('id')->chunkById(100, function ($subscriptions) use (&$report): void {

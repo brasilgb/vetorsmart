@@ -18,6 +18,7 @@ use Illuminate\Validation\ValidationException;
 use Inertia\Testing\AssertableInertia;
 
 beforeEach(function () {
+    enableBillingEnforcement();
     Notification::fake();
 
     $this->tenant = Tenant::factory()->create();

@@ -27,11 +27,12 @@ class AiCreditPurchaseService
     public function __construct(
         private AiCreditService $credits,
         private AuditLogger $auditLogger,
+        private BillingEnforcement $enforcement,
     ) {}
 
     public function request(Tenant $tenant, AiCreditPackage $package, User $actor): AiCreditPurchase
     {
-        if (! BillingSetting::current()->ai_credit_purchases_enabled) {
+        if (! $this->enforcement->active() || ! BillingSetting::current()->ai_credit_purchases_enabled) {
             throw ValidationException::withMessages(['package' => ['A compra de créditos de IA ainda não está liberada.']]);
         }
 

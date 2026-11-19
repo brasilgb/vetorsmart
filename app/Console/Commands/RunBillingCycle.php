@@ -15,7 +15,7 @@ class RunBillingCycle extends Command
     /**
      * @var string
      */
-    protected $description = 'Rotina diária das assinaturas: fim de teste, renovação, carência, suspensão financeira e conciliação com a Efí.';
+    protected $description = 'Rotina diária das assinaturas: fim de teste, renovação, carência, suspensão financeira e conciliação com a Efí. Sem efeito enquanto a cobrança não estiver em vigor.';
 
     public function handle(BillingCycle $cycle): int
     {

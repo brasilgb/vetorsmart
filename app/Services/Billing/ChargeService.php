@@ -33,6 +33,7 @@ class ChargeService
         private EfiPixClient $pix,
         private EfiChargesClient $charges,
         private AuditLogger $auditLogger,
+        private BillingEnforcement $enforcement,
     ) {}
 
     /**
@@ -41,6 +42,10 @@ class ChargeService
      */
     public function openFor(Subscription $subscription, PaymentMethod $method): BillingCharge
     {
+        if (! $this->enforcement->active()) {
+            throw ValidationException::withMessages(['plan' => [BillingEnforcement::inactiveMessage()]]);
+        }
+
         $charge = DB::transaction(function () use ($subscription, $method): BillingCharge {
             $subscription = Subscription::query()->with('plan')->whereKey($subscription->getKey())->lockForUpdate()->firstOrFail();
 
@@ -96,6 +101,12 @@ class ChargeService
     public function issue(BillingCharge $charge): BillingCharge
     {
         if ($charge->status !== ChargeStatus::Pending) {
+            return $charge;
+        }
+
+        if (! $this->enforcement->active()) {
+            $charge->forceFill(['last_error' => 'Cobrança fora de vigor: nenhuma emissão.'])->save();
+
             return $charge;
         }
 

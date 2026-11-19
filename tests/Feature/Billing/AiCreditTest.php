@@ -25,6 +25,7 @@ use Inertia\Testing\AssertableInertia;
  * purchase waits for payment and the RootAdmin confirms it.
  */
 beforeEach(function () {
+    enableBillingEnforcement();
     Notification::fake();
     Plan::main()->forceFill(['ai_monthly_credits' => 100])->save();
     BillingSetting::current()->forceFill(['ai_tokens_per_credit' => 1000, 'ai_low_balance_percent' => 20])->save();

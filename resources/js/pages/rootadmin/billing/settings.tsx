@@ -30,6 +30,8 @@ type OfferCycle = { label: string; total: string; monthly_equivalent: string; sa
 
 type Package = { id: number; name: string; credits: number; price: string; active: boolean };
 
+type Enforcement = { active: boolean; enabled_by_environment: boolean; starts_at: string | null; unmet: string[] };
+
 type Settings = {
     efi_environment: string;
     efi_pix_key: string;
@@ -87,7 +89,7 @@ function PackageRow({ pack }: { pack: Package }) {
     );
 }
 
-export default function BillingSettings({ plan, offer, packages, settings }: { plan: Plan; offer: OfferCycle[]; packages: Package[]; settings: Settings }) {
+export default function BillingSettings({ plan, offer, packages, settings, enforcement }: { plan: Plan; offer: OfferCycle[]; packages: Package[]; settings: Settings; enforcement: Enforcement }) {
     const planForm = useForm({
         ...plan,
         included_users: String(plan.included_users),
@@ -131,6 +133,33 @@ export default function BillingSettings({ plan, offer, packages, settings }: { p
                     <h1 className="mt-1 text-2xl font-semibold text-vs-text">Plano e cobrança</h1>
                     <p className="text-sm text-vs-muted">Valores do plano, créditos de IA, regras de cobrança e integração com a Efí. Toda alteração fica na auditoria.</p>
                 </div>
+
+                <Card className="border-vs-border/70 shadow-sm">
+                    <CardHeader>
+                        <div className="flex flex-wrap items-center gap-3">
+                            <CardTitle className="text-vs-text">Cobrança em vigor</CardTitle>
+                            <Badge variant="outline" className={enforcement.active ? 'border-emerald-600 text-emerald-700 dark:text-emerald-400' : 'border-amber-500 text-amber-700 dark:text-amber-400'}>
+                                {enforcement.active ? `Em vigor desde ${enforcement.starts_at}` : 'Desligada: uso liberado, sem cobrança'}
+                            </Badge>
+                        </div>
+                        <CardDescription>
+                            Enquanto desligada, testes não terminam em suspensão, nenhuma cobrança é aberta e vagas pagas e créditos não são concedidos.
+                            Só é ligada pelo comando auditado <code>billing:start-enforcement</code>, com <code>PLATFORM_BILLING_ENFORCEMENT_ENABLED=true</code> e
+                            os pré-requisitos abaixo. Esta tela não altera essa situação.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="text-sm">
+                        {enforcement.unmet.length === 0 ? (
+                            <p className="text-vs-text">Todos os pré-requisitos verificáveis estão atendidos.</p>
+                        ) : (
+                            <ul className="grid list-disc gap-1 pl-5 text-vs-text">
+                                {enforcement.unmet.map((item) => (
+                                    <li key={item}>{item}</li>
+                                ))}
+                            </ul>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <Card className="border-vs-border/70 shadow-sm">
                     <CardHeader>

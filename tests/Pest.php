@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\BillingSetting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -47,4 +48,14 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/**
+ * Put billing in force for a test: the environment switch on and the start recorded in the past, as the audited
+ * billing:start-enforcement command would leave it. Billing tests that describe the enforced lifecycle call this.
+ */
+function enableBillingEnforcement(): void
+{
+    config(['platform.billing_enforcement_enabled' => true]);
+    BillingSetting::current()->forceFill(['enforcement_starts_at' => now()->subDay()])->save();
 }

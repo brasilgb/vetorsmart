@@ -10,6 +10,7 @@ use App\Models\AiCreditPackage;
 use App\Models\BillingSetting;
 use App\Models\Plan;
 use App\Services\AuditLogger;
+use App\Services\Billing\BillingEnforcement;
 use App\Services\Billing\Efi\EfiChargesClient;
 use App\Services\Billing\Efi\EfiException;
 use App\Services\Billing\Efi\EfiPixClient;
@@ -30,7 +31,7 @@ class BillingSettingsController extends Controller
 {
     private const array SECRET_FIELDS = ['efi_pix_client_id', 'efi_pix_client_secret', 'efi_pix_certificate', 'efi_charges_client_id', 'efi_charges_client_secret'];
 
-    public function edit(PlanCatalog $catalog): Response
+    public function edit(PlanCatalog $catalog, BillingEnforcement $enforcement): Response
     {
         $plan = Plan::main();
         $settings = BillingSetting::current();
@@ -58,6 +59,12 @@ class BillingSettingsController extends Controller
                 'monthly_equivalent' => $this->brl($cycle['monthly_equivalent_cents']),
                 'savings_percent' => $cycle['savings_percent'],
             ], $catalog->offer($plan)['cycles']),
+            'enforcement' => [
+                'active' => $enforcement->active(),
+                'enabled_by_environment' => $enforcement->enabledByEnvironment(),
+                'starts_at' => PlatformTime::dateTime($settings->enforcement_starts_at),
+                'unmet' => $enforcement->unmetPrerequisites(),
+            ],
             'packages' => AiCreditPackage::query()->orderBy('credits')->get()->map(fn (AiCreditPackage $package): array => [
                 'id' => $package->id,
                 'name' => $package->name,

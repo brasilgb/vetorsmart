@@ -25,6 +25,7 @@ use Illuminate\Validation\ValidationException;
  * issues a charge without credentials and never opens credit purchases.
  */
 beforeEach(function () {
+    enableBillingEnforcement();
     Notification::fake();
     Http::fake(['*' => fn (HttpRequest $request) => Http::response([
         'access_token' => 'token', 'expires_in' => 3600,

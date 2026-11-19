@@ -20,6 +20,7 @@ use Illuminate\Support\Facades\Notification;
  * changes nothing when refused.
  */
 beforeEach(function () {
+    enableBillingEnforcement();
     Notification::fake();
     Http::fake();
 

@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Notification;
  * a seat is never active before it is paid. Efí is always Http::fake.
  */
 beforeEach(function () {
+    enableBillingEnforcement();
     Notification::fake();
     Http::fake(['*' => fn (HttpRequest $request) => Http::response([
         'access_token' => 'token', 'expires_in' => 3600,

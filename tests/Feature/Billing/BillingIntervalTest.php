@@ -25,6 +25,7 @@ use Inertia\Testing\AssertableInertia;
  * R$ 719,40, annual R$ 1.318,80, three users included, R$ 19,90 per extra user). Efí is always Http::fake.
  */
 beforeEach(function () {
+    enableBillingEnforcement();
     Notification::fake();
     Http::fake(['*' => fn (HttpRequest $request) => Http::response([
         'access_token' => 'token', 'expires_in' => 3600,

@@ -18,6 +18,7 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Services\Billing\AiCreditPurchaseService;
 use App\Services\Billing\AiCreditService;
+use App\Services\Billing\BillingEnforcement;
 use App\Services\Billing\ChargeService;
 use App\Services\Billing\PlanCatalog;
 use App\Services\Billing\SeatService;
@@ -38,7 +39,7 @@ use Inertia\Response;
  */
 class SubscriptionController extends Controller
 {
-    public function show(Request $request, TenantContext $context, PlanCatalog $catalog, AiCreditService $credits): Response
+    public function show(Request $request, TenantContext $context, PlanCatalog $catalog, AiCreditService $credits, BillingEnforcement $enforcement): Response
     {
         $tenant = $context->requireTenant();
         Gate::authorize('viewBilling', $tenant);
@@ -69,6 +70,7 @@ class SubscriptionController extends Controller
             'methods' => array_map(fn (PaymentMethod $method): array => ['value' => $method->value, 'label' => $method->label()], PaymentMethod::cases()),
             'hasDocument' => in_array(strlen((string) preg_replace('/\D+/', '', (string) $tenant->document)), [11, 14], true),
             'canManage' => Gate::allows('manageBilling', $tenant),
+            'billingEnforced' => $enforcement->active(),
         ]);
     }
 
@@ -234,6 +236,7 @@ class SubscriptionController extends Controller
             'extra_seats' => $subscription->extra_seats,
             'scheduled_extra_seats' => $subscription->scheduled_extra_seats,
             'seats_change_mode' => match (true) {
+                ! app(BillingEnforcement::class)->active() => 'not_in_force',
                 ! in_array($subscription->status, [SubscriptionStatus::Trialing, SubscriptionStatus::Active], true) => 'blocked',
                 $subscription->status === SubscriptionStatus::Trialing && $this->openCharge($subscription) === null => 'now',
                 default => 'next_charge',

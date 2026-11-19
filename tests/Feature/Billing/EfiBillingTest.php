@@ -26,6 +26,7 @@ use Inertia\Testing\AssertableInertia;
  * Efí is never called for real: every request goes to Http::fake, with homologation addresses and fake credentials.
  */
 beforeEach(function () {
+    enableBillingEnforcement();
     Notification::fake();
     Plan::main()->forceFill(['price_cents' => 14990])->save();
 

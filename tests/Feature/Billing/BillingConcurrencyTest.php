@@ -81,6 +81,8 @@ beforeEach(function () {
         'efi_pix_certificate' => encrypt('-----BEGIN CERTIFICATE-----x', false), 'efi_pix_key' => 'chave',
     ]);
 
+    enableBillingEnforcement();
+
     $this->tenant = Tenant::factory()->create(['name' => '[CONCORRENCIA] Cobrança']);
     $this->actor = User::factory()->create();
     $this->subscription = app(SubscriptionService::class)->startTrial($this->tenant, BillingSource::System);
@@ -109,7 +111,7 @@ afterEach(function () {
         $this->plan->forceFill(['price_cents' => $this->originalPrice, 'ai_monthly_credits' => null])->save();
     }
 
-    DB::table('billing_settings')->update(['efi_pix_client_id' => null, 'efi_pix_client_secret' => null, 'efi_pix_certificate' => null, 'efi_pix_key' => null, 'ai_credit_purchases_enabled' => false]);
+    DB::table('billing_settings')->update(['efi_pix_client_id' => null, 'efi_pix_client_secret' => null, 'efi_pix_certificate' => null, 'efi_pix_key' => null, 'ai_credit_purchases_enabled' => false, 'enforcement_starts_at' => null]);
     DB::table('ai_credit_packages')->where('name', '[CONCORRENCIA] Pacote')->delete();
     DB::setDefaultConnection('mysql');
     DB::purge('mysql_second');

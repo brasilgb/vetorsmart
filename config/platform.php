@@ -98,4 +98,24 @@ return [
     | Commercial plans, cycle prices and additional users are not configured here: they live in the database (plans
     | and subscriptions) and are managed in the RootAdmin, with contracted terms frozen per subscription.
     */
+
+    /*
+    |--------------------------------------------------------------------------
+    | Billing enforcement
+    |--------------------------------------------------------------------------
+    |
+    | Whether subscriptions are enforced at all (trial end, grace, suspension, charges, paid seats and credit
+    | purchases). Separate from the four billing locks (Efí environment, approved prices, gateway credentials and the
+    | credit purchase switch): those decide whether a real charge can reach Efí; this one decides whether the
+    | subscription lifecycle applies. Only the literal value `true` enables it; missing or anything else keeps it off.
+    | Even when enabled, enforcement starts only at the date recorded by the audited billing:start-enforcement command.
+    |
+    */
+    'billing_enforcement_enabled' => env('PLATFORM_BILLING_ENFORCEMENT_ENABLED', false) === true,
+
+    /*
+    | Optional end (Y-m-d) of the legacy access for accounts that existed before e-mail confirmation. Empty or invalid:
+    | no deadline, so no existing user is locked out unexpectedly (for example while SMTP is not operational).
+    */
+    'legacy_email_grace_until' => env('PLATFORM_LEGACY_EMAIL_GRACE_UNTIL'),
 ];

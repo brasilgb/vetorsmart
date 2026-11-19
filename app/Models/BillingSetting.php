@@ -24,6 +24,8 @@ use Illuminate\Support\Carbon;
  * @property int $ai_tokens_per_credit
  * @property int $ai_low_balance_percent
  * @property bool $ai_credit_purchases_enabled
+ * @property Carbon|null $enforcement_starts_at
+ * @property int|null $enforcement_scheduled_by
  * @property Carbon|null $connection_tested_at
  */
 #[Hidden(['efi_pix_client_id', 'efi_pix_client_secret', 'efi_pix_certificate', 'efi_charges_client_id', 'efi_charges_client_secret', 'webhook_secret'])]
@@ -82,6 +84,7 @@ class BillingSetting extends Model
             'webhook_secret' => 'encrypted',
             'connection_tested_at' => 'datetime',
             'ai_credit_purchases_enabled' => 'boolean',
+            'enforcement_starts_at' => 'datetime',
         ];
     }
 }
