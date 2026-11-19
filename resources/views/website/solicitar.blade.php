@@ -39,6 +39,7 @@
         .notice { border: 1px solid #86EFAC; background: #F0FDF4; color: #14532D; border-radius: 12px; padding: 16px; margin-bottom: 24px; }
         .alt { margin-top: 28px; color: var(--site-muted); font-size: .95rem; }
         .homolog { background: #FEF3C7; color: #78350F; text-align: center; padding: 10px 16px; font-size: .9rem; font-weight: 600; }
+        button[disabled] { opacity: .75; cursor: progress; }
         @media (max-width: 640px) { button { width: 100%; } }
     </style>
 </head>
@@ -64,6 +65,8 @@
 
     <form method="post" action="{{ $action }}" novalidate>
         @csrf
+        <input type="hidden" name="envio" value="{{ $sendToken }}">
+        @error('envio')<p class="error" role="alert">{{ $message }}</p>@enderror
         @if ($fromPortal ?? false)
             <input type="hidden" name="origem" value="portal">
         @endif
@@ -108,12 +111,21 @@
             <label class="check"><input type="checkbox" name="consent" value="1" @checked(old('consent')) @error('consent') aria-invalid="true" aria-describedby="consent-error" @enderror> Autorizo {{ $business }} a me contatar sobre esta solicitação.</label>
             @error('consent')<p class="error" id="consent-error">{{ $message }}</p>@enderror
         </div>
-        <div><button type="submit">Enviar solicitação</button></div>
+        <div><button type="submit" data-send-button>Enviar solicitação</button></div>
     </form>
 
     @if ($assistant)
         <p class="alt">Prefere escolher um horário agora? <a href="{{ $assistant }}">Agende pelo atendimento online</a>.</p>
     @endif
 </main>
+<script nonce="{{ \Illuminate\Support\Facades\Vite::cspNonce() }}">
+    // A second click while the first send is on its way does nothing; the server also recognises a repeated form.
+    (function () {
+        var button = document.querySelector('[data-send-button]');
+        if (!button || !button.form) { return; }
+        button.form.addEventListener('submit', function () { button.disabled = true; button.textContent = 'Enviando…'; });
+        window.addEventListener('pageshow', function () { button.disabled = false; button.textContent = 'Enviar solicitação'; });
+    })();
+</script>
 </body>
 </html>

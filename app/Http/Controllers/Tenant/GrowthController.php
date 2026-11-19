@@ -50,6 +50,9 @@ class GrowthController extends Controller
             ], $evolution),
             'hasActivity' => array_sum(array_map(fn (array $row): int => $row['requests'] + $row['appointments_done'] + $row['completed'], $evolution)) > 0,
             'minRequestsForConversion' => GrowthMetrics::MIN_REQUESTS_FOR_CONVERSION,
+            // Requests of the month by origin (Regional Portal included), followed until appointment and completion.
+            'origins' => $metrics->byOrigin($tenant->id, $current->utc(), $current->endOfMonth()->utc()),
+            'previousOrigins' => $metrics->byOrigin($tenant->id, $previous->utc(), $previous->endOfMonth()->utc()),
         ]);
     }
 

@@ -11,10 +11,13 @@ use App\Services\Assistant\AssistantOperations;
 use App\Services\ServiceRequestService;
 use App\Services\Websites\PublicSiteContext;
 use App\Services\Websites\SegmentTheme;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -45,6 +48,8 @@ class SiteRequestController extends Controller
             'fromPortal' => $request->query('origem') === 'portal' || old('origem') === 'portal',
             'assistant' => AssistantSetting::query()->forTenant($site['tenant'])->value('enabled') ? $site['base'].'/atendimento' : null,
             'sent' => (bool) $request->session()->get('site_request_sent', false),
+            // One token per form shown: a second send of the same form (double click, reload, slow network) is recognised.
+            'sendToken' => is_string(old('envio')) && preg_match('/^[A-Za-z0-9]{40}$/', old('envio')) === 1 ? old('envio') : Str::random(40),
             'homolog' => $site['tenant']->isHomolog(),
         ])->header('X-Robots-Tag', 'noindex, nofollow');
     }
@@ -73,7 +78,7 @@ class SiteRequestController extends Controller
         // The origin is the visitor's attribution only (link from the portal); the company always comes from the address.
         $origin = $fromPortal ? RequestOrigin::Portal : RequestOrigin::PublicSite;
 
-        DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin): void {
+        $register = fn (): int => DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin): int {
             $customer = $operations->findOrCreateCustomer($tenant, trim((string) $request->validated('name')), (string) $request->phoneDigits());
 
             $serviceRequest = $requests->create($tenant, ['customer_id' => $customer->getKey(), 'description' => $description], null, $origin);
@@ -85,7 +90,36 @@ class SiteRequestController extends Controller
                     // The service cannot be scheduled now: the request stays in the queue for the team to triage.
                 }
             }
+
+            return (int) $serviceRequest->getKey();
         });
+
+        $token = $request->validated('envio');
+
+        if (! is_string($token)) {
+            $register();
+
+            return $back->with('site_request_sent', true);
+        }
+
+        // The same form sent again creates nothing new. The token is marked as used only after the request is saved, so
+        // a failed attempt can be sent again and never yields a confirmation without a record.
+        $key = 'site-request:'.$tenant->getKey().':'.hash('sha256', $token);
+        $lock = Cache::lock($key.':lock', 15);
+
+        try {
+            $lock->block(10);
+        } catch (LockTimeoutException) {
+            return $back->withInput($request->except('website'))->withErrors(['envio' => 'Sua solicitação ainda está sendo registrada. Aguarde alguns segundos e tente novamente.']);
+        }
+
+        try {
+            if (! Cache::has($key)) {
+                Cache::put($key, $register(), now()->addHours(2));
+            }
+        } finally {
+            $lock->release();
+        }
 
         return $back->with('site_request_sent', true);
     }

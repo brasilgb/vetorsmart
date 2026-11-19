@@ -3,6 +3,7 @@
 namespace App\Services\Growth;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\RequestOrigin;
 use App\Enums\RequestStatus;
 use App\Enums\TenantStatus;
 use App\Models\Appointment;
@@ -43,6 +44,42 @@ class GrowthMetrics
             'appointments_done' => $this->countBy(Appointment::query()->whereIn('tenant_id', $tenantIds)->where('status', AppointmentStatus::Completed->value)->whereBetween('starts_at', [$from, $to])),
             'active_services' => $this->countBy(Service::query()->whereIn('tenant_id', $tenantIds)->where('active', true)),
         ];
+    }
+
+    /**
+     * Requests of one company received in the period, by origin, followed as a cohort: how many of them reached an
+     * appointment (at least one was booked, whatever happened to it later) and how many were completed. A booking is
+     * never counted as a completed service, and nothing here is a click or a visit: only recorded requests.
+     *
+     * @return list<array{origin: string, label: string, received: int, scheduled: int, completed: int}>
+     */
+    public function byOrigin(int $tenantId, CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $rows = ServiceRequest::query()
+            ->where('tenant_id', $tenantId)
+            ->whereBetween('created_at', [$from, $to])
+            ->groupBy('origin')
+            ->selectRaw('origin, COUNT(*) AS received')
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS completed', [RequestStatus::Completed->value])
+            ->selectRaw('SUM(CASE WHEN EXISTS (SELECT 1 FROM appointments WHERE appointments.tenant_id = service_requests.tenant_id AND appointments.service_request_id = service_requests.id) THEN 1 ELSE 0 END) AS scheduled')
+            ->toBase()
+            ->get()
+            ->keyBy('origin');
+
+        $figures = [];
+
+        foreach (RequestOrigin::cases() as $origin) {
+            $row = $rows->get($origin->value);
+            $figures[] = [
+                'origin' => $origin->value,
+                'label' => $origin->label(),
+                'received' => (int) ($row->received ?? 0),
+                'scheduled' => (int) ($row->scheduled ?? 0),
+                'completed' => (int) ($row->completed ?? 0),
+            ];
+        }
+
+        return $figures;
     }
 
     /**

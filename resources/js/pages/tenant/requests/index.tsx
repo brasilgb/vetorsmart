@@ -13,18 +13,34 @@ type Row = {
     customer: string | null;
     service: string | null;
     priority: string;
+    origin: string;
+    origin_label: string;
     status: string;
     status_label: string;
     created_at: string;
 };
 
 type Props = {
-    filters: { status: string };
+    filters: { status: string; origem: string };
     statuses: { value: string; label: string }[];
+    origins: { value: string; label: string }[];
     requests: Paginator<Row>;
 };
 
-export default function RequestsIndex({ filters, statuses, requests }: Props) {
+/**
+ * Origin of a request in the list. Requests from the Regional Portal get a badge, so the team spots them at a glance.
+ */
+export function OriginLabel({ origin, label }: { origin: string; label: string }) {
+    if (origin === 'portal') {
+        return <span className="inline-flex items-center rounded-full border border-vs-blue/40 bg-vs-blue/10 px-2 py-0.5 text-xs font-medium text-vs-link">{label}</span>;
+    }
+
+    return <span className="text-vs-muted">{label}</span>;
+}
+
+export default function RequestsIndex({ filters, statuses, origins, requests }: Props) {
+    const filter = (changes: Partial<Props['filters']>) => router.get(requestsIndex.url(), { ...filters, ...changes }, { preserveState: true, replace: true });
+
     return (
         <>
             <Head title="Solicitações" />
@@ -36,16 +52,22 @@ export default function RequestsIndex({ filters, statuses, requests }: Props) {
                     action={<Button asChild className="bg-vs-blue text-white hover:bg-vs-blue-hover"><Link href={create.url()}>Nova solicitação</Link></Button>}
                 />
 
-                <div className="grid gap-3 md:grid-cols-[260px_auto]">
+                <div className="grid gap-3 md:grid-cols-[260px_260px_auto]">
                     <select
                         value={filters.status}
                         aria-label="Situação"
                         className={selectClass}
-                        onChange={(event) => router.get(requestsIndex.url(), { status: event.target.value }, { preserveState: true, replace: true })}
+                        onChange={(event) => filter({ status: event.target.value })}
                     >
                         <option value="">Todas as situações</option>
                         {statuses.map((status) => (
                             <option key={status.value} value={status.value}>{status.label}</option>
+                        ))}
+                    </select>
+                    <select value={filters.origem} aria-label="Origem" className={selectClass} onChange={(event) => filter({ origem: event.target.value })}>
+                        <option value="">Todas as origens</option>
+                        {origins.map((origin) => (
+                            <option key={origin.value} value={origin.value}>{origin.label}</option>
                         ))}
                     </select>
                 </div>
@@ -55,12 +77,13 @@ export default function RequestsIndex({ filters, statuses, requests }: Props) {
                 ) : (
                     <Card className="overflow-hidden border-vs-border/70 shadow-sm">
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[640px] text-left text-sm">
+                            <table className="w-full min-w-[760px] text-left text-sm">
                                 <thead className="bg-vs-surface text-vs-muted">
                                     <tr>
                                         <th className="px-4 py-3 font-medium">Nº</th>
                                         <th className="px-4 py-3 font-medium">Cliente</th>
                                         <th className="px-4 py-3 font-medium">Serviço</th>
+                                        <th className="px-4 py-3 font-medium">Origem</th>
                                         <th className="px-4 py-3 font-medium">Prioridade</th>
                                         <th className="px-4 py-3 font-medium">Situação</th>
                                         <th className="px-4 py-3 font-medium">Criada em</th>
@@ -73,6 +96,7 @@ export default function RequestsIndex({ filters, statuses, requests }: Props) {
                                             <td className="px-4 py-3 font-medium text-vs-text">#{item.id}</td>
                                             <td className="px-4 py-3 text-vs-text">{item.customer ?? '—'}</td>
                                             <td className="px-4 py-3 text-vs-muted">{item.service ?? 'A definir'}</td>
+                                            <td className="px-4 py-3"><OriginLabel origin={item.origin} label={item.origin_label} /></td>
                                             <td className="px-4 py-3 text-vs-muted">{item.priority}</td>
                                             <td className="px-4 py-3 text-vs-text">{item.status_label}</td>
                                             <td className="px-4 py-3 text-vs-muted">{item.created_at}</td>

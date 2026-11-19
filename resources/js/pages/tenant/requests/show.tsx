@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { index as requestsIndex, triage, schedule, start, complete, notPerformed, cancel } from '@/routes/tenant/requests';
+import { OriginLabel } from './index';
 
 type RequestDetail = {
     id: number;
@@ -20,6 +21,7 @@ type RequestDetail = {
     status_label: string;
     description: string;
     origin: string;
+    origin_value: string;
     closing_reason: string | null;
     created_at: string;
     open: boolean;
@@ -75,7 +77,7 @@ export default function RequestShow({ request, events, appointments, services, p
                             <div><dt className="text-vs-muted">Cliente</dt><dd className="text-vs-text">{request.customer ?? '—'}{request.customer_phone ? ` · ${request.customer_phone}` : ''}</dd></div>
                             <div><dt className="text-vs-muted">Serviço</dt><dd className="text-vs-text">{request.service ?? 'A definir na triagem'}</dd></div>
                             <div><dt className="text-vs-muted">Prioridade</dt><dd className="text-vs-text">{request.priority}</dd></div>
-                            <div><dt className="text-vs-muted">Origem</dt><dd className="text-vs-text">{request.origin}</dd></div>
+                            <div><dt className="text-vs-muted">Origem</dt><dd><OriginLabel origin={request.origin_value} label={request.origin} /></dd></div>
                             <div><dt className="text-vs-muted">Descrição</dt><dd className="whitespace-pre-line text-vs-text">{request.description}</dd></div>
                             {request.closing_reason && <div><dt className="text-vs-muted">Motivo do encerramento</dt><dd className="text-vs-text">{request.closing_reason}</dd></div>}
                         </dl>

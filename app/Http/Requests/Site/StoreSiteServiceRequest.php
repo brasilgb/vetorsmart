@@ -26,6 +26,7 @@ class StoreSiteServiceRequest extends FormRequest
             'consent' => ['accepted'],
             'website' => ['nullable', 'string', 'max:200'],
             'origem' => ['nullable', 'string', 'in:portal'],
+            'envio' => ['nullable', 'string', 'size:40', 'alpha_num:ascii'],
         ];
     }
 

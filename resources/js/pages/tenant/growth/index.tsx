@@ -16,7 +16,11 @@ type Props = {
     evolution: { month: string; requests: number; appointments_done: number; completed: number }[];
     hasActivity: boolean;
     minRequestsForConversion: number;
+    origins: OriginRow[];
+    previousOrigins: OriginRow[];
 };
+
+type OriginRow = { origin: string; label: string; received: number; scheduled: number; completed: number };
 
 function Delta({ value, unit = '%' }: { value: number | null; unit?: string }) {
     if (value === null) {
@@ -39,7 +43,10 @@ function Metric({ label, value, delta, unit }: { label: string; value: string | 
 }
 
 /** Real figures of the company: no visits, traffic, revenue or search ranking. */
-export default function GrowthIndex({ period, previousPeriod, current, comparison, services, seo, evolution, hasActivity, minRequestsForConversion }: Props) {
+export default function GrowthIndex({ period, previousPeriod, current, comparison, services, seo, evolution, hasActivity, minRequestsForConversion, origins, previousOrigins }: Props) {
+    const portal = origins.find((row) => row.origin === 'portal');
+    const portalBefore = previousOrigins.find((row) => row.origin === 'portal');
+    const shownOrigins = origins.filter((row) => row.received > 0 || row.origin === 'portal');
     const max = Math.max(1, ...evolution.map((row) => Math.max(row.requests, row.completed, row.appointments_done)));
 
     return (
@@ -97,6 +104,57 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                         </CardContent>
                     </Card>
                 </div>
+
+                <section aria-labelledby="origens" className="grid gap-3">
+                    <h2 id="origens" className="text-lg font-semibold text-vs-text">Origem das solicitações em {period}</h2>
+                    {portal && (
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            <Card className="border-vs-border/70 p-4 shadow-sm">
+                                <p className="text-sm text-vs-muted">Recebidas pelo Portal Regional</p>
+                                <p className="mt-1 text-2xl font-semibold text-vs-text">{portal.received}</p>
+                                <p className="text-xs text-vs-muted">{previousPeriod}: {portalBefore?.received ?? 0}</p>
+                            </Card>
+                            <Card className="border-vs-border/70 p-4 shadow-sm">
+                                <p className="text-sm text-vs-muted">Do portal que chegaram a ser agendadas</p>
+                                <p className="mt-1 text-2xl font-semibold text-vs-text">{portal.scheduled}</p>
+                                <p className="text-xs text-vs-muted">{previousPeriod}: {portalBefore?.scheduled ?? 0}</p>
+                            </Card>
+                            <Card className="border-vs-border/70 p-4 shadow-sm">
+                                <p className="text-sm text-vs-muted">Do portal com serviço concluído</p>
+                                <p className="mt-1 text-2xl font-semibold text-vs-text">{portal.completed}</p>
+                                <p className="text-xs text-vs-muted">{previousPeriod}: {portalBefore?.completed ?? 0}</p>
+                            </Card>
+                        </div>
+                    )}
+                    <Card className="overflow-hidden border-vs-border/70 shadow-sm">
+                        <div className="overflow-x-auto" tabIndex={0} role="region" aria-labelledby="origens">
+                            <table className="w-full min-w-[480px] text-left text-sm">
+                                <caption className="sr-only">Solicitações recebidas em {period} por origem, e quantas delas foram agendadas e concluídas</caption>
+                                <thead className="bg-vs-surface text-vs-muted">
+                                    <tr>
+                                        <th scope="col" className="px-4 py-3 font-medium">Origem</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Recebidas</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Agendadas</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Concluídas</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {shownOrigins.map((row) => (
+                                        <tr key={row.origin} className="border-t border-vs-border/70">
+                                            <th scope="row" className="px-4 py-3 font-medium text-vs-text">{row.label}</th>
+                                            <td className="px-4 py-3 text-vs-text">{row.received}</td>
+                                            <td className="px-4 py-3 text-vs-text">{row.scheduled}</td>
+                                            <td className="px-4 py-3 text-vs-text">{row.completed}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </Card>
+                    <p className="text-xs text-vs-muted">
+                        Contamos as solicitações recebidas no mês e acompanhamos cada uma: "agendadas" teve ao menos um agendamento; "concluídas" teve o serviço concluído. Cliques e visitas não são contados. A receita por origem não é exibida porque o valor cobrado em cada atendimento não é registrado no VetorSmart.
+                    </p>
+                </section>
 
                 <section aria-labelledby="evolucao" className="grid gap-3">
                     <h2 id="evolucao" className="text-lg font-semibold text-vs-text">Últimos seis meses</h2>

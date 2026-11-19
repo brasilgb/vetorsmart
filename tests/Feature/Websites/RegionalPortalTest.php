@@ -2,10 +2,14 @@
 
 use App\Enums\BillingSource;
 use App\Enums\RequestOrigin;
+use App\Enums\RequestStatus;
 use App\Enums\SubscriptionStatus;
+use App\Models\Appointment;
 use App\Models\AssistantSetting;
 use App\Models\BillingSetting;
+use App\Models\Customer;
 use App\Models\PortalListing;
+use App\Models\Professional;
 use App\Models\Segment;
 use App\Models\Service;
 use App\Models\ServiceRequest;
@@ -15,6 +19,7 @@ use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Billing\SubscriptionService;
 use App\Services\Portal\PortalSearch;
+use App\Services\ServiceRequestService;
 use App\Services\Websites\ReservedPaths;
 use App\Services\Websites\TenantSubdomainService;
 use App\Services\Websites\WebsiteService;
@@ -458,4 +463,154 @@ test('cards on friendly pages keep the typed service and the portal origin, and 
         ->assertSee('data-theme-switch hidden', false)
         ->assertSee('data-theme-option="auto"', false)
         ->assertSee("localStorage.getItem('portal-theme')", false);
+});
+
+/*
+| PORTAL-04: origin, conversion and traceability of requests from the portal.
+*/
+
+/**
+ * Send the request form of a company site as a visitor, from the portal or not, with an optional send token.
+ *
+ * @param  array<string, mixed>  $overrides
+ */
+function sendSiteRequest(string $site, array $overrides = []): TestResponse
+{
+    return test()->post('/'.$site.'/solicitar', [
+        'name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Preciso de uma instalação.', 'consent' => '1', 'origem' => 'portal',
+        ...$overrides,
+    ]);
+}
+
+test('the journey from the portal ends in the panel of the right company, with service, origin and status', function () {
+    $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    $other = portalCompany(['name' => 'Luz Forte', 'slug' => 'luz-forte', 'segment' => $this->electric, 'services' => ['Tomadas']]);
+    $service = $company['services'][0];
+
+    // 1-3. Search, card, site: the links carry the service and the portal origin.
+    $requestLink = 'https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$service->id;
+    portal(['q' => 'split'])->assertSee('href="'.$requestLink.'"', false);
+
+    // 4-5. The form keeps both, plus a one-time send token.
+    $form = $this->get('/climatizacao/clima-total/solicitar?origem=portal&servico='.$service->id)->assertOk()
+        ->assertSee('<input type="hidden" name="origem" value="portal">', false)
+        ->assertSee('<option value="'.$service->id.'" selected>', false);
+    preg_match('/name="envio" value="([A-Za-z0-9]{40})"/', (string) $form->getContent(), $token);
+
+    // 6-7. Sent once, confirmed only after it is saved.
+    sendSiteRequest('climatizacao/clima-total', ['service_id' => $service->id, 'envio' => $token[1]])
+        ->assertRedirect('https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal')
+        ->assertSessionHas('site_request_sent', true);
+
+    $request = ServiceRequest::query()->sole();
+    expect($request->only(['tenant_id', 'service_id', 'origin', 'status']))->toBe([
+        'tenant_id' => $company['tenant']->id, 'service_id' => $service->id, 'origin' => RequestOrigin::Portal, 'status' => RequestStatus::Triaged,
+    ])->and($request->created_at)->not->toBeNull();
+
+    // 8. The company sees it, marked as coming from the portal; another company never does.
+    $this->actingAs($company['owner'])->get('/solicitacoes?origem=portal')->assertInertia(fn ($page) => $page
+        ->where('filters.origem', 'portal')
+        ->where('requests.data.0.id', $request->id)
+        ->where('requests.data.0.origin', 'portal')
+        ->where('requests.data.0.origin_label', 'Portal Regional'));
+    $this->actingAs($company['owner'])->get('/solicitacoes/'.$request->id)->assertInertia(fn ($page) => $page->where('request.origin', 'Portal Regional')->where('request.origin_value', 'portal'));
+    $this->actingAs($other['owner'])->get('/solicitacoes')->assertInertia(fn ($page) => $page->where('requests.data', []));
+    $this->actingAs($other['owner'])->get('/solicitacoes/'.$request->id)->assertNotFound();
+});
+
+test('the company comes only from the address, and a service of another company is never linked', function () {
+    $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    $other = portalCompany(['name' => 'Luz Forte', 'slug' => 'luz-forte', 'segment' => $this->electric, 'services' => ['Tomadas']]);
+
+    sendSiteRequest('climatizacao/clima-total', ['service_id' => $other['services'][0]->id, 'tenant_id' => $other['tenant']->id])->assertRedirect();
+
+    expect(ServiceRequest::query()->sole()->only(['tenant_id', 'service_id', 'origin']))
+        ->toBe(['tenant_id' => $company['tenant']->id, 'service_id' => null, 'origin' => RequestOrigin::Portal]);
+});
+
+test('the same form sent twice creates one request, and a new form creates another', function () {
+    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    $token = str_repeat('a', 40);
+
+    sendSiteRequest('climatizacao/clima-total', ['envio' => $token])->assertSessionHas('site_request_sent', true);
+    sendSiteRequest('climatizacao/clima-total', ['envio' => $token])->assertSessionHas('site_request_sent', true);
+    expect(ServiceRequest::query()->count())->toBe(1);
+
+    sendSiteRequest('climatizacao/clima-total', ['envio' => str_repeat('b', 40)]);
+    expect(ServiceRequest::query()->count())->toBe(2);
+});
+
+test('a failed registration never confirms, and the same form can be sent again', function () {
+    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    $token = str_repeat('c', 40);
+    $this->mock(ServiceRequestService::class)->shouldReceive('create')->once()->andThrow(new RuntimeException('banco indisponível'));
+
+    sendSiteRequest('climatizacao/clima-total', ['envio' => $token])->assertServerError()->assertSessionMissing('site_request_sent');
+    expect(ServiceRequest::query()->count())->toBe(0);
+
+    app()->forgetInstance(ServiceRequestService::class);
+    sendSiteRequest('climatizacao/clima-total', ['envio' => $token])->assertSessionHas('site_request_sent', true);
+    expect(ServiceRequest::query()->count())->toBe(1);
+});
+
+test('invalid data never confirms and keeps the send token and the portal origin for the corrected send', function () {
+    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    $token = str_repeat('d', 40);
+
+    $this->from('/climatizacao/clima-total/solicitar?origem=portal')
+        ->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria', 'phone' => '123', 'description' => 'Preciso de ajuda.', 'origem' => 'portal', 'envio' => $token])
+        ->assertSessionHasErrors(['phone', 'consent'])->assertSessionMissing('site_request_sent');
+
+    $this->get('/climatizacao/clima-total/solicitar?origem=portal')
+        ->assertSee('name="envio" value="'.$token.'"', false)
+        ->assertSee('<input type="hidden" name="origem" value="portal">', false)
+        ->assertDontSee('Solicitação recebida.');
+    expect(ServiceRequest::query()->count())->toBe(0);
+});
+
+test('the origin recorded at creation never changes along triage and scheduling', function () {
+    $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    sendSiteRequest('climatizacao/clima-total');
+    $request = ServiceRequest::query()->sole();
+
+    $this->actingAs($company['owner'])->patch(route('tenant.requests.triage', $request), ['service_id' => $company['services'][0]->id, 'origin' => 'panel'])->assertRedirect();
+
+    expect($request->fresh()->origin)->toBe(RequestOrigin::Portal);
+});
+
+test('Meu Crescimento shows requests by origin from real records: received, scheduled and completed, only of the company', function () {
+    $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    $other = portalCompany(['name' => 'Luz Forte', 'slug' => 'luz-forte', 'segment' => $this->electric, 'services' => ['Tomadas']]);
+    $tenant = $company['tenant'];
+    $customer = Customer::factory()->create(['tenant_id' => $tenant->id]);
+    $professional = Professional::factory()->create(['tenant_id' => $tenant->id]);
+    $make = fn (RequestOrigin $origin, RequestStatus $status, array $extra = []): ServiceRequest => ServiceRequest::factory()->create(['tenant_id' => $tenant->id, 'customer_id' => $customer->id, 'origin' => $origin, 'status' => $status, ...$extra]);
+
+    $make(RequestOrigin::Portal, RequestStatus::Requested);
+    $scheduled = $make(RequestOrigin::Portal, RequestStatus::Scheduled);
+    $done = $make(RequestOrigin::Portal, RequestStatus::Completed, ['closed_at' => now()]);
+    foreach ([$scheduled, $done] as $item) {
+        Appointment::factory()->create(['tenant_id' => $tenant->id, 'service_request_id' => $item->id, 'professional_id' => $professional->id]);
+    }
+    $make(RequestOrigin::PublicSite, RequestStatus::Requested);
+    $make(RequestOrigin::Portal, RequestStatus::Requested, ['created_at' => now($tenant->timezone)->startOfMonth()->subDays(5)]);
+    $otherCustomer = Customer::factory()->create(['tenant_id' => $other['tenant']->id]);
+    ServiceRequest::factory()->count(4)->create(['tenant_id' => $other['tenant']->id, 'customer_id' => $otherCustomer->id, 'origin' => RequestOrigin::Portal]);
+
+    $this->actingAs($company['owner'])->get('/meu-crescimento')->assertOk()->assertInertia(fn ($page) => $page
+        ->where('origins', fn ($rows) => collect($rows)->firstWhere('origin', 'portal') == ['origin' => 'portal', 'label' => 'Portal Regional', 'received' => 3, 'scheduled' => 2, 'completed' => 1]
+            && collect($rows)->firstWhere('origin', 'public_site')['received'] === 1)
+        ->where('previousOrigins', fn ($rows) => collect($rows)->firstWhere('origin', 'portal')['received'] === 1));
+});
+
+test('the portal order ignores the volume of requests a company received', function () {
+    $busy = portalCompany(['name' => 'Muito Procurada', 'slug' => 'muito-procurada', 'segment' => $this->climate, 'services' => ['Limpeza de split']]);
+    portalCompany(['name' => 'Recém-chegada', 'slug' => 'recem-chegada', 'segment' => $this->climate, 'services' => ['Limpeza de split']]);
+    $order = fn (): array => app(PortalSearch::class)->search(['q' => 'limpeza'], 1, '2026-11-19')->getCollection()->pluck('business_name')->all();
+    $before = $order();
+
+    $customer = Customer::factory()->create(['tenant_id' => $busy['tenant']->id]);
+    ServiceRequest::factory()->count(15)->create(['tenant_id' => $busy['tenant']->id, 'customer_id' => $customer->id, 'origin' => RequestOrigin::Portal, 'status' => RequestStatus::Completed, 'closed_at' => now()]);
+
+    expect($order())->toBe($before);
 });

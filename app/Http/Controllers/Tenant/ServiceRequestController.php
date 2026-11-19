@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Enums\CustomerStatus;
+use App\Enums\RequestOrigin;
 use App\Enums\RequestStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Tenant\Operations\ReasonRequest;
@@ -43,9 +44,16 @@ class ServiceRequestController extends Controller
             $query->where('status', $status);
         }
 
+        $origin = $request->string('origem')->value();
+
+        if (RequestOrigin::tryFrom($origin) !== null) {
+            $query->where('origin', $origin);
+        }
+
         return Inertia::render('tenant/requests/index', [
-            'filters' => ['status' => $status],
+            'filters' => ['status' => $status, 'origem' => RequestOrigin::tryFrom($origin) !== null ? $origin : ''],
             'statuses' => $this->statusOptions(),
+            'origins' => array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item->label()], RequestOrigin::cases()),
             'requests' => $query->paginate(15)->withQueryString()->through(fn (ServiceRequest $serviceRequest): array => $this->row($serviceRequest)),
         ]);
     }
@@ -103,6 +111,7 @@ class ServiceRequestController extends Controller
                 ...$this->row($record),
                 'description' => $record->description,
                 'origin' => $record->origin->label(),
+                'origin_value' => $record->origin->value,
                 'closing_reason' => $record->closing_reason,
                 'customer_phone' => $record->customer->whatsapp ?? $record->customer->phone,
                 'service_id' => $record->service_id,
@@ -216,6 +225,8 @@ class ServiceRequestController extends Controller
             'customer' => $serviceRequest->customer?->name,
             'service' => $serviceRequest->service?->name,
             'priority' => $serviceRequest->priority->label(),
+            'origin' => $serviceRequest->origin->value,
+            'origin_label' => $serviceRequest->origin->label(),
             'status' => $serviceRequest->status->value,
             'status_label' => $serviceRequest->status->label(),
             'created_at' => $serviceRequest->tenant->toLocal($serviceRequest->created_at)->format('d/m/Y H:i'),
