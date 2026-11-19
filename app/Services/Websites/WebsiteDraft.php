@@ -22,6 +22,9 @@ class WebsiteDraft
             'professional_ids' => [],
             'show_professionals' => false,
             'show_hours' => false,
+            'show_prices' => true,
+            'logo' => null,
+            'hero' => null,
             'seo' => ['title' => null, 'description' => null, 'indexable' => true],
         ];
     }

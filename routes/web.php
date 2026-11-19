@@ -4,6 +4,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandingController;
 use App\Http\Controllers\Site\AssistantController;
 use App\Http\Controllers\Site\SiteController;
+use App\Http\Controllers\Site\SiteMediaController;
+use App\Http\Controllers\Site\SiteRequestController;
+use App\Services\Websites\WebsiteMedia;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -22,6 +25,9 @@ Route::domain('{siteHost}')
     ->group(function () {
         Route::get('/', [SiteController::class, 'hostPage'])->name('site.host.page');
         Route::get('/servicos', [SiteController::class, 'hostServices'])->name('site.host.services');
+        Route::get('/solicitar', [SiteRequestController::class, 'show'])->name('site.host.request.show');
+        Route::post('/solicitar', [SiteRequestController::class, 'store'])->middleware('throttle:site-request')->name('site.host.request.store');
+        Route::get('/midia/{file}', SiteMediaController::class)->where('file', WebsiteMedia::FILE_PATTERN)->name('site.host.media');
         Route::get('/sitemap.xml', [SiteController::class, 'sitemap'])->name('site.host.sitemap');
         Route::get('/robots.txt', [SiteController::class, 'robots'])->name('site.host.robots');
         Route::get('/atendimento', [AssistantController::class, 'show'])->name('site.host.assistant.show');
@@ -63,6 +69,9 @@ Route::prefix('{segment}/{company}')
     ->group(function () {
         Route::get('/', [SiteController::class, 'page'])->name('site.page');
         Route::get('servicos', [SiteController::class, 'services'])->name('site.services');
+        Route::get('solicitar', [SiteRequestController::class, 'show'])->name('site.request.show');
+        Route::post('solicitar', [SiteRequestController::class, 'store'])->middleware('throttle:site-request')->name('site.request.store');
+        Route::get('midia/{file}', SiteMediaController::class)->where('file', WebsiteMedia::FILE_PATTERN)->name('site.media');
         Route::get('atendimento', [AssistantController::class, 'show'])->name('site.assistant.show');
         Route::post('atendimento/conversa', [AssistantController::class, 'start'])->middleware('throttle:assistant-public')->name('site.assistant.start');
         Route::get('atendimento/mensagens', [AssistantController::class, 'messages'])->middleware('throttle:assistant-public')->name('site.assistant.messages');

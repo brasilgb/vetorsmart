@@ -100,6 +100,16 @@ class AppServiceProvider extends ServiceProvider
     {
         RateLimiter::for('assistant-public', fn (Request $request): Limit => Limit::perMinute((int) config('assistant.public_requests_per_minute', 30))
             ->by($request->ip().'|'.(is_string($request->route('segment')) ? $request->route('segment').'/'.$request->route('company') : $request->getHost())));
+
+        // Request form of a public site: a few sends per visitor and company, so the triage queue cannot be flooded.
+        RateLimiter::for('site-request', function (Request $request): array {
+            $site = is_string($request->route('segment')) ? $request->route('segment').'/'.$request->route('company') : $request->getHost();
+
+            return [
+                Limit::perMinute(3)->by('site-request:'.$request->ip().'|'.$site),
+                Limit::perHour(10)->by('site-request-hour:'.$request->ip().'|'.$site),
+            ];
+        });
     }
 
     /**

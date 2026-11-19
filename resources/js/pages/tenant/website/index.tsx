@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input';
 import { draft as websiteDraft, preview, publish, unpublish } from '@/routes/tenant/website';
 import { store as domainStore, verify, primary, destroy as domainDestroy } from '@/routes/tenant/website/domains';
 import { update as subdomainUpdate } from '@/routes/tenant/website/subdomain';
+import { destroy as imageDestroy, store as imageStore } from '@/routes/tenant/website/images';
+import { media as previewMedia } from '@/routes/tenant/website/preview';
 
 type Draft = {
     headline: string | null;
@@ -21,8 +23,13 @@ type Draft = {
     professional_ids: number[];
     show_professionals: boolean;
     show_hours: boolean;
+    show_prices?: boolean;
+    logo?: SiteImage | null;
+    hero?: SiteImage | null;
     seo: { title: string | null; description: string | null; indexable: boolean };
 };
+
+type SiteImage = { file: string; width: number; height: number };
 
 type Domain = {
     id: number;
@@ -64,6 +71,7 @@ type Props = {
     domains: Domain[];
     canEdit: boolean;
     segment: string | null;
+    serviceRegion: string | null;
 };
 
 const tabs = [
@@ -80,13 +88,13 @@ const tabs = [
  * Meu Site. Each section saves only its own fields to the draft. Visitors see the
  * site only after an explicit publication; the server enforces every permission.
  */
-export default function WebsiteIndex({ website, draft, options, domains, canEdit, segment }: Props) {
+export default function WebsiteIndex({ website, draft, options, domains, canEdit, segment, serviceRegion }: Props) {
     const [tab, setTab] = useState('overview');
     const disabled = !canEdit;
 
     const appearance = useForm({ section: 'appearance', accent_color: draft.accent_color, font: draft.font });
     const content = useForm({ section: 'content', headline: draft.headline ?? '', about: draft.about ?? '', differentials: draft.differentials, show_hours: draft.show_hours });
-    const services = useForm({ section: 'services', service_ids: draft.service_ids, show_professionals: draft.show_professionals, professional_ids: draft.professional_ids });
+    const services = useForm({ section: 'services', service_ids: draft.service_ids, show_professionals: draft.show_professionals, show_prices: draft.show_prices ?? true, professional_ids: draft.professional_ids });
     const seo = useForm({ section: 'seo', seo: { title: draft.seo.title ?? '', description: draft.seo.description ?? '', indexable: draft.seo.indexable } });
     const domain = useForm({ hostname: '' });
     const subdomain = useForm({ subdomain: website.subdomain?.label ?? '' });
@@ -154,9 +162,13 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                                     <option value="serif">Com serifa (clássica)</option>
                                 </select>
                             </Field>
-                            <p className="md:col-span-2 text-xs text-vs-muted">Logotipo próprio do site ainda não está disponível. O site usa a identidade escolhida acima.</p>
                             {canEdit && <div className="md:col-span-2"><Button type="submit" disabled={appearance.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar aparência</Button></div>}
                         </form>
+                        <div className="grid gap-5 border-t border-vs-border/70 pt-5 md:grid-cols-2">
+                            <ImageField kind="logo" label="Logotipo" hint="Aparece ao lado do nome, no topo do site. Prefira fundo transparente (PNG ou WebP)." image={draft.logo ?? null} canEdit={canEdit} />
+                            <ImageField kind="hero" label="Imagem principal" hint="Aparece ao lado do título na página inicial. Use uma foto real do seu trabalho, na horizontal." image={draft.hero ?? null} canEdit={canEdit} />
+                        </div>
+                        <p className="text-xs text-vs-muted">JPG, PNG ou WebP de até 2 MB. As imagens são otimizadas automaticamente e só aparecem no site após a publicação.</p>
                     </Card>
                 )}
 
@@ -186,7 +198,10 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                                 <input type="checkbox" checked={content.data.show_hours} disabled={disabled} onChange={(e) => content.setData('show_hours', e.target.checked)} className="size-4 accent-vs-blue" />
                                 Mostrar horários de funcionamento (cadastrados em Configurações)
                             </label>
-                            <p className="text-xs text-vs-muted">Telefone, WhatsApp, e-mail e endereço vêm de Configurações, sem duplicação.</p>
+                            <p className="text-xs text-vs-muted">Telefone, WhatsApp, e-mail, endereço e link de avaliação do Google vêm de Configurações, sem duplicação.</p>
+                            <p className="text-xs text-vs-muted">
+                                Região atendida: {serviceRegion ? <strong className="text-vs-text">{serviceRegion}</strong> : 'não informada'} (definida em Atendimento IA).
+                            </p>
                             {canEdit && <div><Button type="submit" disabled={content.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar conteúdo</Button></div>}
                         </form>
                     </Card>
@@ -206,6 +221,11 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                                 ))}
                             </div>
                         )}
+                        <label className="flex items-center gap-3 text-sm text-vs-text">
+                            <input type="checkbox" checked={services.data.show_prices} disabled={disabled} onChange={(e) => services.setData('show_prices', e.target.checked)} className="size-4 accent-vs-blue" />
+                            Mostrar valores dos serviços no site
+                        </label>
+                        <p className="-mt-3 text-xs text-vs-muted">Cada serviço publicado tem o botão "Solicitar este serviço", que leva ao formulário de solicitação do site.</p>
                         <label className="flex items-center gap-3 text-sm text-vs-text">
                             <input type="checkbox" checked={services.data.show_professionals} disabled={disabled} onChange={(e) => services.setData('show_professionals', e.target.checked)} className="size-4 accent-vs-blue" />
                             Mostrar profissionais no site
@@ -402,5 +422,58 @@ function SiteNotice({ website }: { website: Props['website'] }) {
         <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
             {message}
         </p>
+    );
+}
+
+/**
+ * Logo or main image of the draft: shows the current one (served only to the company, through the preview), sends a new
+ * one or removes it. The server validates type and size and re-encodes the file.
+ */
+function ImageField({ kind, label, hint, image, canEdit }: { kind: 'logo' | 'hero'; label: string; hint: string; image: SiteImage | null; canEdit: boolean }) {
+    const form = useForm<{ image: File | null }>({ image: null });
+    const inputId = `image-${kind}`;
+
+    return (
+        <div className="grid content-start gap-3">
+            <p className="text-sm font-medium text-vs-text">{label}</p>
+            <p className="text-xs text-vs-muted">{hint}</p>
+            {image ? (
+                <img
+                    src={previewMedia.url({ file: image.file })}
+                    alt={`${label} atual`}
+                    width={image.width || undefined}
+                    height={image.height || undefined}
+                    className={`rounded-md border border-vs-border/70 bg-muted object-contain ${kind === 'logo' ? 'h-16 w-auto max-w-[200px]' : 'aspect-video w-full max-w-sm object-cover'}`}
+                />
+            ) : (
+                <p className="text-sm text-vs-muted">Nenhuma imagem enviada.</p>
+            )}
+            {canEdit && (
+                <form
+                    onSubmit={(event) => {
+                        event.preventDefault();
+                        form.post(imageStore.url({ kind }), { preserveScroll: true, forceFormData: true, onSuccess: () => form.reset() });
+                    }}
+                    className="grid gap-2"
+                >
+                    <label htmlFor={inputId} className="sr-only">{`Escolher ${label.toLowerCase()}`}</label>
+                    <Input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => form.setData('image', event.target.files?.[0] ?? null)} className="h-10" aria-invalid={form.errors.image ? true : undefined} aria-describedby={form.errors.image ? `${inputId}-error` : undefined} />
+                    {form.errors.image && <p id={`${inputId}-error`} className="text-sm text-vs-danger">{form.errors.image}</p>}
+                    <div className="flex flex-wrap gap-2">
+                        <Button type="submit" disabled={form.processing || form.data.image === null} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">{form.processing ? 'Enviando…' : 'Enviar'}</Button>
+                        {image && (
+                            <ConfirmAction
+                                trigger={<Button type="button" variant="outline" className="h-10">Remover</Button>}
+                                title={`Remover ${label.toLowerCase()}?`}
+                                description="A imagem sai do rascunho. O site publicado só muda na próxima publicação."
+                                confirmLabel="Remover"
+                                destructive
+                                onConfirm={() => router.delete(imageDestroy.url({ kind }), { preserveScroll: true })}
+                            />
+                        )}
+                    </div>
+                </form>
+            )}
+        </div>
     );
 }

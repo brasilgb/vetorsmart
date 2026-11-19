@@ -15,6 +15,7 @@ use App\Http\Controllers\Tenant\TeamController;
 use App\Http\Controllers\Tenant\WebsiteController;
 use App\Http\Controllers\Tenant\WebsiteDomainController;
 use App\Http\Controllers\Tenant\WebsiteSubdomainController;
+use App\Services\Websites\WebsiteMedia;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -84,6 +85,9 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
     Route::post('meu-site/publicar', [WebsiteController::class, 'publish'])->name('tenant.website.publish');
     Route::post('meu-site/retirar', [WebsiteController::class, 'unpublish'])->name('tenant.website.unpublish');
     Route::get('meu-site/previa', [WebsiteController::class, 'preview'])->name('tenant.website.preview');
+    Route::get('meu-site/previa/midia/{file}', [WebsiteController::class, 'previewMedia'])->where('file', WebsiteMedia::FILE_PATTERN)->name('tenant.website.preview.media');
+    Route::post('meu-site/imagens/{kind}', [WebsiteController::class, 'storeImage'])->whereIn('kind', ['logo', 'hero'])->middleware('throttle:20,1')->name('tenant.website.images.store');
+    Route::delete('meu-site/imagens/{kind}', [WebsiteController::class, 'removeImage'])->whereIn('kind', ['logo', 'hero'])->name('tenant.website.images.destroy');
     Route::patch('meu-site/subdominio', [WebsiteSubdomainController::class, 'update'])->middleware('throttle:10,1')->name('tenant.website.subdomain.update');
     Route::post('meu-site/dominios', [WebsiteDomainController::class, 'store'])->name('tenant.website.domains.store');
     Route::post('meu-site/dominios/{domain}/verificar', [WebsiteDomainController::class, 'verify'])->whereNumber('domain')->name('tenant.website.domains.verify');

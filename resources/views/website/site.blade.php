@@ -4,6 +4,8 @@
     $title = $seo['title'] ?: $business;
     $description = $seo['description'] ?: ($content['about'] ?: null);
     $accent = in_array($content['accent_color'] ?? '', ['#0F172A', '#1E3A5F', '#2563EB', '#06B6D4'], true) ? $content['accent_color'] : '#2563EB';
+    // Cyan on white does not reach 4.5:1; text and buttons use its darker tone (#0E7490, 5.4:1).
+    $accent = $accent === '#06B6D4' ? '#0E7490' : $accent;
     // Sem aspas: o valor é impresso com escape dentro de <style>, e um &quot; invalidaria a declaração inteira.
     $fontStack = ($content['font'] ?? 'sans') === 'serif' ? 'Georgia, Times New Roman, serif' : 'system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
     $contact = $content['contact'] ?? [];
@@ -15,8 +17,15 @@
     $location = trim(implode(', ', array_filter([$contact['address'] ?? null, $contact['city'] ?? null, $contact['state'] ?? null])));
     $page = $page ?? 'home';
     $homolog = $homolog ?? false;
-    $links = $links ?? ['home' => null, 'services' => null, 'assistant' => null];
+    $links = array_merge(['home' => null, 'services' => null, 'assistant' => null, 'request' => null], $links ?? []);
     $title = $page === 'services' ? 'Serviços · '.$title : $title;
+    $theme = $theme ?? \App\Services\Websites\SegmentTheme::for($content['segment_slug'] ?? null);
+    $mediaBase = $mediaBase ?? null;
+    $ogImage = $ogImage ?? null;
+    $logo = is_array($content['logo'] ?? null) && $mediaBase ? $content['logo'] : null;
+    $hero = is_array($content['hero'] ?? null) && $mediaBase ? $content['hero'] : null;
+    $region = ($content['service_region'] ?? null) ?: null;
+    $requestLink = fn (?int $serviceId = null): ?string => $links['request'] === null ? null : ($serviceId === null || $links['request'] === '#' ? $links['request'] : $links['request'].'?servico='.$serviceId);
     // Built inside this PHP block: in the template body, Blade would compile the schema.org context key as a directive.
     $structuredData = json_encode(array_filter([
         '@context' => 'https://schema.org',
@@ -26,6 +35,8 @@
         'telephone' => ($contact['phone'] ?? null) ?: null,
         'email' => ($contact['email'] ?? null) ?: null,
         'url' => $canonical,
+        'image' => $ogImage,
+        'areaServed' => $region,
         'address' => ($contact['city'] ?? null) ? array_filter([
             '@type' => 'PostalAddress',
             'streetAddress' => ($contact['address'] ?? null) ?: null,
@@ -62,6 +73,9 @@
     @if ($canonical)
         <meta property="og:url" content="{{ $canonical }}">
     @endif
+    @if ($ogImage)
+        <meta property="og:image" content="{{ $ogImage }}">
+    @endif
     @if (! $noindex && ! $preview && $business !== '')
         <script type="application/ld+json">
         {!! $structuredData !!}
@@ -75,6 +89,7 @@
             --site-muted: #475569;
             --site-border: #CBD5E1;
             --site-surface: #F8FAFC;
+            --site-tone: {{ $theme['tone'] }};
         }
         * { box-sizing: border-box; }
         body { margin: 0; font-family: var(--site-font); color: var(--site-text); background: #fff; line-height: 1.6; }
@@ -105,7 +120,22 @@
         nav.site a { color: var(--site-text); text-decoration: none; font-weight: 500; padding: 8px 0; }
         nav.site a[aria-current="page"] { color: var(--site-accent); text-decoration: underline; text-underline-offset: 4px; }
         a:focus-visible { outline: 3px solid var(--site-accent); outline-offset: 2px; }
-        @media (max-width: 640px) { .hero { padding-top: 40px; padding-bottom: 28px; } }
+        header.site .brand { display: inline-flex; align-items: center; gap: 10px; }
+        header.site .brand img { height: 40px; width: auto; max-width: 160px; object-fit: contain; }
+        .hero-band { background: var(--site-tone); }
+        .hero-band .wrap { display: grid; gap: 28px; align-items: center; }
+        .hero-band .hero { padding-bottom: 48px; }
+        .hero .eyebrow { display: inline-flex; align-items: center; gap: 8px; color: var(--site-text); font-weight: 600; font-size: .95rem; margin: 0 0 12px; }
+        .hero .eyebrow svg { width: 22px; height: 22px; stroke: var(--site-accent); }
+        .hero .region { font-size: .98rem; color: var(--site-text); margin: 0 0 20px; }
+        .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+        .cta.secondary { background: #fff; color: var(--site-text); border: 1px solid var(--site-border); }
+        .hero-image { width: 100%; height: auto; border-radius: 16px; display: block; object-fit: cover; max-height: 420px; background: var(--site-surface); }
+        .card .ask { display: inline-block; margin-top: 12px; font-weight: 600; text-decoration: none; padding: 6px 0; }
+        .card .ask:hover { text-decoration: underline; }
+        .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+        @media (min-width: 900px) { .hero-band .wrap.has-image { grid-template-columns: 1.1fr 1fr; } }
+        @media (max-width: 640px) { .hero { padding-top: 40px; padding-bottom: 28px; } .actions .cta { flex: 1 1 100%; text-align: center; } }
     </style>
 </head>
 <body>
@@ -119,7 +149,12 @@
 
 <header class="site">
     <div class="wrap">
-        <a class="name" href="{{ $links['home'] ?? '#' }}">{{ $business }}</a>
+        <a class="name brand" href="{{ $links['home'] ?? '#' }}">
+            @if ($logo)
+                <img src="{{ $mediaBase.$logo['file'] }}" alt="Logotipo de {{ $business }}" width="{{ $logo['width'] ?: '' }}" height="{{ $logo['height'] ?: '' }}">
+            @endif
+            <span>{{ $business }}</span>
+        </a>
         @if ($links['home'] && ($links['services'] || $links['assistant']))
             <nav class="site" aria-label="Navegação do site">
                 <a href="{{ $links['home'] }}" @if ($page === 'home') aria-current="page" @endif>Início</a>
@@ -141,15 +176,41 @@
     @if ($page === 'services')
     <section class="wrap hero">
         <h1>Serviços</h1>
-        <p>Conheça os serviços de {{ $business }}.</p>
+        <p>Conheça os serviços de {{ $business }}.@if ($region) Atendemos: {{ $region }}.@endif</p>
     </section>
     @else
-    <section class="wrap hero">
-        <h1>{{ $content['headline'] ?: $business }}</h1>
-        @if (($content['segment'] ?? null) !== null)
-            <p style="font-size:.95rem">{{ $content['segment'] }}</p>
-        @endif
-    </section>
+    <div class="hero-band">
+        <div class="wrap @if ($hero) has-image @endif">
+            <section class="hero" aria-labelledby="titulo-principal">
+                @if (($content['segment'] ?? null) !== null)
+                    <p class="eyebrow">
+                        <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="{{ $theme['icon'] }}"/></svg>
+                        {{ $content['segment'] }}
+                    </p>
+                @endif
+                <h1 id="titulo-principal">{{ $content['headline'] ?: $business }}</h1>
+                @if ($region)
+                    <p class="region">Atendemos: {{ $region }}</p>
+                @endif
+                @if ($links['request'] || $links['assistant'] || $whatsDigits !== '')
+                    <div class="actions">
+                        @if ($links['request'])
+                            <a class="cta" href="{{ $requestLink() }}">Solicitar atendimento</a>
+                        @endif
+                        @if ($links['assistant'])
+                            <a class="cta secondary" href="{{ $links['assistant'] }}">Agendar online</a>
+                        @endif
+                        @if ($whatsDigits !== '')
+                            <a class="cta secondary" href="https://wa.me/{{ $whatsDigits }}" rel="noopener">Falar no WhatsApp</a>
+                        @endif
+                    </div>
+                @endif
+            </section>
+            @if ($hero)
+                <img class="hero-image" src="{{ $mediaBase.$hero['file'] }}" alt="" width="{{ $hero['width'] ?: '' }}" height="{{ $hero['height'] ?: '' }}" fetchpriority="high" decoding="async">
+            @endif
+        </div>
+    </div>
     @endif
 
     @if ($page === 'home' && filled($content['about'] ?? null))
@@ -177,6 +238,9 @@
                             @endif
                             @if (filled($service['price_label'] ?? null))
                                 <div class="price">{{ $service['price_label'] }}</div>
+                            @endif
+                            @if ($links['request'])
+                                <a class="ask" href="{{ $requestLink(isset($service['id']) ? (int) $service['id'] : null) }}">Solicitar este serviço<span class="sr-only">: {{ $service['name'] }}</span> <span aria-hidden="true">→</span></a>
                             @endif
                         </div>
                     @endforeach

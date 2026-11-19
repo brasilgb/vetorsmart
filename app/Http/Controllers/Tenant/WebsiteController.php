@@ -3,18 +3,25 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\StoreWebsiteImageRequest;
 use App\Http\Requests\Tenant\UpdateWebsiteDraftRequest;
+use App\Models\AssistantSetting;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Services\Tenancy\TenantContext;
+use App\Services\Websites\SegmentTheme;
+use App\Services\Websites\WebsiteMedia;
 use App\Services\Websites\WebsitePresenter;
 use App\Services\Websites\WebsiteService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 /**
  * Meu Site: the company's public website. Drafts are edited here; visitors see only
@@ -38,6 +45,7 @@ class WebsiteController extends Controller
             'domains' => $presenter->domains($tenant),
             'canEdit' => Gate::allows('manageSettings', $tenant),
             'segment' => $tenant->segment?->name,
+            'serviceRegion' => AssistantSetting::query()->forTenant($tenant)->value('service_region'),
         ]);
     }
 
@@ -85,13 +93,66 @@ class WebsiteController extends Controller
     public function preview(TenantContext $context, WebsiteService $websites): View
     {
         $tenant = $context->requireTenant();
+        $content = $websites->previewContent($tenant);
 
         return view('website.site', [
-            'content' => $websites->previewContent($tenant),
+            'content' => $content,
+            'theme' => SegmentTheme::for($content['segment_slug'] ?? null),
             'canonical' => null,
             'noindex' => true,
             'preview' => true,
+            'mediaBase' => url('/meu-site/previa/midia').'/',
+            'ogImage' => null,
+            'links' => ['home' => null, 'services' => null, 'assistant' => null, 'request' => '#'],
         ]);
+    }
+
+    /**
+     * An image of the draft, for the preview only. The file must be in the company's own folder and referenced by its
+     * draft; images of another company never resolve here.
+     */
+    public function previewMedia(string $file, TenantContext $context, WebsiteService $websites, WebsiteMedia $media): HttpResponse
+    {
+        $tenant = $context->requireTenant();
+        $website = $websites->ensure($tenant);
+        $path = $media->path($tenant, $file);
+
+        if (! $media->isReferenced($website->draft_content ?? [], $file) || ! Storage::disk(WebsiteMedia::DISK)->exists($path)) {
+            abort(404);
+        }
+
+        return Storage::disk(WebsiteMedia::DISK)->response($path, $file, [
+            'Content-Type' => 'image/webp',
+            'Cache-Control' => 'private, max-age=300',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    public function storeImage(StoreWebsiteImageRequest $request, string $kind, TenantContext $context, WebsiteService $websites): RedirectResponse
+    {
+        $tenant = $context->requireTenant();
+        Gate::authorize('manageSettings', $tenant);
+
+        $upload = $request->file('image');
+        abort_unless($upload instanceof UploadedFile, 422);
+
+        $websites->storeImage($tenant, $kind, $upload, $this->actor($request));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => ($kind === 'logo' ? 'Logotipo' : 'Imagem principal').' salvo no rascunho. Publique para exibir no site.']);
+
+        return to_route('tenant.website.index');
+    }
+
+    public function removeImage(Request $request, string $kind, TenantContext $context, WebsiteService $websites): RedirectResponse
+    {
+        $tenant = $context->requireTenant();
+        Gate::authorize('manageSettings', $tenant);
+
+        $websites->removeImage($tenant, $kind, $this->actor($request));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => ($kind === 'logo' ? 'Logotipo' : 'Imagem principal').' removido do rascunho. Publique para atualizar o site.']);
+
+        return to_route('tenant.website.index');
     }
 
     /**
@@ -111,6 +172,7 @@ class WebsiteController extends Controller
             'services' => [
                 'service_ids' => array_values(array_map('intval', $data['service_ids'] ?? [])),
                 'show_professionals' => (bool) ($data['show_professionals'] ?? false),
+                'show_prices' => (bool) ($data['show_prices'] ?? true),
                 'professional_ids' => array_values(array_map('intval', $data['professional_ids'] ?? [])),
             ],
             'seo' => ['seo' => [

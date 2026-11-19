@@ -3,8 +3,8 @@
 namespace App\Enums;
 
 /**
- * Where a request came from. Only the panel creates requests today; the other origins are
- * reserved for integrations that do not exist yet.
+ * Where a request came from: the panel, the request form of the public site, the visitor assistant of the site, or
+ * the API (reserved for an integration that does not exist yet).
  */
 enum RequestOrigin: string
 {

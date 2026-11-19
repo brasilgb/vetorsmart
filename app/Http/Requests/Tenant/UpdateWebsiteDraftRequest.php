@@ -31,6 +31,7 @@ class UpdateWebsiteDraftRequest extends FormRequest
             'service_ids' => ['sometimes', 'array', 'max:50'],
             'service_ids.*' => ['integer'],
             'show_professionals' => ['sometimes', 'boolean'],
+            'show_prices' => ['sometimes', 'boolean'],
             'professional_ids' => ['sometimes', 'array', 'max:50'],
             'professional_ids.*' => ['integer'],
 

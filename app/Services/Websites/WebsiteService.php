@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\WebsiteVersion;
 use App\Services\AuditLogger;
 use App\Services\GrowthEventRecorder;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,6 +25,7 @@ class WebsiteService
         private WebsiteSnapshotBuilder $builder,
         private AuditLogger $auditLogger,
         private GrowthEventRecorder $growth,
+        private WebsiteMedia $media,
     ) {}
 
     /**
@@ -105,8 +107,53 @@ class WebsiteService
             $this->growth->record($tenant, GrowthEventType::WebsitePublished, $website);
             $this->auditLogger->record('website.published', $tenant, $website, ['version' => $nextVersion], $actor);
 
+            DB::afterCommit(fn () => $this->media->prune($tenant, [$website->draft_content ?? [], $content]));
+
             return $version;
         });
+    }
+
+    /**
+     * Replace the logo or the main image of the draft. The published site keeps its own image until the next
+     * publication; an earlier draft image that nothing uses any more is removed.
+     */
+    public function storeImage(Tenant $tenant, string $kind, UploadedFile $upload, User $actor): TenantWebsite
+    {
+        $stored = $this->media->store($tenant, $kind, $upload);
+        $website = $this->saveDraft($tenant, [$kind => $stored], $actor);
+        $this->pruneMedia($tenant, $website);
+
+        return $website;
+    }
+
+    /**
+     * Take the logo or the main image out of the draft.
+     */
+    public function removeImage(Tenant $tenant, string $kind, User $actor): TenantWebsite
+    {
+        $website = $this->saveDraft($tenant, [$kind => null], $actor);
+        $this->pruneMedia($tenant, $website);
+
+        return $website;
+    }
+
+    /**
+     * Content of the version visitors see now, or null when the site was never published.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function publishedContent(TenantWebsite $website): ?array
+    {
+        if ($website->published_version_id === null) {
+            return null;
+        }
+
+        return WebsiteVersion::query()->forTenant($website->tenant_id)->whereKey($website->published_version_id)->first()?->content;
+    }
+
+    private function pruneMedia(Tenant $tenant, TenantWebsite $website): void
+    {
+        $this->media->prune($tenant, array_values(array_filter([$website->draft_content ?? [], $this->publishedContent($website) ?? []])));
     }
 
     /**

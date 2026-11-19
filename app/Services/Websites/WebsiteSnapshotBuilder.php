@@ -2,6 +2,7 @@
 
 namespace App\Services\Websites;
 
+use App\Models\AssistantSetting;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Models\Tenant;
@@ -41,21 +42,28 @@ class WebsiteSnapshotBuilder
             ->get();
 
         $hours = ($draft['show_hours'] ?? false) ? ($setting?->business_hours) : null;
+        $showPrices = (bool) ($draft['show_prices'] ?? true);
+        $region = AssistantSetting::query()->forTenant($tenant)->value('service_region');
 
         return [
             'business_name' => $setting === null ? $tenant->name : $setting->business_name,
             'segment' => $tenant->segment?->name,
+            'segment_slug' => $tenant->segment?->slug,
             'template_label' => $templateLabel,
             'headline' => $draft['headline'] ?? null,
             'about' => $draft['about'] ?? null,
             'differentials' => array_values(array_filter((array) ($draft['differentials'] ?? []), fn ($item): bool => is_string($item) && $item !== '')),
             'accent_color' => $draft['accent_color'] ?? '#2563EB',
             'font' => $draft['font'] ?? 'sans',
+            'logo' => $this->image($draft['logo'] ?? null),
+            'hero' => $this->image($draft['hero'] ?? null),
+            'service_region' => is_string($region) && trim($region) !== '' ? trim($region) : null,
             'services' => $services->map(fn (Service $service): array => [
+                'id' => $service->id,
                 'name' => $service->name,
                 'description' => $service->description,
                 'duration_minutes' => $service->duration_minutes,
-                'price_label' => $this->priceLabel($service),
+                'price_label' => $showPrices ? $this->priceLabel($service) : null,
             ])->values()->all(),
             'professionals' => $professionals->map(fn (Professional $professional): array => ['name' => $professional->name])->values()->all(),
             'hours' => is_array($hours) ? $hours : null,
@@ -74,6 +82,20 @@ class WebsiteSnapshotBuilder
                 'indexable' => (bool) ($draft['seo']['indexable'] ?? true),
             ],
         ];
+    }
+
+    /**
+     * A stored image of the draft, kept only with its expected shape.
+     *
+     * @return array{file: string, width: int, height: int}|null
+     */
+    private function image(mixed $image): ?array
+    {
+        if (! is_array($image) || ! is_string($image['file'] ?? null) || preg_match('/^'.WebsiteMedia::FILE_PATTERN.'$/', $image['file']) !== 1) {
+            return null;
+        }
+
+        return ['file' => $image['file'], 'width' => (int) ($image['width'] ?? 0), 'height' => (int) ($image['height'] ?? 0)];
     }
 
     private function priceLabel(Service $service): ?string

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AssistantSetting;
 use App\Models\Tenant;
 use App\Services\Websites\PublicSiteAddress;
+use App\Services\Websites\SegmentTheme;
 use App\Services\Websites\WebsiteResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -231,8 +232,13 @@ class SiteController extends Controller
         $home = $onCustomDomain ? $base.'/' : $base;
         $noindex = $tenant->isHomolog() || ! ($content['seo']['indexable'] ?? true);
 
+        $shareImage = $content['hero']['file'] ?? $content['logo']['file'] ?? null;
+
         $response = response()->view('website.site', [
             'content' => $content,
+            'theme' => SegmentTheme::for($content['segment_slug'] ?? null),
+            'mediaBase' => $base.'/midia/',
+            'ogImage' => is_string($shareImage) ? $this->address->canonical($tenant, '/midia/'.$shareImage) : null,
             'canonical' => $this->address->canonical($tenant, $page === 'services' ? '/servicos' : ''),
             'noindex' => $noindex,
             'homolog' => $tenant->isHomolog(),
@@ -242,6 +248,7 @@ class SiteController extends Controller
                 'home' => $home,
                 'services' => empty($content['services'] ?? []) ? null : $base.'/servicos',
                 'assistant' => $assistantEnabled ? $base.'/atendimento' : null,
+                'request' => $base.'/solicitar',
             ],
         ]);
 
