@@ -4,9 +4,11 @@ namespace App\Http\Controllers\RootAdmin;
 
 use App\Enums\ChargeStatus;
 use App\Enums\DomainStatus;
+use App\Enums\SupportTicketCategory;
 use App\Enums\SupportTicketPriority;
 use App\Enums\SupportTicketStatus;
 use App\Enums\TenantStatus;
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RootAdmin\StoreSupportTicketRequest;
 use App\Http\Requests\RootAdmin\UpdateSupportTicketRequest;
@@ -16,164 +18,243 @@ use App\Models\SupportTicket;
 use App\Models\SupportTicketEvent;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
-use App\Services\AuditLogger;
+use App\Models\User;
+use App\Services\Support\SupportTicketService;
+use App\Support\CsvExport;
 use App\Support\PlatformTime;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Suporte operacional of the platform team (RootAdmin only): companies showing problems in real data, and support
- * records with status, priority and an append-only follow-up history. Every change is audited. No chat, no external
- * channel: this is the internal base, not the future Central ABrasil Suporte.
+ * Central de Suporte, platform side (RootAdmin only): requests of every company and of the platform, with filters,
+ * indicators (open, waiting for the company, overdue), person responsible, due date set on the request, replies seen
+ * by the company, internal notes, controlled status changes, closing and reopening. Every change goes through
+ * SupportTicketService (append-only history and audit). Companies with problems in real data are listed as signals.
  */
 class SupportController extends Controller
 {
     public function index(Request $request): Response
     {
-        $status = SupportTicketStatus::tryFrom($request->string('status')->value());
-        $priority = SupportTicketPriority::tryFrom($request->string('priority')->value());
-        $term = $request->string('q')->trim()->value();
-        $openOnly = $status === null && $request->string('status')->value() !== 'todos';
-
-        $tickets = SupportTicket::query()
-            ->with('tenant:id,name')
-            ->when($status !== null, fn ($query) => $query->where('status', $status->value))
-            ->when($openOnly, fn ($query) => $query->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value]))
-            ->when($priority !== null, fn ($query) => $query->where('priority', $priority->value))
-            ->when($request->filled('tenant_id'), fn ($query) => $query->where('tenant_id', $request->integer('tenant_id')))
-            ->when($term !== '', fn ($query) => $query->where('subject', 'like', '%'.addcslashes($term, '%_\\').'%'))
-            ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
-            ->orderByDesc('last_activity_at')
-            ->paginate(20)
-            ->withQueryString();
+        $tickets = $this->filtered($request)->with(['tenant:id,name', 'assignee:id,name'])->paginate(20)->withQueryString();
+        $open = SupportTicket::query()->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value]);
 
         return Inertia::render('rootadmin/support/index', [
-            'filters' => ['status' => $status->value ?? ($openOnly ? '' : 'todos'), 'priority' => $priority->value ?? '', 'q' => $term, 'tenant_id' => $request->string('tenant_id')->value()],
-            'statuses' => array_map(fn (SupportTicketStatus $item): array => ['value' => $item->value, 'label' => $item->label()], SupportTicketStatus::cases()),
-            'priorities' => array_map(fn (SupportTicketPriority $item): array => ['value' => $item->value, 'label' => $item->label()], SupportTicketPriority::cases()),
+            'filters' => $this->filterValues($request),
+            'statuses' => $this->options(SupportTicketStatus::cases()),
+            'priorities' => $this->options(SupportTicketPriority::cases()),
+            'categories' => SupportTicketCategory::options(),
             'tenants' => Tenant::query()->orderBy('name')->get(['id', 'name'])->map(fn (Tenant $tenant): array => ['id' => $tenant->id, 'name' => $tenant->name])->all(),
-            'tickets' => $tickets->through(fn (SupportTicket $ticket): array => [
-                'id' => $ticket->id,
-                'subject' => $ticket->subject,
-                'tenant' => $ticket->tenant?->name,
-                'tenant_id' => $ticket->tenant_id,
-                'status' => $ticket->status->value,
-                'status_label' => $ticket->status->label(),
-                'priority' => $ticket->priority->value,
-                'priority_label' => $ticket->priority->label(),
-                'opened_at' => PlatformTime::dateTime($ticket->created_at),
-                'last_activity_at' => PlatformTime::dateTime($ticket->last_activity_at),
-            ]),
+            'assignees' => $this->assignees(),
+            'indicators' => [
+                'open' => (clone $open)->count(),
+                'waiting' => SupportTicket::query()->where('status', SupportTicketStatus::Waiting->value)->count(),
+                'overdue' => (clone $open)->whereNotNull('due_at')->where('due_at', '<', now())->count(),
+                'unassigned' => (clone $open)->whereNull('assigned_to')->count(),
+            ],
+            'tickets' => $tickets->through(fn (SupportTicket $ticket): array => $this->row($ticket)),
             'signals' => $this->signals(),
         ]);
     }
 
+    public function export(Request $request): StreamedResponse
+    {
+        return CsvExport::download('chamados-'.now()->format('Y-m-d').'.csv', [
+            'Número', 'Empresa', 'Assunto', 'Categoria', 'Situação', 'Prioridade', 'Origem', 'Responsável', 'Prazo', 'Atrasado', 'Aberto em', 'Última atualização', 'Finalizado em',
+        ], function (callable $write) use ($request): void {
+            $this->filtered($request)->with(['tenant:id,name', 'assignee:id,name'])->chunk(200, function (Collection $tickets) use ($write): void {
+                foreach ($tickets as $ticket) {
+                    $write([
+                        $ticket->id, $ticket->tenant->name ?? 'Plataforma', $ticket->subject, $ticket->category->label(), $ticket->status->label(), $ticket->priority->label(),
+                        $ticket->opened_via === 'tenant' ? 'Empresa' : 'Plataforma', $ticket->assignee->name ?? '', PlatformTime::dateTime($ticket->due_at) ?? '',
+                        $ticket->isOverdue(), PlatformTime::dateTime($ticket->created_at), PlatformTime::dateTime($ticket->last_activity_at), PlatformTime::dateTime($ticket->closed_at) ?? '',
+                    ]);
+                }
+            });
+        });
+    }
+
     public function show(SupportTicket $ticket): Response
     {
-        $ticket->load(['tenant:id,name', 'opener:id,name']);
+        $ticket->load(['tenant:id,name', 'opener:id,name', 'assignee:id,name']);
+        $names = User::query()->whereIn('id', $ticket->events()->where('type', 'assigned')->get(['from_value', 'to_value'])->flatMap(fn (SupportTicketEvent $event): array => [$event->from_value, $event->to_value])->filter())->pluck('name', 'id');
 
         return Inertia::render('rootadmin/support/show', [
             'ticket' => [
-                'id' => $ticket->id,
-                'subject' => $ticket->subject,
+                ...$this->row($ticket),
                 'description' => $ticket->description,
-                'tenant' => $ticket->tenant?->name,
-                'tenant_id' => $ticket->tenant_id,
-                'status' => $ticket->status->value,
-                'status_label' => $ticket->status->label(),
-                'priority' => $ticket->priority->value,
-                'priority_label' => $ticket->priority->label(),
                 'opened_by' => $ticket->opener?->name,
-                'opened_at' => PlatformTime::dateTime($ticket->created_at),
-                'last_activity_at' => PlatformTime::dateTime($ticket->last_activity_at),
                 'closed_at' => PlatformTime::dateTime($ticket->closed_at),
+                'assigned_to' => $ticket->assigned_to,
+                'due_at_input' => $ticket->due_at === null ? '' : PlatformTime::toDisplay($ticket->due_at)->format('Y-m-d\TH:i'),
             ],
             'events' => $ticket->events()->with('user:id,name')->latest('id')->limit(200)->get()->map(fn (SupportTicketEvent $event): array => [
                 'id' => $event->id,
                 'type' => $event->type,
-                'from' => $this->valueLabel($event->type, $event->from_value),
-                'to' => $this->valueLabel($event->type, $event->to_value),
+                'from' => $this->valueLabel($event->type, $event->from_value, $names),
+                'to' => $this->valueLabel($event->type, $event->to_value, $names),
                 'note' => $event->note,
+                'internal' => $event->is_internal,
                 'user' => $event->user?->name,
                 'at' => PlatformTime::dateTime($event->created_at),
             ])->all(),
-            'statuses' => array_map(fn (SupportTicketStatus $item): array => ['value' => $item->value, 'label' => $item->label()], SupportTicketStatus::cases()),
-            'priorities' => array_map(fn (SupportTicketPriority $item): array => ['value' => $item->value, 'label' => $item->label()], SupportTicketPriority::cases()),
+            'statuses' => $this->options(SupportTicketStatus::cases()),
+            'priorities' => $this->options(SupportTicketPriority::cases()),
+            'assignees' => $this->assignees(),
         ]);
     }
 
-    public function store(StoreSupportTicketRequest $request, AuditLogger $auditLogger): RedirectResponse
+    public function store(StoreSupportTicketRequest $request, SupportTicketService $support): RedirectResponse
     {
         $data = $request->validated();
-        $actor = $this->actor($request);
-
-        $ticket = DB::transaction(function () use ($data, $actor, $auditLogger): SupportTicket {
-            $ticket = new SupportTicket;
-            $ticket->forceFill([
-                'tenant_id' => $data['tenant_id'] ?? null,
-                'subject' => $data['subject'],
-                'description' => $data['description'],
-                'priority' => SupportTicketPriority::from($data['priority']),
-                'status' => SupportTicketStatus::Open,
-                'opened_by' => $actor->getKey(),
-                'last_activity_at' => now(),
-            ])->save();
-
-            $this->event($ticket, 'opened', null, SupportTicketStatus::Open->value, null, $actor->getKey());
-            $auditLogger->record('support.ticket_opened', $ticket->tenant, $ticket, ['priority' => $ticket->priority->value], $actor);
-
-            return $ticket;
-        });
+        $ticket = $support->open(
+            isset($data['tenant_id']) ? Tenant::query()->whereKey((int) $data['tenant_id'])->first() : null,
+            $data['subject'],
+            $data['description'],
+            SupportTicketCategory::tryFrom($data['category'] ?? '') ?? SupportTicketCategory::Other,
+            SupportTicketPriority::from($data['priority']),
+            'platform',
+            $this->actor($request),
+        );
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Chamado aberto.']);
 
         return to_route('rootadmin.support.show', $ticket);
     }
 
-    public function update(UpdateSupportTicketRequest $request, SupportTicket $ticket, AuditLogger $auditLogger): RedirectResponse
+    public function update(UpdateSupportTicketRequest $request, SupportTicket $ticket, SupportTicketService $support): RedirectResponse
     {
         $data = $request->validated();
-        $actor = $this->actor($request);
 
-        DB::transaction(function () use ($ticket, $data, $actor, $auditLogger): void {
-            $ticket = SupportTicket::query()->whereKey($ticket->getKey())->lockForUpdate()->firstOrFail();
-            $changes = [];
+        $support->platformUpdate($ticket, [
+            'note' => $data['note'] ?? null,
+            'internal' => $request->boolean('internal'),
+            'status' => isset($data['status']) ? SupportTicketStatus::from($data['status']) : null,
+            'priority' => isset($data['priority']) ? SupportTicketPriority::from($data['priority']) : null,
+            'assign' => $request->has('assigned_to'),
+            'assigned_to' => filled($data['assigned_to'] ?? null) ? User::query()->whereKey((int) $data['assigned_to'])->first() : null,
+            'set_due' => $request->has('due_at'),
+            'due_at' => filled($data['due_at'] ?? null) ? PlatformTime::fromLocal((string) $data['due_at']) : null,
+        ], $this->actor($request));
 
-            if (filled($data['note'] ?? null)) {
-                $this->event($ticket, 'comment', null, null, $data['note'], $actor->getKey());
-                $changes['comment'] = true;
-            }
-
-            $status = isset($data['status']) ? SupportTicketStatus::from($data['status']) : null;
-
-            if ($status !== null && $status !== $ticket->status) {
-                $this->event($ticket, 'status', $ticket->status->value, $status->value, null, $actor->getKey());
-                $changes['status'] = ['de' => $ticket->status->value, 'para' => $status->value];
-                $ticket->forceFill(['status' => $status, 'closed_at' => $status->isFinal() ? now() : null]);
-            }
-
-            $priority = isset($data['priority']) ? SupportTicketPriority::from($data['priority']) : null;
-
-            if ($priority !== null && $priority !== $ticket->priority) {
-                $this->event($ticket, 'priority', $ticket->priority->value, $priority->value, null, $actor->getKey());
-                $changes['priority'] = ['de' => $ticket->priority->value, 'para' => $priority->value];
-                $ticket->forceFill(['priority' => $priority]);
-            }
-
-            if ($changes === []) {
-                return;
-            }
-
-            $ticket->forceFill(['last_activity_at' => now()])->save();
-            $auditLogger->record('support.ticket_updated', $ticket->tenant, $ticket, $changes, $actor);
-        });
-
-        Inertia::flash('toast', ['type' => 'success', 'message' => 'Acompanhamento registrado.']);
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Chamado atualizado.']);
 
         return to_route('rootadmin.support.show', $ticket);
+    }
+
+    public function reopen(Request $request, SupportTicket $ticket, SupportTicketService $support): RedirectResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:5', 'max:500']], ['reason.*' => 'Informe o motivo da reabertura (5 a 500 caracteres).']);
+        $support->reopen($ticket, $this->actor($request), $data['reason']);
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => 'Chamado reaberto.']);
+
+        return to_route('rootadmin.support.show', $ticket);
+    }
+
+    /**
+     * @return Builder<SupportTicket>
+     */
+    private function filtered(Request $request): Builder
+    {
+        $values = $this->filterValues($request);
+        $status = SupportTicketStatus::tryFrom($values['status']);
+        $priority = SupportTicketPriority::tryFrom($values['priority']);
+        $category = SupportTicketCategory::tryFrom($values['category']);
+
+        return SupportTicket::query()
+            ->when($status !== null, fn ($query) => $query->where('status', $status->value))
+            ->when($values['status'] === '' || $values['status'] === 'atrasados', fn ($query) => $query->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value]))
+            ->when($values['status'] === 'atrasados', fn ($query) => $query->whereNotNull('due_at')->where('due_at', '<', now()))
+            ->when($priority !== null, fn ($query) => $query->where('priority', $priority->value))
+            ->when($category !== null, fn ($query) => $query->where('category', $category->value))
+            ->when($values['tenant_id'] !== '', fn ($query) => $query->where('tenant_id', (int) $values['tenant_id']))
+            ->when($values['assigned_to'] === 'ninguem', fn ($query) => $query->whereNull('assigned_to'))
+            ->when(ctype_digit($values['assigned_to']), fn ($query) => $query->where('assigned_to', (int) $values['assigned_to']))
+            ->when($values['q'] !== '', fn ($query) => $query->where('subject', 'like', '%'.addcslashes($values['q'], '%_\\').'%'))
+            ->orderByRaw("CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END")
+            ->orderByDesc('last_activity_at')
+            ->orderByDesc('id');
+    }
+
+    /**
+     * @return array{status: string, priority: string, category: string, tenant_id: string, assigned_to: string, q: string}
+     */
+    private function filterValues(Request $request): array
+    {
+        return [
+            'status' => $request->string('status')->value(),
+            'priority' => $request->string('priority')->value(),
+            'category' => $request->string('category')->value(),
+            'tenant_id' => ctype_digit($request->string('tenant_id')->value()) ? $request->string('tenant_id')->value() : '',
+            'assigned_to' => $request->string('assigned_to')->value(),
+            'q' => $request->string('q')->trim()->value(),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function row(SupportTicket $ticket): array
+    {
+        return [
+            'id' => $ticket->id,
+            'subject' => $ticket->subject,
+            'tenant' => $ticket->tenant?->name,
+            'tenant_id' => $ticket->tenant_id,
+            'category_label' => $ticket->category->label(),
+            'status' => $ticket->status->value,
+            'status_label' => $ticket->status->label(),
+            'priority' => $ticket->priority->value,
+            'priority_label' => $ticket->priority->label(),
+            'opened_via' => $ticket->opened_via,
+            'assignee' => $ticket->assignee?->name,
+            'due_at' => PlatformTime::dateTime($ticket->due_at),
+            'overdue' => $ticket->isOverdue(),
+            'is_final' => $ticket->status->isFinal(),
+            'opened_at' => PlatformTime::dateTime($ticket->created_at),
+            'last_activity_at' => PlatformTime::dateTime($ticket->last_activity_at),
+        ];
+    }
+
+    /**
+     * @return list<array{id: int, name: string}>
+     */
+    private function assignees(): array
+    {
+        return array_values(User::query()->where('is_root_admin', true)->where('status', UserStatus::Active->value)->orderBy('name')->get(['id', 'name'])
+            ->map(fn (User $user): array => ['id' => $user->id, 'name' => $user->name])->all());
+    }
+
+    /**
+     * @param  list<SupportTicketStatus>|list<SupportTicketPriority>  $cases
+     * @return list<array{value: string, label: string}>
+     */
+    private function options(array $cases): array
+    {
+        return array_map(fn (SupportTicketStatus|SupportTicketPriority $item): array => ['value' => $item->value, 'label' => $item->label()], $cases);
+    }
+
+    /**
+     * @param  Collection<int, string>  $names
+     */
+    private function valueLabel(string $type, ?string $value, Collection $names): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        return match ($type) {
+            'priority' => SupportTicketPriority::tryFrom($value)?->label(),
+            'assigned' => $names->get((int) $value),
+            'due' => PlatformTime::dateTime(Carbon::parse($value)),
+            default => SupportTicketStatus::tryFrom($value)?->label(),
+        } ?? $value;
     }
 
     /**
@@ -192,35 +273,10 @@ class SupportController extends Controller
                 ->map(fn (TenantDomain $domain): array => ['tenant_id' => $domain->tenant_id, 'tenant' => $domain->tenant->name, 'detail' => "Verificação falhou: {$domain->hostname}"])->values()->all(),
             'charges' => BillingCharge::query()->with('tenant:id,name')->whereIn('tenant_id', $realTenants)->where('status', ChargeStatus::Pending->value)->where('issue_attempts', '>', 0)->limit(10)->get()
                 ->map(fn (BillingCharge $charge): array => ['tenant_id' => $charge->tenant_id, 'tenant' => $charge->tenant->name, 'detail' => "Cobrança #{$charge->id} sem emissão após {$charge->issue_attempts} tentativa(s)"])->values()->all(),
-            'assistant' => AssistantUsage::query()->where('usage_date', '>=', now()->startOfMonth()->toDateString())->where('provider_failures', '>', 0)
+            'assistant' => AssistantUsage::query()->with('tenant:id,name')->where('usage_date', '>=', now()->startOfMonth()->toDateString())->where('provider_failures', '>', 0)
                 ->whereIn('tenant_id', Tenant::query()->where('is_homolog', false)->select('id'))
                 ->groupBy('tenant_id')->selectRaw('tenant_id, SUM(provider_failures) AS failures')->orderByDesc('failures')->limit(10)->get()
-                ->map(fn (AssistantUsage $row): array => ['tenant_id' => $row->tenant_id, 'tenant' => (string) Tenant::query()->whereKey($row->tenant_id)->value('name'), 'detail' => $row->getAttribute('failures').' falha(s) do provedor de IA no mês'])->values()->all(),
+                ->map(fn (AssistantUsage $row): array => ['tenant_id' => $row->tenant_id, 'tenant' => (string) $row->tenant?->name, 'detail' => $row->getAttribute('failures').' falha(s) do provedor de IA no mês'])->values()->all(),
         ];
-    }
-
-    private function event(SupportTicket $ticket, string $type, ?string $from, ?string $to, ?string $note, ?int $userId): void
-    {
-        $event = new SupportTicketEvent;
-        $event->forceFill([
-            'support_ticket_id' => $ticket->getKey(),
-            'user_id' => $userId,
-            'type' => $type,
-            'from_value' => $from,
-            'to_value' => $to,
-            'note' => $note,
-        ])->save();
-    }
-
-    private function valueLabel(string $type, ?string $value): ?string
-    {
-        if ($value === null) {
-            return null;
-        }
-
-        return match ($type) {
-            'priority' => SupportTicketPriority::tryFrom($value)?->label(),
-            default => SupportTicketStatus::tryFrom($value)?->label(),
-        } ?? $value;
     }
 }

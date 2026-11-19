@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { index as growthIndex } from '@/routes/rootadmin/growth';
+import { exportMethod as growthExport, index as growthIndex } from '@/routes/rootadmin/growth';
 import { show as tenantShow } from '@/routes/rootadmin/tenants';
 import type { Paginator } from '@/types';
 
@@ -67,12 +67,17 @@ export default function GrowthIndex({ filters, months, period, overview, evoluti
             <Head title="Crescimento e SEO · RootAdmin" />
 
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
+                <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                     <h1 className="text-2xl font-semibold text-vs-text">Crescimento e SEO</h1>
                     <p className="text-sm text-vs-muted">
                         Atividade real e SEO técnico das empresas, sem as de homologação nos totais. “Indexável” indica que a configuração permite a
                         indexação; não significa que a página já esteja indexada em buscadores.
                     </p>
+                </div>
+                    <Button asChild variant="outline" size="sm">
+                        <a href={growthExport.url({ query: filters })}>Exportar CSV</a>
+                    </Button>
                 </div>
 
                 <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

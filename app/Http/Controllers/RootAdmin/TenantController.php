@@ -17,11 +17,14 @@ use App\Models\TenantUser;
 use App\Models\TenantWebsite;
 use App\Models\User;
 use App\Services\TenantStatusService;
+use App\Support\CsvExport;
 use App\Support\PlatformTime;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class TenantController extends Controller
 {
@@ -30,10 +33,37 @@ class TenantController extends Controller
      */
     public function index(Request $request): Response
     {
-        $query = Tenant::query()
-            ->with(['segment:id,name', 'owners.user:id,name,email'])
-            ->orderByDesc('id');
+        $tenants = $this->filtered($request)->with(['segment:id,name', 'owners.user:id,name,email'])->paginate(15)->withQueryString();
 
+        return Inertia::render('rootadmin/tenants/index', [
+            'filters' => $request->only(['q', 'status', 'segment_id']),
+            'segments' => Segment::query()->orderBy('name')->get(['id', 'name']),
+            'tenants' => $tenants->through(fn (Tenant $tenant): array => $this->summary($tenant)),
+        ]);
+    }
+
+    /**
+     * The same list as the screen (every page), as CSV. No e-mail, document or credential is exported.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        return CsvExport::download('empresas-'.now()->format('Y-m-d').'.csv', ['Número', 'Empresa', 'Endereço (slug)', 'Segmento', 'Situação', 'Homologação', 'Assinatura', 'Usuários ativos', 'Cadastrada em'], function (callable $write) use ($request): void {
+            $this->filtered($request)->with(['segment:id,name'])->withCount(['memberships as active_users' => fn ($query) => $query->where('status', 'active')])->chunk(200, function ($tenants) use ($write): void {
+                $subscriptions = Subscription::query()->whereIn('tenant_id', $tenants->pluck('id'))->get(['tenant_id', 'status'])->keyBy('tenant_id');
+
+                foreach ($tenants as $tenant) {
+                    $write([$tenant->id, $tenant->name, $tenant->slug, $tenant->segment?->name, $tenant->status->value, $tenant->isHomolog(), $subscriptions->get($tenant->id)?->status->label() ?? 'Sem assinatura (anterior à cobrança)', $tenant->getAttribute('active_users'), PlatformTime::date($tenant->created_at)]);
+                }
+            });
+        });
+    }
+
+    /**
+     * @return Builder<Tenant>
+     */
+    private function filtered(Request $request): Builder
+    {
+        $query = Tenant::query()->orderByDesc('id');
         $term = $request->string('q')->trim()->value();
 
         if ($term !== '') {
@@ -49,13 +79,7 @@ class TenantController extends Controller
             $query->where('segment_id', $request->integer('segment_id'));
         }
 
-        $tenants = $query->paginate(15)->withQueryString();
-
-        return Inertia::render('rootadmin/tenants/index', [
-            'filters' => $request->only(['q', 'status', 'segment_id']),
-            'segments' => Segment::query()->orderBy('name')->get(['id', 'name']),
-            'tenants' => $tenants->through(fn (Tenant $tenant): array => $this->summary($tenant)),
-        ]);
+        return $query;
     }
 
     /**

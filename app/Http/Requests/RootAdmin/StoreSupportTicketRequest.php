@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\RootAdmin;
 
+use App\Enums\SupportTicketCategory;
 use App\Enums\SupportTicketPriority;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -21,6 +22,7 @@ class StoreSupportTicketRequest extends FormRequest
             'subject' => ['required', 'string', 'min:5', 'max:160'],
             'description' => ['required', 'string', 'min:10', 'max:5000'],
             'priority' => ['required', Rule::enum(SupportTicketPriority::class)],
+            'category' => ['nullable', Rule::enum(SupportTicketCategory::class)],
         ];
     }
 
@@ -36,6 +38,7 @@ class StoreSupportTicketRequest extends FormRequest
             'description.required' => 'Descreva a situação.',
             'description.min' => 'A descrição precisa de ao menos 10 caracteres.',
             'priority.*' => 'Escolha uma prioridade válida.',
+            'category.*' => 'Escolha uma categoria válida.',
         ];
     }
 }

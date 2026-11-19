@@ -105,7 +105,7 @@ test('a follow-up records comment, status and priority changes, and resolving se
     $ticket = SupportTicket::query()->sole();
 
     $this->actingAs($this->root)->post("/rootadmin/suporte/{$ticket->id}/acompanhamentos", [])
-        ->assertSessionHasErrors(['note' => 'Escreva o acompanhamento ou altere a situação ou a prioridade.']);
+        ->assertSessionHasErrors(['note' => 'Escreva o acompanhamento ou altere a situação, a prioridade, o responsável ou o prazo.']);
 
     $this->actingAs($this->root)->post("/rootadmin/suporte/{$ticket->id}/acompanhamentos", ['note' => 'SMTP corrigido.', 'status' => 'resolved', 'priority' => 'urgent'])->assertRedirect();
 

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Pagination } from '@/components/vetor-smart/pagination';
-import { index as tenantsIndex, show as tenantShow } from '@/routes/rootadmin/tenants';
+import { exportMethod as tenantsExport, index as tenantsIndex, show as tenantShow } from '@/routes/rootadmin/tenants';
 import type { Paginator } from '@/types';
 
 type TenantRow = {
@@ -43,9 +43,14 @@ export default function TenantsIndex({ filters, segments, tenants }: Props) {
             <Head title="Empresas" />
 
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
-                <div>
-                    <h1 className="text-2xl font-semibold text-vs-text">Empresas</h1>
-                    <p className="text-sm text-vs-muted">Cadastros da plataforma. Empresas não são excluídas por esta tela.</p>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h1 className="text-2xl font-semibold text-vs-text">Empresas</h1>
+                        <p className="text-sm text-vs-muted">Cadastros da plataforma. Empresas não são excluídas por esta tela.</p>
+                    </div>
+                    <Button asChild variant="outline" size="sm">
+                        <a href={tenantsExport.url({ query: { q: filters.q ?? '', status: filters.status ?? '', segment_id: filters.segment_id ?? '' } })}>Exportar CSV</a>
+                    </Button>
                 </div>
 
                 <form onSubmit={search} className="grid gap-3 md:grid-cols-[1fr_180px_220px_auto]">

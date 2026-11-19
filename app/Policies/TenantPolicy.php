@@ -31,6 +31,22 @@ class TenantPolicy
     /**
      * Owners and admins see the subscription, its charges and the billing documents.
      */
+    /**
+     * Meu Crescimento: business figures of the company (owners and admins).
+     */
+    public function viewGrowth(User $user, Tenant $tenant): bool
+    {
+        return $this->isActiveTenant($tenant) && $this->hasRoleIn([TenantRole::Owner, TenantRole::Admin]);
+    }
+
+    /**
+     * Central de Suporte: open and follow the support requests of the company (owners and admins).
+     */
+    public function useSupport(User $user, Tenant $tenant): bool
+    {
+        return $this->isActiveTenant($tenant) && $this->hasRoleIn([TenantRole::Owner, TenantRole::Admin]);
+    }
+
     public function viewBilling(User $user, Tenant $tenant): bool
     {
         return $this->isActiveTenant($tenant) && $this->hasRoleIn([TenantRole::Owner, TenantRole::Admin]);

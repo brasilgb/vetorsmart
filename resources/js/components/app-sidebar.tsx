@@ -27,6 +27,8 @@ import { index as tenantNotifications } from '@/routes/tenant/notifications';
 import { show as tenantSubscription } from '@/routes/tenant/subscription';
 import { show as tenantSettings } from '@/routes/tenant/settings';
 import { index as tenantWebsite } from '@/routes/tenant/website';
+import { index as tenantGrowth } from '@/routes/tenant/growth';
+import { index as tenantSupport } from '@/routes/tenant/support';
 import { index as auditIndex } from '@/routes/rootadmin/audit';
 import { index as rootadminSubscriptions } from '@/routes/rootadmin/subscriptions';
 import { index as rootadminAi } from '@/routes/rootadmin/ai';
@@ -45,6 +47,7 @@ const tenantNavGroups: NavGroup[] = [
         label: 'Visão Geral',
         items: [
             { title: 'Painel', href: dashboard(), icon: LayoutGrid },
+            { title: 'Meu Crescimento', href: tenantGrowth(), icon: TrendingUp, managersOnly: true },
             { title: 'Notificações', href: tenantNotifications(), icon: Bell },
         ],
     },
@@ -69,6 +72,7 @@ const tenantNavGroups: NavGroup[] = [
             { title: 'Usuários e permissões', href: tenantTeam(), icon: KeyRound, managersOnly: true },
             { title: 'Minha Assinatura', href: tenantSubscription(), icon: CreditCard, managersOnly: true },
             { title: 'Configurações', href: tenantSettings(), icon: Settings },
+            { title: 'Suporte', href: tenantSupport(), icon: LifeBuoy, managersOnly: true },
         ],
     },
 ];

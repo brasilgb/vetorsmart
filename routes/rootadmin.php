@@ -33,6 +33,7 @@ Route::prefix('rootadmin')
         Route::get('/', DashboardController::class)->name('dashboard');
 
         Route::get('tenants', [TenantController::class, 'index'])->name('tenants.index');
+        Route::get('tenants/exportar', [TenantController::class, 'export'])->middleware('throttle:10,1')->name('tenants.export');
         Route::get('tenants/{tenant}', [TenantController::class, 'show'])->name('tenants.show');
         Route::post('tenants/{tenant}/status', [TenantController::class, 'updateStatus'])->name('tenants.status');
 
@@ -49,11 +50,14 @@ Route::prefix('rootadmin')
         Route::get('ia', AiUsageController::class)->name('ai.index');
         Route::get('sites', WebsiteController::class)->name('websites.index');
         Route::get('crescimento', GrowthController::class)->name('growth.index');
+        Route::get('crescimento/exportar', [GrowthController::class, 'export'])->middleware('throttle:10,1')->name('growth.export');
         Route::get('configuracoes', GlobalSettingsController::class)->name('settings.show');
         Route::get('suporte', [SupportController::class, 'index'])->name('support.index');
+        Route::get('suporte/exportar', [SupportController::class, 'export'])->middleware('throttle:10,1')->name('support.export');
         Route::post('suporte', [SupportController::class, 'store'])->middleware('throttle:30,1')->name('support.store');
         Route::get('suporte/{ticket}', [SupportController::class, 'show'])->whereNumber('ticket')->name('support.show');
         Route::post('suporte/{ticket}/acompanhamentos', [SupportController::class, 'update'])->whereNumber('ticket')->middleware('throttle:60,1')->name('support.update');
+        Route::post('suporte/{ticket}/reabrir', [SupportController::class, 'reopen'])->whereNumber('ticket')->name('support.reopen');
 
         Route::get('assinaturas', [SubscriptionController::class, 'index'])->name('subscriptions.index');
         Route::get('assinaturas/{subscription}', [SubscriptionController::class, 'show'])->name('subscriptions.show');

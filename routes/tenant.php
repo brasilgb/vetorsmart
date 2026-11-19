@@ -3,12 +3,14 @@
 use App\Http\Controllers\Tenant\AgendaController;
 use App\Http\Controllers\Tenant\AssistantController;
 use App\Http\Controllers\Tenant\CustomerController;
+use App\Http\Controllers\Tenant\GrowthController;
 use App\Http\Controllers\Tenant\NotificationController;
 use App\Http\Controllers\Tenant\ProfessionalController;
 use App\Http\Controllers\Tenant\ServiceController;
 use App\Http\Controllers\Tenant\ServiceRequestController;
 use App\Http\Controllers\Tenant\SettingsController;
 use App\Http\Controllers\Tenant\SubscriptionController;
+use App\Http\Controllers\Tenant\SupportController;
 use App\Http\Controllers\Tenant\TeamController;
 use App\Http\Controllers\Tenant\WebsiteController;
 use App\Http\Controllers\Tenant\WebsiteDomainController;
@@ -88,6 +90,8 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
     Route::post('meu-site/dominios/{domain}/principal', [WebsiteDomainController::class, 'primary'])->whereNumber('domain')->name('tenant.website.domains.primary');
     Route::delete('meu-site/dominios/{domain}', [WebsiteDomainController::class, 'destroy'])->whereNumber('domain')->name('tenant.website.domains.destroy');
 
+    Route::get('meu-crescimento', GrowthController::class)->name('tenant.growth.index');
+
     Route::get('notificacoes', [NotificationController::class, 'index'])->name('tenant.notifications.index');
     Route::post('notificacoes/lidas', [NotificationController::class, 'readAll'])->name('tenant.notifications.read-all');
     Route::patch('notificacoes/preferencias', [NotificationController::class, 'preferences'])->name('tenant.notifications.preferences');
@@ -109,6 +113,11 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
 */
 Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
     Route::get('assinatura', [SubscriptionController::class, 'show'])->name('tenant.subscription.show');
+
+    Route::get('suporte', [SupportController::class, 'index'])->name('tenant.support.index');
+    Route::post('suporte', [SupportController::class, 'store'])->middleware('throttle:10,1')->name('tenant.support.store');
+    Route::get('suporte/{ticket}', [SupportController::class, 'show'])->whereNumber('ticket')->name('tenant.support.show');
+    Route::post('suporte/{ticket}/respostas', [SupportController::class, 'reply'])->whereNumber('ticket')->middleware('throttle:30,1')->name('tenant.support.reply');
     Route::post('assinatura/contratar', [SubscriptionController::class, 'contract'])->middleware('verified.strict')->middleware('throttle:10,1')->name('tenant.subscription.contract');
     Route::post('assinatura/ciclo', [SubscriptionController::class, 'interval'])->middleware('verified.strict')->middleware('throttle:10,1')->name('tenant.subscription.interval');
     Route::post('assinatura/vagas', [SubscriptionController::class, 'seats'])->middleware('verified.strict')->middleware('throttle:10,1')->name('tenant.subscription.seats');

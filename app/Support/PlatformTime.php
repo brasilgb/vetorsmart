@@ -52,4 +52,12 @@ final class PlatformTime
     {
         return CarbonImmutable::parse($date, self::timezone())->startOfDay()->utc();
     }
+
+    /**
+     * A date and time typed in the platform time zone (e.g. a datetime-local field), as a UTC instant to store.
+     */
+    public static function fromLocal(string $dateTime): CarbonImmutable
+    {
+        return CarbonImmutable::parse($dateTime, self::timezone())->utc();
+    }
 }

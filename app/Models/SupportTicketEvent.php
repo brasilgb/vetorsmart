@@ -7,7 +7,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * Append-only follow-up of a support record: opened, comment, status or priority change.
+ * Append-only follow-up of a support request: opened, reply, internal note, status, priority, assignment, due date,
+ * reopening. Internal notes (is_internal) are never shown to the company.
  *
  * @property int $id
  * @property int $support_ticket_id
@@ -16,6 +17,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $from_value
  * @property string|null $to_value
  * @property string|null $note
+ * @property bool $is_internal
  * @property Carbon|null $created_at
  * @property User|null $user
  */
@@ -34,5 +36,13 @@ class SupportTicketEvent extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return ['is_internal' => 'boolean'];
     }
 }
