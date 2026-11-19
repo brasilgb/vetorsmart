@@ -31,21 +31,46 @@ import { index as auditIndex } from '@/routes/rootadmin/audit';
 import { index as rootadminSubscriptions } from '@/routes/rootadmin/subscriptions';
 import { index as rootadminAi } from '@/routes/rootadmin/ai';
 import { index as rootadminWebsites } from '@/routes/rootadmin/websites';
-import type { NavItem } from '@/types';
+import { index as rootadminGrowth } from '@/routes/rootadmin/growth';
+import { index as rootadminSupport } from '@/routes/rootadmin/support';
+import { show as rootadminSettings } from '@/routes/rootadmin/settings';
+import type { NavGroup, NavItem } from '@/types';
 
-const tenantNavItems: NavItem[] = [
-    { title: 'Painel', href: dashboard(), icon: LayoutGrid },
-    { title: 'Clientes', href: tenantCustomers(), icon: Contact },
-    { title: 'Solicitações', href: tenantRequests(), icon: ClipboardList },
-    { title: 'Atendimento IA', href: tenantAssistant(), icon: MessageSquare },
-    { title: 'Notificações', href: tenantNotifications(), icon: Bell },
-    { title: 'Agenda', href: tenantAgenda(), icon: CalendarDays },
-    { title: 'Serviços', href: tenantServices(), icon: Briefcase },
-    { title: 'Profissionais', href: tenantProfessionals(), icon: UsersRound },
-    { title: 'Usuários e permissões', href: tenantTeam(), icon: KeyRound },
-    { title: 'Meu Site', href: tenantWebsite(), icon: Globe },
-    { title: 'Configurações', href: tenantSettings(), icon: Settings },
-    { title: 'Minha Assinatura', href: tenantSubscription(), icon: CreditCard },
+/**
+ * Company panel, grouped by what the person is doing. Only screens that exist are listed; managersOnly items are
+ * hidden from operators (the server authorizes every page as well).
+ */
+const tenantNavGroups: NavGroup[] = [
+    {
+        label: 'Visão Geral',
+        items: [
+            { title: 'Painel', href: dashboard(), icon: LayoutGrid },
+            { title: 'Notificações', href: tenantNotifications(), icon: Bell },
+        ],
+    },
+    {
+        label: 'Atendimento e Operação',
+        items: [
+            { title: 'Solicitações', href: tenantRequests(), icon: ClipboardList },
+            { title: 'Agenda', href: tenantAgenda(), icon: CalendarDays },
+            { title: 'Atendimento IA', href: tenantAssistant(), icon: MessageSquare },
+            { title: 'Clientes', href: tenantCustomers(), icon: Contact },
+            { title: 'Serviços', href: tenantServices(), icon: Briefcase },
+            { title: 'Profissionais', href: tenantProfessionals(), icon: UsersRound },
+        ],
+    },
+    {
+        label: 'Presença Digital',
+        items: [{ title: 'Meu Site', href: tenantWebsite(), icon: Globe }],
+    },
+    {
+        label: 'Administração',
+        items: [
+            { title: 'Usuários e permissões', href: tenantTeam(), icon: KeyRound, managersOnly: true },
+            { title: 'Minha Assinatura', href: tenantSubscription(), icon: CreditCard, managersOnly: true },
+            { title: 'Configurações', href: tenantSettings(), icon: Settings },
+        ],
+    },
 ];
 
 /**
@@ -63,17 +88,21 @@ const rootadminNavItems: NavItem[] = [
     { title: 'Sites e Domínios', href: rootadminWebsites(), icon: Globe },
     { title: 'Segmentos', href: segmentsIndex(), icon: Tag },
     { title: 'Usuários e Acessos', href: usersIndex(), icon: UsersRound },
-    { title: 'Crescimento e SEO', href: rootadminDashboard(), icon: TrendingUp, disabled: true },
-    { title: 'Suporte', href: rootadminDashboard(), icon: LifeBuoy, disabled: true },
+    { title: 'Crescimento e SEO', href: rootadminGrowth(), icon: TrendingUp },
+    { title: 'Suporte', href: rootadminSupport(), icon: LifeBuoy },
     { title: 'Segurança e Auditoria', href: auditIndex(), icon: ScrollText },
-    { title: 'Configurações Globais', href: rootadminDashboard(), icon: Settings, disabled: true },
+    { title: 'Configurações Globais', href: rootadminSettings(), icon: Settings },
 ];
 
 export function AppSidebar() {
     const { auth, tenant } = usePage().props;
     const isRootAdmin = Boolean(auth.user.is_root_admin);
     const canManageTeam = tenant?.role === 'owner' || tenant?.role === 'admin';
-    const items = isRootAdmin ? rootadminNavItems : tenantNavItems.filter((item) => !['Usuários e permissões', 'Minha Assinatura'].includes(item.title) || canManageTeam);
+    const groups: NavGroup[] = isRootAdmin
+        ? [{ label: 'Plataforma', items: rootadminNavItems }]
+        : tenantNavGroups
+              .map((group) => ({ ...group, items: group.items.filter((item) => !item.managersOnly || canManageTeam) }))
+              .filter((group) => group.items.length > 0);
 
     return (
         <Sidebar collapsible="icon" variant="inset">
@@ -97,7 +126,9 @@ export function AppSidebar() {
             </SidebarHeader>
 
             <SidebarContent>
-                <NavMain items={items} />
+                {groups.map((group) => (
+                    <NavMain key={group.label} label={group.label} items={group.items} />
+                ))}
             </SidebarContent>
 
             <SidebarFooter>

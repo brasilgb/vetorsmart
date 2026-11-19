@@ -4,8 +4,11 @@ use App\Http\Controllers\RootAdmin\AiUsageController;
 use App\Http\Controllers\RootAdmin\AuditLogController;
 use App\Http\Controllers\RootAdmin\BillingSettingsController;
 use App\Http\Controllers\RootAdmin\DashboardController;
+use App\Http\Controllers\RootAdmin\GlobalSettingsController;
+use App\Http\Controllers\RootAdmin\GrowthController;
 use App\Http\Controllers\RootAdmin\SegmentController;
 use App\Http\Controllers\RootAdmin\SubscriptionController;
+use App\Http\Controllers\RootAdmin\SupportController;
 use App\Http\Controllers\RootAdmin\TenantController;
 use App\Http\Controllers\RootAdmin\UserAccountController;
 use App\Http\Controllers\RootAdmin\UserController;
@@ -45,6 +48,12 @@ Route::prefix('rootadmin')
         Route::get('audit', [AuditLogController::class, 'index'])->name('audit.index');
         Route::get('ia', AiUsageController::class)->name('ai.index');
         Route::get('sites', WebsiteController::class)->name('websites.index');
+        Route::get('crescimento', GrowthController::class)->name('growth.index');
+        Route::get('configuracoes', GlobalSettingsController::class)->name('settings.show');
+        Route::get('suporte', [SupportController::class, 'index'])->name('support.index');
+        Route::post('suporte', [SupportController::class, 'store'])->middleware('throttle:30,1')->name('support.store');
+        Route::get('suporte/{ticket}', [SupportController::class, 'show'])->whereNumber('ticket')->name('support.show');
+        Route::post('suporte/{ticket}/acompanhamentos', [SupportController::class, 'update'])->whereNumber('ticket')->middleware('throttle:60,1')->name('support.update');
 
         Route::get('assinaturas', [SubscriptionController::class, 'index'])->name('subscriptions.index');
         Route::get('assinaturas/{subscription}', [SubscriptionController::class, 'show'])->name('subscriptions.show');

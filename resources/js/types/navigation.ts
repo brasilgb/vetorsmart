@@ -13,4 +13,11 @@ export type NavItem = {
     isActive?: boolean;
     /** Listed for the roadmap but not operational yet: shown as "Em breve" and never linked. */
     disabled?: boolean;
+    /** Shown only to the owners and admins of the company (the server authorizes the page as well). */
+    managersOnly?: boolean;
+};
+
+export type NavGroup = {
+    label: string;
+    items: NavItem[];
 };
