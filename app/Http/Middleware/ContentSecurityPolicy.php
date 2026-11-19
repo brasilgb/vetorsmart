@@ -44,13 +44,28 @@ class ContentSecurityPolicy
         return $response;
     }
 
+    /**
+     * Scheme, host and port of the public sites (platform.public_url), the only other origin of images.
+     */
+    private function publicOrigin(): string
+    {
+        $parts = parse_url((string) config('platform.public_url'));
+
+        if (! is_array($parts) || ! isset($parts['scheme'], $parts['host'])) {
+            return '';
+        }
+
+        return $parts['scheme'].'://'.$parts['host'].(isset($parts['port']) ? ':'.$parts['port'] : '');
+    }
+
     private function policy(string $nonce): string
     {
         $directives = [
             'default-src' => "'self'",
             'script-src' => "'self' 'nonce-{$nonce}'",
             'style-src' => "'self' 'unsafe-inline'",
-            'img-src' => "'self' data: blob:",
+            // The platform's public origin serves the published company images that the Regional Portal shows on its own host.
+            'img-src' => trim("'self' data: blob: ".$this->publicOrigin()),
             'font-src' => "'self' data:",
             'connect-src' => "'self'",
             'object-src' => "'none'",

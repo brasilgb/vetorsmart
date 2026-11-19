@@ -18,6 +18,12 @@ return [
     'tenant_base_domain' => env('PLATFORM_TENANT_BASE_DOMAIN', 'vetorsmart.test'),
 
     /*
+    | Host of the Regional Portal (portal.<tenant_base_domain> by default). It has its own routes and is never read as a
+    | company hostname; the subdomain "portal" is reserved for the platform.
+    */
+    'portal_host' => env('PLATFORM_PORTAL_HOST', 'portal.'.env('PLATFORM_TENANT_BASE_DOMAIN', 'vetorsmart.test')),
+
+    /*
     | Time zone used to present platform-level records (RootAdmin console, audit trail). Instants stay in UTC
     | in the database; companies keep their own time zone for their own screens.
     */
@@ -60,7 +66,7 @@ return [
         'status', 'suporte', 'support', 'ajuda', 'help', 'docs', 'blog', 'webmail', 'mx', 'ns', 'ns1', 'ns2', 'dns',
         'autodiscover', 'autoconfig', 'auth', 'oauth', 'sso', 'id', 'conta', 'contas', 'account', 'billing',
         'pagamento', 'pagamentos', 'cobranca', 'financeiro', 'dev', 'staging', 'homolog', 'homologacao', 'teste',
-        'test', 'demo', 'sandbox', 'vetorsmart', 'vetor', 'site', 'sites', 'm', 'mobile', 'localhost', 'n8n',
+        'test', 'demo', 'sandbox', 'vetorsmart', 'vetor', 'site', 'sites', 'm', 'mobile', 'localhost', 'n8n', 'portal',
         'waha', 'phpmyadmin', 'pma', 'mysql', 'db', 'redis', 'grafana', 'metrics', 'monitor', 'health',
     ],
 

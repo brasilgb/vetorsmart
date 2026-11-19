@@ -233,6 +233,8 @@ class SiteController extends Controller
         $noindex = $tenant->isHomolog() || ! ($content['seo']['indexable'] ?? true);
 
         $shareImage = $content['hero']['file'] ?? $content['logo']['file'] ?? null;
+        // A visit that came from the Regional Portal keeps that attribution on the way to the request form.
+        $origin = request()->query('origem') === 'portal' ? '?origem=portal' : '';
 
         $response = response()->view('website.site', [
             'content' => $content,
@@ -245,10 +247,10 @@ class SiteController extends Controller
             'preview' => false,
             'page' => $page,
             'links' => [
-                'home' => $home,
-                'services' => empty($content['services'] ?? []) ? null : $base.'/servicos',
+                'home' => $home.$origin,
+                'services' => empty($content['services'] ?? []) ? null : $base.'/servicos'.$origin,
                 'assistant' => $assistantEnabled ? $base.'/atendimento' : null,
-                'request' => $base.'/solicitar',
+                'request' => $base.'/solicitar'.$origin,
             ],
         ]);
 

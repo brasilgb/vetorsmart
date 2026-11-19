@@ -64,6 +64,9 @@
 
     <form method="post" action="{{ $action }}" novalidate>
         @csrf
+        @if ($fromPortal ?? false)
+            <input type="hidden" name="origem" value="portal">
+        @endif
         <div>
             <label for="name">Seu nome</label>
             <input type="text" id="name" name="name" value="{{ old('name') }}" autocomplete="name" required maxlength="120" @error('name') aria-invalid="true" aria-describedby="name-error" @enderror>

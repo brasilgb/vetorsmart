@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/vetor-smart/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { draft as websiteDraft, preview, publish, unpublish } from '@/routes/tenant/website';
+import { draft as websiteDraft, portal as portalUpdate, preview, publish, unpublish } from '@/routes/tenant/website';
 import { store as domainStore, verify, primary, destroy as domainDestroy } from '@/routes/tenant/website/domains';
 import { update as subdomainUpdate } from '@/routes/tenant/website/subdomain';
 import { destroy as imageDestroy, store as imageStore } from '@/routes/tenant/website/images';
@@ -72,6 +72,7 @@ type Props = {
     canEdit: boolean;
     segment: string | null;
     serviceRegion: string | null;
+    portal: { listed: boolean; issues: string[]; url: string };
 };
 
 const tabs = [
@@ -81,6 +82,7 @@ const tabs = [
     { key: 'services', label: 'Serviços' },
     { key: 'domains', label: 'Domínios' },
     { key: 'seo', label: 'SEO' },
+    { key: 'portal', label: 'Portal Regional' },
     { key: 'publish', label: 'Publicação' },
 ];
 
@@ -88,7 +90,7 @@ const tabs = [
  * Meu Site. Each section saves only its own fields to the draft. Visitors see the
  * site only after an explicit publication; the server enforces every permission.
  */
-export default function WebsiteIndex({ website, draft, options, domains, canEdit, segment, serviceRegion }: Props) {
+export default function WebsiteIndex({ website, draft, options, domains, canEdit, segment, serviceRegion, portal }: Props) {
     const [tab, setTab] = useState('overview');
     const disabled = !canEdit;
 
@@ -339,6 +341,8 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                     </Card>
                 )}
 
+                {tab === 'portal' && <PortalSection portal={portal} canEdit={canEdit} />}
+
                 {tab === 'publish' && (
                     <Card className="grid gap-5 border-vs-border/70 p-6 shadow-sm">
                         <h2 className="text-base font-semibold text-vs-text">Publicação</h2>
@@ -475,5 +479,64 @@ function ImageField({ kind, label, hint, image, canEdit }: { kind: 'logo' | 'her
                 </form>
             )}
         </div>
+    );
+}
+
+/**
+ * Consent to appear in the Regional Portal. Off by default; it takes effect at once and the portal shows only what the
+ * site already published, never phones, e-mails or the draft. The issues explain why the company does not appear yet.
+ */
+function PortalSection({ portal, canEdit }: { portal: Props['portal']; canEdit: boolean }) {
+    const [processing, setProcessing] = useState(false);
+    const visible = portal.listed && portal.issues.length === 0;
+
+    const change = (listed: boolean) => {
+        router.patch(portalUpdate.url(), { listed }, { preserveScroll: true, onStart: () => setProcessing(true), onFinish: () => setProcessing(false) });
+    };
+
+    return (
+        <Card className="grid gap-5 border-vs-border/70 p-6 shadow-sm">
+            <h2 className="text-base font-semibold text-vs-text">Portal Regional</h2>
+            <p className="text-sm text-vs-muted">
+                O Portal Regional ajuda clientes da sua região a encontrar sua empresa pelo serviço e pela cidade. Quem encontrar sua empresa abre o seu site e envia a solicitação diretamente para você, com a origem "Portal Regional". Não há custo nem posições pagas.
+            </p>
+            <div className="grid gap-1 text-sm text-vs-text">
+                <p className="font-medium">O que aparece no portal (apenas o que já está publicado no seu site):</p>
+                <ul className="list-disc pl-5 text-vs-muted">
+                    <li>Nome comercial, logotipo, segmento, cidade e UF</li>
+                    <li>Descrição resumida, região atendida e serviços publicados</li>
+                    <li>Links para o seu site e para o formulário de solicitação</li>
+                </ul>
+                <p className="text-vs-muted">Telefones, e-mails, rascunhos e dados internos nunca aparecem no portal.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-vs-muted">Situação:</span>
+                <StatusBadge active={visible} activeLabel="Aparece no portal" inactiveLabel={portal.listed ? 'Participação ativa, ainda não aparece' : 'Não participa'} />
+            </div>
+            {portal.listed && portal.issues.length > 0 && (
+                <div role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
+                    <p className="font-medium">Para aparecer no portal:</p>
+                    <ul className="list-disc pl-5">
+                        {portal.issues.map((issue) => <li key={issue}>{issue}</li>)}
+                    </ul>
+                </div>
+            )}
+            {canEdit && (
+                <div className="flex flex-wrap gap-3">
+                    {portal.listed ? (
+                        <ConfirmAction
+                            trigger={<Button type="button" variant="outline" className="h-10" disabled={processing}>Sair do portal</Button>}
+                            title="Sair do Portal Regional?"
+                            description="Sua empresa deixa de aparecer no portal imediatamente. O seu site continua no ar."
+                            confirmLabel="Sair do portal"
+                            onConfirm={() => change(false)}
+                        />
+                    ) : (
+                        <Button type="button" className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover" disabled={processing} onClick={() => change(true)}>Participar do portal</Button>
+                    )}
+                    <a href={portal.url} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center text-sm font-medium text-vs-link hover:underline">Abrir o Portal Regional</a>
+                </div>
+            )}
+        </Card>
     );
 }

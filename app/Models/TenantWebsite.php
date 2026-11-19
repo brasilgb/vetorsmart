@@ -19,8 +19,10 @@ use Illuminate\Support\Carbon;
  * @property WebsiteStatus $status
  * @property array<string, mixed> $draft_content
  * @property int|null $published_version_id
+ * @property bool $portal_listed
+ * @property Carbon|null $portal_listed_at
  */
-#[Fillable(['tenant_id', 'name', 'template', 'status', 'draft_content', 'published_version_id', 'configured_at', 'published_at', 'unpublished_at'])]
+#[Fillable(['tenant_id', 'name', 'template', 'status', 'portal_listed', 'portal_listed_at', 'draft_content', 'published_version_id', 'configured_at', 'published_at', 'unpublished_at'])]
 class TenantWebsite extends Model
 {
     use BelongsToTenant;
@@ -49,6 +51,8 @@ class TenantWebsite extends Model
         return [
             'status' => WebsiteStatus::class,
             'draft_content' => 'array',
+            'portal_listed' => 'boolean',
+            'portal_listed_at' => 'datetime',
             'configured_at' => 'datetime',
             'published_at' => 'datetime',
             'unpublished_at' => 'datetime',

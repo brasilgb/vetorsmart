@@ -2,12 +2,29 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\Portal\PortalController;
 use App\Http\Controllers\Site\AssistantController;
 use App\Http\Controllers\Site\SiteController;
 use App\Http\Controllers\Site\SiteMediaController;
 use App\Http\Controllers\Site\SiteRequestController;
 use App\Services\Websites\WebsiteMedia;
 use Illuminate\Support\Facades\Route;
+
+/*
+|--------------------------------------------------------------------------
+| Regional Portal
+|--------------------------------------------------------------------------
+|
+| The directory of companies at portal.<domain>. Its own host, registered before the company hostnames, so it is never
+| read as a company. Only these three paths exist there (SiteHostGuard).
+|
+*/
+
+Route::domain((string) config('platform.portal_host'))->group(function () {
+    Route::get('/', [PortalController::class, 'index'])->middleware('throttle:portal-search')->name('portal.home');
+    Route::get('/robots.txt', [PortalController::class, 'robots'])->name('portal.robots');
+    Route::get('/sitemap.xml', [PortalController::class, 'sitemap'])->name('portal.sitemap');
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -21,7 +38,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::domain('{siteHost}')
-    ->where(['siteHost' => '(?!'.preg_quote((string) config('platform.central_host'), '#').'$)[^/]+'])
+    ->where(['siteHost' => '(?!(?:'.preg_quote((string) config('platform.central_host'), '#').'|'.preg_quote((string) config('platform.portal_host'), '#').')$)[^/]+'])
     ->group(function () {
         Route::get('/', [SiteController::class, 'hostPage'])->name('site.host.page');
         Route::get('/servicos', [SiteController::class, 'hostServices'])->name('site.host.services');

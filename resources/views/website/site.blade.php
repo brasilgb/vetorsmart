@@ -25,7 +25,7 @@
     $logo = is_array($content['logo'] ?? null) && $mediaBase ? $content['logo'] : null;
     $hero = is_array($content['hero'] ?? null) && $mediaBase ? $content['hero'] : null;
     $region = ($content['service_region'] ?? null) ?: null;
-    $requestLink = fn (?int $serviceId = null): ?string => $links['request'] === null ? null : ($serviceId === null || $links['request'] === '#' ? $links['request'] : $links['request'].'?servico='.$serviceId);
+    $requestLink = fn (?int $serviceId = null): ?string => $links['request'] === null ? null : ($serviceId === null || $links['request'] === '#' ? $links['request'] : $links['request'].(str_contains($links['request'], '?') ? '&' : '?').'servico='.$serviceId);
     // Built inside this PHP block: in the template body, Blade would compile the schema.org context key as a directive.
     $structuredData = json_encode(array_filter([
         '@context' => 'https://schema.org',

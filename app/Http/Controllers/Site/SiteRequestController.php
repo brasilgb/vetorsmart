@@ -19,7 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * "Solicitar atendimento" of a public company site: the visitor leaves name, phone and what they need, and the
- * request enters the company's triage queue with origin "Site público". The page is never indexed. It is rate limited
+ * request enters the company's triage queue with origin "Site público" (or "Portal Regional" when the visitor came
+ * from the portal through ?origem=portal). The page is never indexed. It is rate limited
  * per visitor and company, has a hidden trap field for robots, and confirms only after the request is saved. The
  * visitor never sees any record of the company beyond the published site.
  */
@@ -41,6 +42,7 @@ class SiteRequestController extends Controller
             'chosen' => in_array($chosen, $this->publishedServiceIds($content), true) ? $chosen : null,
             'home' => $site['on_host'] ? $site['base'].'/' : $site['base'],
             'action' => $site['base'].'/solicitar',
+            'fromPortal' => $request->query('origem') === 'portal' || old('origem') === 'portal',
             'assistant' => AssistantSetting::query()->forTenant($site['tenant'])->value('enabled') ? $site['base'].'/atendimento' : null,
             'sent' => (bool) $request->session()->get('site_request_sent', false),
             'homolog' => $site['tenant']->isHomolog(),
@@ -50,7 +52,8 @@ class SiteRequestController extends Controller
     public function store(StoreSiteServiceRequest $request, AssistantOperations $operations, ServiceRequestService $requests): RedirectResponse
     {
         $site = $this->sites->forRequest($request) ?? abort(404);
-        $back = redirect()->to($site['base'].'/solicitar');
+        $fromPortal = $request->validated('origem') === 'portal';
+        $back = redirect()->to($site['base'].'/solicitar'.($fromPortal ? '?origem=portal' : ''));
 
         // A filled trap field is a robot: it sees the same confirmation, and nothing is saved.
         if (filled($request->validated('website'))) {
@@ -67,10 +70,13 @@ class SiteRequestController extends Controller
             filled($request->validated('email')) ? 'E-mail informado: '.$request->validated('email') : null,
         ])));
 
-        DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description): void {
+        // The origin is the visitor's attribution only (link from the portal); the company always comes from the address.
+        $origin = $fromPortal ? RequestOrigin::Portal : RequestOrigin::PublicSite;
+
+        DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin): void {
             $customer = $operations->findOrCreateCustomer($tenant, trim((string) $request->validated('name')), (string) $request->phoneDigits());
 
-            $serviceRequest = $requests->create($tenant, ['customer_id' => $customer->getKey(), 'description' => $description], null, RequestOrigin::PublicSite);
+            $serviceRequest = $requests->create($tenant, ['customer_id' => $customer->getKey(), 'description' => $description], null, $origin);
 
             if ($service !== null) {
                 try {

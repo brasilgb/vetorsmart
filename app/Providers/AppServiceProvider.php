@@ -101,6 +101,9 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('assistant-public', fn (Request $request): Limit => Limit::perMinute((int) config('assistant.public_requests_per_minute', 30))
             ->by($request->ip().'|'.(is_string($request->route('segment')) ? $request->route('segment').'/'.$request->route('company') : $request->getHost())));
 
+        // Regional Portal search: generous for people, short enough to make scraping the directory slow.
+        RateLimiter::for('portal-search', fn (Request $request): Limit => Limit::perMinute(60)->by('portal:'.$request->ip()));
+
         // Request form of a public site: a few sends per visitor and company, so the triage queue cannot be flooded.
         RateLimiter::for('site-request', function (Request $request): array {
             $site = is_string($request->route('segment')) ? $request->route('segment').'/'.$request->route('company') : $request->getHost();

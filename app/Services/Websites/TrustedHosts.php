@@ -28,6 +28,12 @@ class TrustedHosts
             '^(?:[a-z0-9-]+\.)*'.preg_quote($base, '/').'$',
         ];
 
+        $portal = (string) config('platform.portal_host');
+
+        if ($portal !== '') {
+            $patterns[] = '^'.preg_quote($portal, '/').'$';
+        }
+
         foreach ($this->verifiedCustomHosts() as $host) {
             $patterns[] = '^'.preg_quote($host, '/').'$';
         }

@@ -84,6 +84,7 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
     Route::patch('meu-site/rascunho', [WebsiteController::class, 'saveDraft'])->name('tenant.website.draft');
     Route::post('meu-site/publicar', [WebsiteController::class, 'publish'])->name('tenant.website.publish');
     Route::post('meu-site/retirar', [WebsiteController::class, 'unpublish'])->name('tenant.website.unpublish');
+    Route::patch('meu-site/portal', [WebsiteController::class, 'portal'])->name('tenant.website.portal');
     Route::get('meu-site/previa', [WebsiteController::class, 'preview'])->name('tenant.website.preview');
     Route::get('meu-site/previa/midia/{file}', [WebsiteController::class, 'previewMedia'])->where('file', WebsiteMedia::FILE_PATTERN)->name('tenant.website.preview.media');
     Route::post('meu-site/imagens/{kind}', [WebsiteController::class, 'storeImage'])->whereIn('kind', ['logo', 'hero'])->middleware('throttle:20,1')->name('tenant.website.images.store');

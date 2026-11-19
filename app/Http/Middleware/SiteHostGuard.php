@@ -32,11 +32,30 @@ class SiteHostGuard
     ];
 
     /**
+     * Paths of the Regional Portal host. Nothing else exists there: no panel, no login, no company site.
+     *
+     * @var array<string, list<string>>
+     */
+    private const array PORTAL_PATHS = [
+        '/' => ['GET', 'HEAD'],
+        '/robots.txt' => ['GET', 'HEAD'],
+        '/sitemap.xml' => ['GET', 'HEAD'],
+    ];
+
+    /**
      * @param  Closure(Request): Response  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
         if ($request->getHost() === (string) config('platform.central_host')) {
+            return $next($request);
+        }
+
+        if ($request->getHost() === (string) config('platform.portal_host')) {
+            if (! in_array($request->getMethod(), self::PORTAL_PATHS[$request->getPathInfo()] ?? [], true)) {
+                abort(404);
+            }
+
             return $next($request);
         }
 

@@ -8,6 +8,7 @@ use App\Http\Requests\Tenant\UpdateWebsiteDraftRequest;
 use App\Models\AssistantSetting;
 use App\Models\Professional;
 use App\Models\Service;
+use App\Services\Portal\PortalDirectory;
 use App\Services\Tenancy\TenantContext;
 use App\Services\Websites\SegmentTheme;
 use App\Services\Websites\WebsiteMedia;
@@ -29,7 +30,7 @@ use Symfony\Component\HttpFoundation\Response as HttpResponse;
  */
 class WebsiteController extends Controller
 {
-    public function index(TenantContext $context, WebsiteService $websites, WebsitePresenter $presenter): Response
+    public function index(TenantContext $context, WebsiteService $websites, WebsitePresenter $presenter, PortalDirectory $portal): Response
     {
         $tenant = $context->requireTenant();
         $website = $websites->ensure($tenant);
@@ -46,6 +47,11 @@ class WebsiteController extends Controller
             'canEdit' => Gate::allows('manageSettings', $tenant),
             'segment' => $tenant->segment?->name,
             'serviceRegion' => AssistantSetting::query()->forTenant($tenant)->value('service_region'),
+            'portal' => [
+                'listed' => (bool) $website->portal_listed,
+                'issues' => $portal->issues($tenant, $website),
+                'url' => config('platform.public_scheme', 'https').'://'.config('platform.portal_host').'/',
+            ],
         ]);
     }
 
@@ -71,6 +77,22 @@ class WebsiteController extends Controller
         $version = $websites->publish($tenant, $this->actor($request));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => 'Site publicado (versão '.$version->version.').']);
+
+        return to_route('tenant.website.index');
+    }
+
+    /**
+     * Consent to appear in the Regional Portal. Takes effect at once and shows only what is already published.
+     */
+    public function portal(Request $request, TenantContext $context, WebsiteService $websites): RedirectResponse
+    {
+        $tenant = $context->requireTenant();
+        Gate::authorize('manageSettings', $tenant);
+
+        $listed = $request->validate(['listed' => ['required', 'boolean']])['listed'];
+        $websites->setPortalListing($tenant, (bool) $listed, $this->actor($request));
+
+        Inertia::flash('toast', ['type' => 'success', 'message' => $listed ? 'Sua empresa participa do Portal Regional.' : 'Sua empresa saiu do Portal Regional.']);
 
         return to_route('tenant.website.index');
     }

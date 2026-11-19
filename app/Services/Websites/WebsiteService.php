@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Models\WebsiteVersion;
 use App\Services\AuditLogger;
 use App\Services\GrowthEventRecorder;
+use App\Services\Portal\PortalDirectory;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 
@@ -26,6 +27,7 @@ class WebsiteService
         private AuditLogger $auditLogger,
         private GrowthEventRecorder $growth,
         private WebsiteMedia $media,
+        private PortalDirectory $portal,
     ) {}
 
     /**
@@ -107,10 +109,31 @@ class WebsiteService
             $this->growth->record($tenant, GrowthEventType::WebsitePublished, $website);
             $this->auditLogger->record('website.published', $tenant, $website, ['version' => $nextVersion], $actor);
 
-            DB::afterCommit(fn () => $this->media->prune($tenant, [$website->draft_content ?? [], $content]));
+            DB::afterCommit(function () use ($tenant, $website, $content): void {
+                $this->media->prune($tenant, [$website->draft_content ?? [], $content]);
+                $this->portal->sync($tenant);
+            });
 
             return $version;
         });
+    }
+
+    /**
+     * The company's consent to appear in the Regional Portal. It takes effect at once: turning it off removes the
+     * company from the directory immediately; turning it on lists only what is already published.
+     */
+    public function setPortalListing(Tenant $tenant, bool $listed, User $actor): TenantWebsite
+    {
+        $website = $this->ensure($tenant);
+
+        if ((bool) $website->portal_listed !== $listed) {
+            $website->forceFill(['portal_listed' => $listed, 'portal_listed_at' => $listed ? now() : null])->save();
+            $this->auditLogger->record($listed ? 'website.portal_listed' : 'website.portal_unlisted', $tenant, $website, [], $actor);
+        }
+
+        $this->portal->sync($tenant);
+
+        return $website;
     }
 
     /**
@@ -169,6 +192,7 @@ class WebsiteService
         ])->save();
 
         $this->auditLogger->record('website.unpublished', $tenant, $website, [], $actor);
+        $this->portal->sync($tenant);
 
         return $website;
     }
