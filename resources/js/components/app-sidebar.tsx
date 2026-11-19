@@ -29,6 +29,8 @@ import { show as tenantSettings } from '@/routes/tenant/settings';
 import { index as tenantWebsite } from '@/routes/tenant/website';
 import { index as auditIndex } from '@/routes/rootadmin/audit';
 import { index as rootadminSubscriptions } from '@/routes/rootadmin/subscriptions';
+import { index as rootadminAi } from '@/routes/rootadmin/ai';
+import { index as rootadminWebsites } from '@/routes/rootadmin/websites';
 import type { NavItem } from '@/types';
 
 const tenantNavItems: NavItem[] = [
@@ -57,8 +59,8 @@ const rootadminNavItems: NavItem[] = [
     { title: 'Visão Geral', href: rootadminDashboard(), icon: LayoutDashboard },
     { title: 'Empresas', href: tenantsIndex(), icon: Building2 },
     { title: 'Assinaturas e Financeiro', href: rootadminSubscriptions(), icon: CreditCard },
-    { title: 'IA e Créditos', href: rootadminDashboard(), icon: Bot, disabled: true },
-    { title: 'Sites e Domínios', href: rootadminDashboard(), icon: Globe, disabled: true },
+    { title: 'IA e Créditos', href: rootadminAi(), icon: Bot },
+    { title: 'Sites e Domínios', href: rootadminWebsites(), icon: Globe },
     { title: 'Segmentos', href: segmentsIndex(), icon: Tag },
     { title: 'Usuários e Acessos', href: usersIndex(), icon: UsersRound },
     { title: 'Crescimento e SEO', href: rootadminDashboard(), icon: TrendingUp, disabled: true },

@@ -81,7 +81,7 @@ export default function TeamIndex({ memberships, roles }: Props) {
                 </Card>
 
                 <Card className="overflow-hidden border-vs-border/70 shadow-sm">
-                    <div className="overflow-x-auto">
+                    <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Tabela de usuários da empresa">
                         <table className="w-full min-w-[720px] text-left text-sm">
                             <thead className="bg-vs-surface text-vs-muted">
                                 <tr>

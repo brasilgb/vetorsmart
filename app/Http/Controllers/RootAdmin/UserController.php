@@ -9,15 +9,15 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Read-only view of users linked to companies. Credentials are never selected, and
- * permission changes are not offered here.
+ * Users linked to companies, with the state of the account and of the e-mail confirmation. Credentials are never
+ * selected, and company permissions are not changed here. Account actions live in UserAccountController.
  */
 class UserController extends Controller
 {
     public function index(Request $request): Response
     {
         $query = TenantUser::query()
-            ->with(['user:id,name,email,status', 'tenant:id,name'])
+            ->with(['user:id,name,email,status,is_root_admin,email_verified_at,email_verification_legacy_at', 'tenant:id,name'])
             ->orderByDesc('id');
 
         $term = $request->string('q')->trim()->value();
@@ -45,7 +45,15 @@ class UserController extends Controller
                 'id' => $membership->id,
                 'name' => $membership->user?->name,
                 'email' => $membership->user?->email,
+                'user_id' => $membership->user_id,
                 'user_status' => $membership->user?->status->value,
+                'email_state' => match (true) {
+                    $membership->user === null => null,
+                    $membership->user->hasVerifiedEmail() => 'verified',
+                    $membership->user->hasLegacyEmailAccess() => 'legacy',
+                    default => 'pending',
+                },
+                'is_self' => $membership->user_id === $request->user()?->getKey(),
                 'tenant' => $membership->tenant?->name,
                 'tenant_id' => $membership->tenant_id,
                 'role' => $membership->role->value,

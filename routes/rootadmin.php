@@ -1,12 +1,15 @@
 <?php
 
+use App\Http\Controllers\RootAdmin\AiUsageController;
 use App\Http\Controllers\RootAdmin\AuditLogController;
 use App\Http\Controllers\RootAdmin\BillingSettingsController;
 use App\Http\Controllers\RootAdmin\DashboardController;
 use App\Http\Controllers\RootAdmin\SegmentController;
 use App\Http\Controllers\RootAdmin\SubscriptionController;
 use App\Http\Controllers\RootAdmin\TenantController;
+use App\Http\Controllers\RootAdmin\UserAccountController;
 use App\Http\Controllers\RootAdmin\UserController;
+use App\Http\Controllers\RootAdmin\WebsiteController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,8 +38,13 @@ Route::prefix('rootadmin')
         Route::patch('segments/{segment}', [SegmentController::class, 'update'])->name('segments.update');
 
         Route::get('users', [UserController::class, 'index'])->name('users.index');
+        Route::post('users/{user}/suspender', [UserAccountController::class, 'suspend'])->whereNumber('user')->name('users.suspend');
+        Route::post('users/{user}/reativar', [UserAccountController::class, 'reactivate'])->whereNumber('user')->name('users.reactivate');
+        Route::post('users/{user}/reenviar-confirmacao', [UserAccountController::class, 'resendVerification'])->whereNumber('user')->middleware('throttle:6,1')->name('users.resend-verification');
 
         Route::get('audit', [AuditLogController::class, 'index'])->name('audit.index');
+        Route::get('ia', AiUsageController::class)->name('ai.index');
+        Route::get('sites', WebsiteController::class)->name('websites.index');
 
         Route::get('assinaturas', [SubscriptionController::class, 'index'])->name('subscriptions.index');
         Route::get('assinaturas/{subscription}', [SubscriptionController::class, 'show'])->name('subscriptions.show');
