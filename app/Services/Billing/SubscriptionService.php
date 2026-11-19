@@ -109,8 +109,16 @@ class SubscriptionService
                 ? [now(), now()->addMonths($charge->billing_interval->months())]
                 : [$charge->period_start, $charge->period_end];
 
+            // The seats billed by the paid charge become the active seats: a scheduled change is activated only when the
+            // charge that includes it is paid, never before.
             $changes = $extends
-                ? ['current_period_start' => $start, 'current_period_end' => $end, 'grace_ends_at' => null]
+                ? [
+                    'current_period_start' => $start,
+                    'current_period_end' => $end,
+                    'grace_ends_at' => null,
+                    'extra_seats' => $charge->extra_users,
+                    'scheduled_extra_seats' => $subscription->scheduled_extra_seats === $charge->extra_users ? null : $subscription->scheduled_extra_seats,
+                ]
                 : [];
 
             $stillCovered = ($extends ? $end : $currentEnd)->isFuture();
@@ -211,12 +219,6 @@ class SubscriptionService
             $changes += ['billing_interval' => $subscription->scheduled_interval, 'scheduled_interval' => null, 'price_cents' => null, 'extra_user_price_cents' => null];
             $notes[] = "Ciclo {$subscription->scheduled_interval->label()} aplicado.";
             $subscription->forceFill($changes);
-        }
-
-        if ($subscription->scheduled_extra_seats !== null) {
-            $changes += ['extra_seats' => $subscription->scheduled_extra_seats, 'scheduled_extra_seats' => null];
-            $notes[] = "Vagas adicionais: {$subscription->scheduled_extra_seats} a partir deste período.";
-            $subscription->forceFill(['extra_seats' => $subscription->scheduled_extra_seats, 'scheduled_extra_seats' => null]);
         }
 
         if ($subscription->price_cents === null && ($price = $plan->priceFor($subscription->billing_interval)) !== null) {

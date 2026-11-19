@@ -133,8 +133,8 @@ class SubscriptionController extends Controller
         $subscription = $seats->changeExtraSeats(Subscription::query()->forTenant($tenant)->firstOrFail(), (int) $data['extra_seats'], $this->actor($request));
 
         Inertia::flash('toast', ['type' => 'success', 'message' => $subscription->scheduled_extra_seats !== null
-            ? 'Redução de vagas agendada para o próximo período.'
-            : 'Vagas atualizadas. As adicionais entram nas próximas cobranças geradas.']);
+            ? 'Alteração de vagas incluída na próxima cobrança. As novas vagas valem depois do pagamento.'
+            : 'Vagas atualizadas. Elas entram na primeira cobrança.']);
 
         return to_route('tenant.subscription.show');
     }
@@ -233,6 +233,11 @@ class SubscriptionController extends Controller
             'active_users' => $quote['active_users'] ?? null,
             'extra_seats' => $subscription->extra_seats,
             'scheduled_extra_seats' => $subscription->scheduled_extra_seats,
+            'seats_change_mode' => match (true) {
+                ! in_array($subscription->status, [SubscriptionStatus::Trialing, SubscriptionStatus::Active], true) => 'blocked',
+                $subscription->status === SubscriptionStatus::Trialing && $this->openCharge($subscription) === null => 'now',
+                default => 'next_charge',
+            },
             'seat_limit' => $subscription->plan->included_users === null ? null : $subscription->plan->included_users + $subscription->extra_seats,
             'extra_user_price' => ($price = $subscription->extra_user_price_cents ?? $subscription->plan->extra_user_price_cents) === null ? null : $this->money($price),
             'can_contract' => $quote !== null,

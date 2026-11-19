@@ -21,12 +21,15 @@ use Illuminate\Validation\ValidationException;
  * contracting seats are separate actions:
  *
  * - a user can be added or reactivated only while an active seat is free; replacing a user (deactivate one, add or
- *   reactivate another) never creates a charge;
- * - more seats take effect at once and are charged from the next charge created; open charges are never changed and
- *   no proportional amount is charged (no approved commercial rule);
- * - fewer seats require the active users to fit; with a paid period running or a charge open they apply to the next
- *   period (the seats of the current period were paid), otherwise at once. While a reduction waits, activations
- *   respect the reduced limit, so it always fits when applied.
+ *   reactivate another) never creates a charge, and inactive users are never charged;
+ * - no complementary (proportional) charge exists yet, so a seat is never active before it is paid:
+ *   - in the trial without an open charge, a change applies at once and the seats go into the first charge;
+ *   - with a paid period running or a charge open, the change is scheduled (scheduled_extra_seats): the next charge
+ *     created includes it, and the seats become active only when that charge is paid (SubscriptionService::
+ *     periodPaid). Open charges and running contracts are never changed;
+ * - fewer seats always require the active users to fit; while a reduction waits, activations respect it;
+ * - with a payment pending, a suspension or a cancellation no change is accepted;
+ * - asking again for the seats already scheduled changes nothing (idempotent).
  *
  * A company without subscription, or a plan without included users, has no limit.
  */
@@ -83,44 +86,39 @@ class SeatService
                 throw ValidationException::withMessages(['extra_seats' => ['O plano não limita usuários: não há vagas adicionais a contratar.']]);
             }
 
-            if (in_array($subscription->status, [SubscriptionStatus::Suspended, SubscriptionStatus::Cancelled], true)) {
-                throw ValidationException::withMessages(['extra_seats' => ['Regularize a assinatura antes de alterar as vagas.']]);
+            if (! in_array($subscription->status, [SubscriptionStatus::Trialing, SubscriptionStatus::Active], true)) {
+                throw ValidationException::withMessages(['extra_seats' => ['Regularize a assinatura (pagamento pendente, suspensão ou cancelamento) antes de alterar as vagas.']]);
             }
 
             $current = $subscription->extra_seats;
+            $pending = $subscription->scheduled_extra_seats ?? $current;
 
-            if ($target === $current) {
-                if ($subscription->scheduled_extra_seats !== null) {
-                    $subscription->forceFill(['scheduled_extra_seats' => null])->save();
-                    $this->record($subscription, 'seats_change_withdrawn', $actor, "Mantidas {$current} vaga(s) adicional(is).");
-                }
-
+            if ($target === $pending) {
                 return $subscription;
             }
 
-            if ($target > $current) {
-                $subscription->forceFill(['extra_seats' => $target, 'scheduled_extra_seats' => null])->save();
-                $this->record($subscription, 'seats_added', $actor, "Vagas adicionais: {$current} → {$target}. Cobradas a partir da próxima cobrança gerada, sem valor proporcional.");
-                $this->auditLogger->record('subscription.seats_changed', $subscription->tenant, $subscription, ['from' => $current, 'to' => $target, 'scheduled' => false], $actor);
+            if ($target === $current) {
+                $subscription->forceFill(['scheduled_extra_seats' => null])->save();
+                $this->record($subscription, 'seats_change_withdrawn', $actor, "Mantidas {$current} vaga(s) adicional(is).");
 
                 return $subscription;
             }
 
             $active = $this->activeUsers($subscription->tenant);
 
-            if ($active > $included + $target) {
+            if ($target < $current && $active > $included + $target) {
                 throw ValidationException::withMessages(['extra_seats' => ["Há {$active} usuários ativos. Desative usuários até caberem em ".($included + $target).' vagas antes de reduzir.']]);
             }
 
-            $paidPeriodRunning = $subscription->current_period_end?->isFuture() === true;
             $openCharge = BillingCharge::query()->where('subscription_id', $subscription->getKey())->whereIn('status', [ChargeStatus::Pending->value, ChargeStatus::Waiting->value])->exists();
-            $scheduled = $paidPeriodRunning || $openCharge;
+            $immediate = $subscription->status === SubscriptionStatus::Trialing && ! $openCharge;
 
-            $subscription->forceFill($scheduled ? ['scheduled_extra_seats' => $target] : ['extra_seats' => $target, 'scheduled_extra_seats' => null])->save();
-            $this->record($subscription, $scheduled ? 'seats_reduction_scheduled' : 'seats_removed', $actor, $scheduled
-                ? "Vagas adicionais: {$current} → {$target} a partir do próximo período."
-                : "Vagas adicionais: {$current} → {$target}.");
-            $this->auditLogger->record('subscription.seats_changed', $subscription->tenant, $subscription, ['from' => $current, 'to' => $target, 'scheduled' => $scheduled], $actor);
+            $subscription->forceFill($immediate ? ['extra_seats' => $target, 'scheduled_extra_seats' => null] : ['scheduled_extra_seats' => $target])->save();
+
+            $this->record($subscription, $immediate ? 'seats_changed' : 'seats_change_scheduled', $actor, $immediate
+                ? "Vagas adicionais: {$current} → {$target}, incluídas na primeira cobrança."
+                : "Vagas adicionais: {$current} → {$target} na próxima cobrança; ativas quando ela for paga, sem valor proporcional.");
+            $this->auditLogger->record('subscription.seats_changed', $subscription->tenant, $subscription, ['from' => $current, 'to' => $target, 'scheduled' => ! $immediate], $actor);
 
             return $subscription;
         });

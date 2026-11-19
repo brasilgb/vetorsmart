@@ -45,6 +45,7 @@ type Summary = {
     active_users: number | null;
     extra_seats: number;
     scheduled_extra_seats: number | null;
+    seats_change_mode: 'now' | 'next_charge' | 'blocked';
     seat_limit: number | null;
     extra_user_price: string | null;
     can_contract: boolean;
@@ -152,9 +153,8 @@ function SeatsCard({ subscription, canManage }: { subscription: Summary; canMana
             <CardHeader>
                 <CardTitle className="text-vs-text">Vagas de usuários</CardTitle>
                 <CardDescription>
-                    Cadastrar usuários e contratar vagas são ações separadas. Trocar um usuário por outro dentro das vagas não gera cobrança.
-                    Vagas a mais valem na hora e entram nas próximas cobranças geradas, sem valor proporcional; cobranças já abertas não mudam.
-                    Reduções valem no próximo período.
+                    Cadastrar usuários e contratar vagas são ações separadas. Trocar um usuário por outro dentro das vagas não gera cobrança,
+                    e usuários inativos não são cobrados.
                 </CardDescription>
             </CardHeader>
             <CardContent className="grid gap-4">
@@ -163,10 +163,21 @@ function SeatsCard({ subscription, canManage }: { subscription: Summary; canMana
                     <div><dt className="text-vs-muted">Adicionais contratadas</dt><dd className="font-medium text-vs-text">{subscription.extra_seats}{subscription.extra_user_price && ` × ${subscription.extra_user_price}/mês`}</dd></div>
                     <div><dt className="text-vs-muted">Usuários ativos</dt><dd className="font-medium text-vs-text">{subscription.active_users} de {subscription.seat_limit}</dd></div>
                     {subscription.scheduled_extra_seats !== null && (
-                        <div><dt className="text-vs-muted">A partir do próximo período</dt><dd className="font-medium text-vs-text">{subscription.scheduled_extra_seats} adicional(is)</dd></div>
+                        <div><dt className="text-vs-muted">Na próxima cobrança</dt><dd className="font-medium text-vs-text">{subscription.scheduled_extra_seats} adicional(is), ativas após o pagamento</dd></div>
                     )}
                 </dl>
-                {canManage && (
+                <ul className="grid list-disc gap-1 pl-5 text-sm text-vs-text">
+                    <li>
+                        {subscription.seats_change_mode === 'now'
+                            ? 'Agora: a alteração vale na hora e as vagas entram na primeira cobrança.'
+                            : subscription.seats_change_mode === 'next_charge'
+                              ? 'Agora: a alteração entra na próxima cobrança gerada, e as novas vagas passam a valer quando ela for paga.'
+                              : 'Agora: as vagas não podem ser alteradas. Regularize a assinatura primeiro.'}
+                    </li>
+                    <li>Não há cobrança proporcional, e cobranças já abertas não mudam.</li>
+                    <li>Para reduzir, os usuários ativos precisam caber no novo total.</li>
+                </ul>
+                {canManage && subscription.seats_change_mode !== 'blocked' && (
                     <form
                         onSubmit={(event) => {
                             event.preventDefault();
