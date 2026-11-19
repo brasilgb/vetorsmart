@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Enums\MembershipStatus;
 use App\Enums\RequestOrigin;
+use App\Enums\RequestStatus;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
 use App\Services\Growth\GrowthMetrics;
+use App\Services\Growth\GrowthRecommendations;
 use App\Services\Tenancy\TenantContext;
 use App\Support\Money;
 use Carbon\CarbonImmutable;
@@ -17,13 +19,18 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Meu Crescimento: real figures of the authenticated company only (the tenant always comes from TenantContext):
- * requests, appointments, completed and cancelled services, conversion (from five requests), declared revenue, origin
- * of the requests and the last six months, compared with the previous period of the same length.
+ * Meu Crescimento: commercial results of the authenticated company only (the tenant always comes from TenantContext).
  *
- * Filters: period (months in the company's time zone), origin and responsible. Revenue is the amount the company
- * declared for completed services: unknown amounts are counted apart and never added as zero. Amounts are integer
- * cents, formatted on the server. No visits, traffic or search ranking.
+ * - Operational: requests received, converted (received in the period and completed), conversion rate (converted ÷
+ *   received, from five requests), services completed and requests closed without the service, with their reasons;
+ *   new and recurring customers; origin of the requests followed as a cohort.
+ * - Financial (declared by the company, not proof of payment): revenue of the services completed in the period, the
+ *   average ticket of the services with an amount, and how many have none. Unknown amounts never count as zero.
+ * - What to do now: deterministic recommendations with links to the records behind them.
+ *
+ * Filters: period (months in the company's time zone), origin and responsible; the previous period of the same length
+ * is the comparison base. Every figure links to the request list with the same filters. Amounts are integer cents,
+ * formatted on the server.
  */
 class GrowthController extends Controller
 {
@@ -40,7 +47,7 @@ class GrowthController extends Controller
         '12-meses' => ['label' => 'Últimos 12 meses', 'months' => 12],
     ];
 
-    public function __invoke(Request $request, TenantContext $context, GrowthMetrics $metrics): Response
+    public function __invoke(Request $request, TenantContext $context, GrowthMetrics $metrics, GrowthRecommendations $recommendations): Response
     {
         $tenant = $context->requireTenant();
         Gate::authorize('viewGrowth', $tenant);
@@ -66,13 +73,23 @@ class GrowthController extends Controller
         $site = $metrics->site($tenant, $websites->get($tenant->id), $versions);
         $evolution = $metrics->evolution($tenant->id, collect(), $tenant->timezone);
 
+        // The request list with the same origin and responsible, for the records behind each figure.
+        $responsibleFilter = $responsible === 'none' ? 'nenhum' : ($responsible === null ? '' : (string) $responsible);
+        $list = fn (array $query): string => route('tenant.requests.index', array_filter([
+            'origem' => $origin->value ?? '',
+            'responsavel' => $responsibleFilter,
+            ...$query,
+        ], fn (mixed $value): bool => $value !== '' && $value !== null), false);
+        $received = ['de' => $from->toDateString(), 'ate' => $to->toDateString()];
+        $closed = [...$received, 'data' => 'encerramento'];
+
         return Inertia::render('tenant/growth/index', [
             'period' => $this->label($from, $to),
             'previousPeriod' => $this->label($previousFrom, $previousTo),
             'filters' => [
                 'periodo' => $period,
                 'origem' => $origin->value ?? '',
-                'responsavel' => $responsible === 'none' ? 'nenhum' : ($responsible === null ? '' : (string) $responsible),
+                'responsavel' => $responsibleFilter,
             ],
             'options' => [
                 'periods' => array_map(fn (string $key, array $preset): array => ['value' => $key, 'label' => $preset['label']], array_keys(self::PERIODS), self::PERIODS),
@@ -82,6 +99,16 @@ class GrowthController extends Controller
             'current' => $now,
             'previous' => $before,
             'comparison' => $this->comparison($now, $before),
+            'links' => [
+                'received' => $list($received),
+                'converted' => $list([...$received, 'status' => RequestStatus::Completed->value]),
+                'completed' => $list([...$closed, 'status' => RequestStatus::Completed->value]),
+                'cancelled' => $list([...$closed, 'status' => 'sem-servico']),
+                'without_amount' => $list([...$closed, 'status' => RequestStatus::Completed->value, 'sem_valor' => 1]),
+            ],
+            'recommendations' => $recommendations->for($tenant, $now, $before),
+            'customers' => $metrics->customers($tenant->id, $from->utc(), $to->utc(), $origin, $responsible),
+            'closingReasons' => $metrics->closingReasons($tenant->id, $from->utc(), $to->utc(), $origin, $responsible),
             'services' => ['active' => (int) ($activity['active_services'][$tenant->id] ?? 0), 'on_site' => $site['public_services'], 'site' => $site['site']],
             'seo' => $site['seo'],
             'evolution' => array_map(fn (array $row): array => [
@@ -90,16 +117,21 @@ class GrowthController extends Controller
                 'appointments_done' => $row['appointments_done'],
                 'completed' => $row['completed'],
                 'revenue' => $row['revenue_cents'] > 0 ? Money::format($row['revenue_cents']) : null,
+                'revenue_cents' => $row['revenue_cents'],
                 'revenue_unknown' => $row['revenue_unknown'],
             ], $evolution),
             'hasActivity' => array_sum(array_map(fn (array $row): int => $row['requests'] + $row['appointments_done'] + $row['completed'], $evolution)) > 0,
             'minRequestsForConversion' => GrowthMetrics::MIN_REQUESTS_FOR_CONVERSION,
             // Requests of the period by origin, followed until appointment, completion or closing without the service.
-            'origins' => $origin === null ? $metrics->byOrigin($tenant->id, $from->utc(), $to->utc(), $responsible) : array_values(array_filter($metrics->byOrigin($tenant->id, $from->utc(), $to->utc(), $responsible), fn (array $row): bool => $row['origin'] === $origin->value)),
+            'origins' => array_map(fn (array $row): array => [...$row, 'href' => $list([...$received, 'origem' => $row['origin']])], array_values(array_filter(
+                $metrics->byOrigin($tenant->id, $from->utc(), $to->utc(), $responsible),
+                fn (array $row): bool => $origin === null || $row['origin'] === $origin->value,
+            ))),
             'previousOrigins' => $metrics->byOrigin($tenant->id, $previousFrom->utc(), $previousTo->utc(), $responsible),
             'revenueByOrigin' => array_map(fn (array $row): array => [
                 ...$row,
                 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null,
+                'ticket' => ($ticket = $metrics->averageTicket($row['revenue_cents'], $row['revenue_known'])) === null ? null : Money::format($ticket),
             ], array_values(array_filter($metrics->revenueByOrigin($tenant->id, $from->utc(), $to->utc(), $responsible), fn (array $row): bool => $origin === null || $row['origin'] === $origin->value))),
         ]);
     }
@@ -125,29 +157,34 @@ class GrowthController extends Controller
     }
 
     /**
-     * @param  array{requests: int, completed: int, cancelled: int, appointments_done: int, revenue_cents: int, revenue_known: int, revenue_unknown: int}  $figures
-     * @return array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int}
+     * @param  array{requests: int, converted: int, completed: int, cancelled: int, appointments_done: int, revenue_cents: int, revenue_known: int, revenue_unknown: int}  $figures
+     * @return array{requests: int, converted: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int, ticket: string|null, ticket_cents: int|null}
      */
     private function figures(array $figures, GrowthMetrics $metrics): array
     {
+        $ticket = $metrics->averageTicket($figures['revenue_cents'], $figures['revenue_known']);
+
         return [
             'requests' => $figures['requests'],
+            'converted' => $figures['converted'],
             'appointments_done' => $figures['appointments_done'],
             'completed' => $figures['completed'],
             'cancelled' => $figures['cancelled'],
-            'conversion' => $metrics->conversion($figures['requests'], $figures['completed']),
+            'conversion' => $metrics->conversion($figures['requests'], $figures['converted']),
             'revenue' => $figures['revenue_known'] > 0 ? Money::format($figures['revenue_cents']) : null,
             'revenue_cents' => $figures['revenue_cents'],
             'revenue_known' => $figures['revenue_known'],
             'revenue_unknown' => $figures['revenue_unknown'],
+            'ticket' => $ticket === null ? null : Money::format($ticket),
+            'ticket_cents' => $ticket,
         ];
     }
 
     /**
      * Change against the previous period, only where the previous one has data (otherwise there is nothing to compare).
      *
-     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int}  $now
-     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int}  $before
+     * @param  array{requests: int, converted: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int, ticket: string|null, ticket_cents: int|null}  $now
+     * @param  array{requests: int, converted: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int, ticket: string|null, ticket_cents: int|null}  $before
      * @return array<string, int|null>
      */
     private function comparison(array $now, array $before): array
@@ -157,12 +194,14 @@ class GrowthController extends Controller
 
         return [
             'requests' => $delta($now['requests'], $before['requests']),
+            'converted' => $delta($now['converted'], $before['converted']),
             'appointments_done' => $delta($now['appointments_done'], $before['appointments_done']),
             'completed' => $delta($now['completed'], $before['completed']),
             'cancelled' => $delta($now['cancelled'], $before['cancelled']),
             'conversion' => $now['conversion'] !== null && $before['conversion'] !== null ? $now['conversion'] - $before['conversion'] : null,
             // Compared only when both periods have known amounts.
             'revenue' => $now['revenue_known'] > 0 && $before['revenue_known'] > 0 ? $delta($now['revenue_cents'], $before['revenue_cents']) : null,
+            'ticket' => $now['ticket_cents'] !== null && $before['ticket_cents'] !== null ? $delta($now['ticket_cents'], $before['ticket_cents']) : null,
         ];
     }
 

@@ -3,11 +3,13 @@
 namespace App\Models;
 
 use App\Concerns\BelongsToTenant;
+use App\Enums\AppointmentStatus;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestPriority;
 use App\Enums\RequestStatus;
 use Database\Factories\ServiceRequestFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -80,6 +82,33 @@ class ServiceRequest extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ServiceRequestEvent::class)->orderBy('id');
+    }
+
+    /**
+     * Days without any history entry after which an open request counts as stalled.
+     */
+    public const int STALE_AFTER_DAYS = 7;
+
+    /**
+     * Open requests without movement: no history entry in the last STALE_AFTER_DAYS days, and, when scheduled, no
+     * appointment still ahead (a visit that already passed without being started also counts).
+     *
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
+    public function scopeStalled(Builder $query): Builder
+    {
+        $limit = now()->subDays(self::STALE_AFTER_DAYS);
+
+        return $query
+            ->whereIn($this->qualifyColumn('status'), [RequestStatus::Requested->value, RequestStatus::Triaged->value, RequestStatus::Scheduled->value, RequestStatus::InProgress->value])
+            ->where($this->qualifyColumn('created_at'), '<', $limit)
+            ->whereDoesntHave('events', fn (Builder $events) => $events->where('created_at', '>=', $limit))
+            ->where(fn (Builder $scheduled) => $scheduled
+                ->where($this->qualifyColumn('status'), '!=', RequestStatus::Scheduled->value)
+                ->orWhereDoesntHave('appointments', fn (Builder $appointments) => $appointments
+                    ->where('status', AppointmentStatus::Scheduled->value)
+                    ->where('starts_at', '>=', now()->subDay())));
     }
 
     /**

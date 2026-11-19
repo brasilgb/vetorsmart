@@ -598,7 +598,7 @@ test('Meu Crescimento shows requests by origin from real records: received, sche
     ServiceRequest::factory()->count(4)->create(['tenant_id' => $other['tenant']->id, 'customer_id' => $otherCustomer->id, 'origin' => RequestOrigin::Portal]);
 
     $this->actingAs($company['owner'])->get('/meu-crescimento')->assertOk()->assertInertia(fn ($page) => $page
-        ->where('origins', fn ($rows) => collect($rows)->firstWhere('origin', 'portal') == ['origin' => 'portal', 'label' => 'Portal Regional', 'received' => 3, 'scheduled' => 2, 'completed' => 1, 'cancelled' => 0]
+        ->where('origins', fn ($rows) => collect(collect($rows)->firstWhere('origin', 'portal'))->except('href')->all() == ['origin' => 'portal', 'label' => 'Portal Regional', 'received' => 3, 'scheduled' => 2, 'completed' => 1, 'cancelled' => 0]
             && collect($rows)->firstWhere('origin', 'public_site')['received'] === 1)
         ->where('previousOrigins', fn ($rows) => collect($rows)->firstWhere('origin', 'portal')['received'] === 1));
 });

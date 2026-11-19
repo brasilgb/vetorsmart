@@ -54,11 +54,21 @@ class GrowthMetrics
      * amounts (integer cents, summed by the database) and, apart, how many completed services have no amount. Unknown is
      * never added as zero. Cancelled or not performed requests never carry an amount.
      *
-     * @return array{requests: int, completed: int, cancelled: int, appointments_done: int, revenue_cents: int, revenue_known: int, revenue_unknown: int}
+     * "converted" follows the requests received in the period as a cohort: how many of them have the service completed.
+     * It is the numerator of the conversion rate, whose denominator is "requests" (received in the period).
+     *
+     * @return array{requests: int, converted: int, completed: int, cancelled: int, appointments_done: int, revenue_cents: int, revenue_known: int, revenue_unknown: int}
      */
     public function tenantFigures(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
     {
         $requests = fn (): Builder => $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible);
+
+        $received = $requests()
+            ->whereBetween('created_at', [$from, $to])
+            ->selectRaw('COUNT(*) AS received')
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS converted', [RequestStatus::Completed->value])
+            ->toBase()
+            ->first();
 
         $closed = $requests()
             ->whereBetween('closed_at', [$from, $to])
@@ -78,7 +88,8 @@ class GrowthMetrics
             ->count();
 
         return [
-            'requests' => $requests()->whereBetween('created_at', [$from, $to])->count(),
+            'requests' => (int) ($received->received ?? 0),
+            'converted' => (int) ($received->converted ?? 0),
             'completed' => (int) ($closed->completed ?? 0),
             'cancelled' => (int) ($closed->cancelled ?? 0),
             'appointments_done' => $appointmentsDone,
@@ -181,7 +192,64 @@ class GrowthMetrics
     }
 
     /**
-     * Conversion rate (completed ÷ received, in %) only with enough requests to mean something.
+     * Customers who sent requests in the period: "new" sent their first request ever to the company in the period;
+     * "recurring" had sent an earlier one (any origin). Read from the requests, never from a stored counter.
+     *
+     * @return array{total: int, new: int, recurring: int}
+     */
+    public function customers(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
+    {
+        $inPeriod = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
+            ->whereBetween('created_at', [$from, $to])
+            ->distinct()
+            ->pluck('customer_id');
+
+        $recurring = $inPeriod->isEmpty() ? 0 : ServiceRequest::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('customer_id', $inPeriod)
+            ->where('created_at', '<', $from)
+            ->distinct()
+            ->count('customer_id');
+
+        return ['total' => $inPeriod->count(), 'new' => $inPeriod->count() - $recurring, 'recurring' => $recurring];
+    }
+
+    /**
+     * Reasons of the requests closed in the period without the service (cancelled or not performed), most frequent
+     * first. The reason is the text the team wrote when closing.
+     *
+     * @return list<array{reason: string, status: string, total: int}>
+     */
+    public function closingReasons(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null, int $limit = 5): array
+    {
+        return array_values($this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
+            ->whereIn('status', [RequestStatus::Cancelled->value, RequestStatus::NotPerformed->value])
+            ->whereBetween('closed_at', [$from, $to])
+            ->groupBy('closing_reason', 'status')
+            ->selectRaw('closing_reason, status, COUNT(*) AS total')
+            ->orderByDesc('total')
+            ->limit($limit)
+            ->toBase()
+            ->get()
+            ->map(fn (object $row): array => [
+                'reason' => trim((string) $row->closing_reason) !== '' ? (string) $row->closing_reason : 'Sem motivo informado',
+                'status' => RequestStatus::from((string) $row->status)->label(),
+                'total' => (int) $row->total,
+            ])
+            ->all());
+    }
+
+    /**
+     * Average declared amount of the completed services that have one, in cents (rounded half up with integers only).
+     * Services without an amount are left out, never averaged as zero. Null when no service has an amount.
+     */
+    public function averageTicket(int $revenueCents, int $knownServices): ?int
+    {
+        return $knownServices > 0 ? intdiv(2 * $revenueCents + $knownServices, 2 * $knownServices) : null;
+    }
+
+    /**
+     * Conversion rate (converted ÷ received, in %) only with enough requests to mean something.
      */
     public function conversion(int $requests, int $completed): ?int
     {

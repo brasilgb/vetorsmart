@@ -38,6 +38,11 @@ class ServiceRequestController extends Controller
      */
     private const int CUSTOMER_OPTIONS = 50;
 
+    /**
+     * Status filter for requests closed without the service (cancelled or not performed).
+     */
+    private const string CLOSED_WITHOUT_SERVICE = 'sem-servico';
+
     public function index(Request $request, TenantContext $context): Response
     {
         $this->authorize('viewAny', ServiceRequest::class);
@@ -49,8 +54,24 @@ class ServiceRequestController extends Controller
 
         $status = $request->string('status')->value();
 
-        if (RequestStatus::tryFrom($status) !== null) {
-            $query->where('status', $status);
+        match (true) {
+            RequestStatus::tryFrom($status) !== null => $query->where('status', $status),
+            // Closed without the service: cancelled or not performed (Meu Crescimento counts them together).
+            $status === self::CLOSED_WITHOUT_SERVICE => $query->whereIn('status', [RequestStatus::Cancelled->value, RequestStatus::NotPerformed->value]),
+            default => $status = '',
+        };
+
+        // Completed services whose amount was not informed, and open requests without recent movement.
+        $withoutAmount = $request->boolean('sem_valor');
+
+        if ($withoutAmount) {
+            $query->where('status', RequestStatus::Completed->value)->whereNull('realized_amount_cents');
+        }
+
+        $stalled = $request->boolean('parada');
+
+        if ($stalled) {
+            $query->stalled();
         }
 
         $origin = $request->string('origem')->value();
@@ -70,20 +91,31 @@ class ServiceRequestController extends Controller
             default => $responsible = '',
         };
 
-        // Period of arrival, in the company's own calendar.
+        // Period in the company's own calendar: of arrival (default) or of closing ("data=encerramento").
         $from = $this->localDate($request->string('de')->value());
         $until = $this->localDate($request->string('ate')->value());
+        $dateField = $request->string('data')->value() === 'encerramento' ? 'encerramento' : 'recebimento';
+        $column = $dateField === 'encerramento' ? 'closed_at' : 'created_at';
 
         if ($from !== null) {
-            $query->where('created_at', '>=', $tenant->startOfLocalDay($from)->utc());
+            $query->where($column, '>=', $tenant->startOfLocalDay($from)->utc());
         }
 
         if ($until !== null) {
-            $query->where('created_at', '<', $tenant->startOfLocalDay($until)->addDay()->utc());
+            $query->where($column, '<', $tenant->startOfLocalDay($until)->addDay()->utc());
         }
 
         return Inertia::render('tenant/requests/index', [
-            'filters' => ['status' => $status, 'origem' => RequestOrigin::tryFrom($origin) !== null ? $origin : '', 'responsavel' => $responsible, 'de' => $from ?? '', 'ate' => $until ?? ''],
+            'filters' => [
+                'status' => $status,
+                'origem' => RequestOrigin::tryFrom($origin) !== null ? $origin : '',
+                'responsavel' => $responsible,
+                'de' => $from ?? '',
+                'ate' => $until ?? '',
+                'data' => $dateField === 'encerramento' ? 'encerramento' : '',
+                'sem_valor' => $withoutAmount ? '1' : '',
+                'parada' => $stalled ? '1' : '',
+            ],
             'assignees' => $assignees,
             'statuses' => $this->statusOptions(),
             'origins' => array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item->label()], RequestOrigin::cases()),
@@ -315,10 +347,13 @@ class ServiceRequestController extends Controller
      */
     private function statusOptions(): array
     {
-        return array_map(
-            fn (RequestStatus $status): array => ['value' => $status->value, 'label' => $status->label()],
-            RequestStatus::cases(),
-        );
+        return [
+            ...array_map(
+                fn (RequestStatus $status): array => ['value' => $status->value, 'label' => $status->label()],
+                RequestStatus::cases(),
+            ),
+            ['value' => self::CLOSED_WITHOUT_SERVICE, 'label' => 'Canceladas ou não realizadas'],
+        ];
     }
 
     /**

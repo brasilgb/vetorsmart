@@ -22,7 +22,7 @@ type Row = {
 };
 
 type Props = {
-    filters: { status: string; origem: string; responsavel: string; de: string; ate: string };
+    filters: { status: string; origem: string; responsavel: string; de: string; ate: string; data: string; sem_valor: string; parada: string };
     statuses: { value: string; label: string }[];
     origins: { value: string; label: string }[];
     assignees: { id: number; name: string }[];
@@ -42,6 +42,16 @@ export function OriginLabel({ origin, label }: { origin: string; label: string }
 
 export default function RequestsIndex({ filters, statuses, origins, assignees, requests }: Props) {
     const filter = (changes: Partial<Props['filters']>) => router.get(requestsIndex.url(), { ...filters, ...changes }, { preserveState: true, replace: true });
+    // Filters that arrive from Meu Crescimento and have no field of their own: shown as removable chips.
+    const chips: { label: string; clear: Partial<Props['filters']> }[] = [];
+
+    if (filters.sem_valor === '1') {
+        chips.push({ label: 'Concluídas sem valor registrado', clear: { sem_valor: '' } });
+    }
+
+    if (filters.parada === '1') {
+        chips.push({ label: 'Sem movimentação recente', clear: { parada: '' } });
+    }
 
     return (
         <>
@@ -81,7 +91,7 @@ export default function RequestsIndex({ filters, statuses, origins, assignees, r
                         ))}
                     </select>
                     <label className="grid gap-1 text-xs text-vs-muted">
-                        Recebidas de
+                        {filters.data === 'encerramento' ? 'Encerradas de' : 'Recebidas de'}
                         <input type="date" value={filters.de} max={filters.ate || undefined} onChange={(event) => filter({ de: event.target.value })} className={selectClass} />
                     </label>
                     <label className="grid gap-1 text-xs text-vs-muted">
@@ -89,6 +99,25 @@ export default function RequestsIndex({ filters, statuses, origins, assignees, r
                         <input type="date" value={filters.ate} min={filters.de || undefined} onChange={(event) => filter({ ate: event.target.value })} className={selectClass} />
                     </label>
                 </div>
+
+                {(chips.length > 0 || filters.data === 'encerramento') && (
+                    <ul className="flex flex-wrap gap-2" aria-label="Filtros aplicados">
+                        {filters.data === 'encerramento' && (
+                            <li>
+                                <button type="button" onClick={() => filter({ data: '' })} className="inline-flex items-center gap-1 rounded-full border border-vs-border bg-vs-surface px-3 py-1 text-xs text-vs-text hover:border-vs-blue">
+                                    Período pela data de encerramento <span aria-hidden="true">×</span><span className="sr-only">(remover filtro)</span>
+                                </button>
+                            </li>
+                        )}
+                        {chips.map((chip) => (
+                            <li key={chip.label}>
+                                <button type="button" onClick={() => filter(chip.clear)} className="inline-flex items-center gap-1 rounded-full border border-vs-border bg-vs-surface px-3 py-1 text-xs text-vs-text hover:border-vs-blue">
+                                    {chip.label} <span aria-hidden="true">×</span><span className="sr-only">(remover filtro)</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
 
                 {requests.data.length === 0 ? (
                     <EmptyState>Nenhuma solicitação encontrada. Use “Nova solicitação” para registrar o primeiro atendimento.</EmptyState>
