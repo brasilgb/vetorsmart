@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { index as supportIndex, reopen as supportReopen, update as supportUpdate } from '@/routes/rootadmin/support';
 import { show as tenantShow } from '@/routes/rootadmin/tenants';
-import { priorityTone } from './index';
+import { nextActionLabel, priorityTone } from './index';
 
 type Option = { value: string; label: string };
 
@@ -22,6 +22,7 @@ type Ticket = {
     category_label: string;
     status: string;
     status_label: string;
+    next_action: string | null;
     priority: string;
     priority_label: string;
     opened_via: string;
@@ -55,6 +56,7 @@ export default function SupportShow({ ticket, events, statuses, priorities, assi
     const form = useForm({
         note: '',
         internal: false,
+        await_company: true,
         status: ticket.status,
         priority: ticket.priority,
         assigned_to: ticket.assigned_to === null ? '' : String(ticket.assigned_to),
@@ -74,6 +76,7 @@ export default function SupportShow({ ticket, events, statuses, priorities, assi
                         {ticket.overdue && <Badge variant="outline" className="border-vs-danger text-vs-danger">Atrasado</Badge>}
                         <Badge variant="outline" className={priorityTone[ticket.priority] ?? ''}>{ticket.priority_label}</Badge>
                         <Badge variant="outline" className="border-vs-border text-vs-text">{ticket.status_label}</Badge>
+                        {ticket.next_action && <span className="font-medium text-vs-text">{nextActionLabel[ticket.next_action]} ·</span>}
                         <span>
                             {ticket.tenant_id !== null ? <Link href={tenantShow.url({ tenant: ticket.tenant_id })} className="text-vs-link hover:underline">{ticket.tenant}</Link> : 'Plataforma'}
                             {' · '}{ticket.category_label} · {ticket.opened_via === 'tenant' ? 'aberto pela empresa' : 'aberto pela equipe'} ({ticket.opened_by ?? '—'}) em {ticket.opened_at}
@@ -107,7 +110,7 @@ export default function SupportShow({ ticket, events, statuses, priorities, assi
                         <form
                             onSubmit={(event) => {
                                 event.preventDefault();
-                                form.post(supportUpdate.url({ ticket: ticket.id }), { preserveScroll: true, onSuccess: () => form.reset('note', 'internal') });
+                                form.post(supportUpdate.url({ ticket: ticket.id }), { preserveScroll: true, onSuccess: () => form.reset('note', 'internal', 'await_company') });
                             }}
                             className="grid gap-4 md:grid-cols-2"
                         >
@@ -119,6 +122,12 @@ export default function SupportShow({ ticket, events, statuses, priorities, assi
                                     <Checkbox id="internal" checked={form.data.internal} onCheckedChange={(checked) => form.setData('internal', checked === true)} />
                                     <Label htmlFor="internal" className="text-vs-text">Registrar como nota interna</Label>
                                 </div>
+                                {!form.data.internal && (
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <Checkbox id="await_company" checked={form.data.await_company} onCheckedChange={(checked) => form.setData('await_company', checked === true)} />
+                                        <Label htmlFor="await_company" className="text-vs-text">Aguardar retorno da empresa (passa a próxima ação para a empresa)</Label>
+                                    </div>
+                                )}
                             </div>
                             <Field id="status" label="Situação" error={form.errors.status}>
                                 <select id="status" value={form.data.status} onChange={(event) => form.setData('status', event.target.value)} disabled={ticket.is_final} className={selectClass}>

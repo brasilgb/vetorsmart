@@ -242,6 +242,7 @@
                     @if (filled($contact['phone'] ?? null))<li>Telefone: {{ $contact['phone'] }}</li>@endif
                     @if (filled($contact['whatsapp'] ?? null))<li>WhatsApp: {{ $contact['whatsapp'] }}</li>@endif
                     @if (filled($contact['email'] ?? null))<li>E-mail: {{ $contact['email'] }}</li>@endif
+                    @if (filled($contact['google_review_url'] ?? null) && str_starts_with((string) $contact['google_review_url'], 'https://'))<li><a href="{{ $contact['google_review_url'] }}" rel="noopener nofollow" target="_blank">Avalie-nos no Google</a></li>@endif
                 </ul>
             </div>
         </section>

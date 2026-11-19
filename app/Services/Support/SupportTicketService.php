@@ -10,14 +10,18 @@ use App\Models\SupportTicketEvent;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\OperationalNotifier;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 /**
  * Every change of a support request. Each runs in a transaction with a row lock, writes the append-only history
- * (support_ticket_events) and the audit log.
+ * (support_ticket_events) and the audit log. Public answers of the team and company answers to a request waiting for
+ * it are notified by e-mail through OperationalNotifier (queued, once per answer, never blocking).
  *
+ * - Next action: "Aberto" and "Em andamento" are with the team, "Aguardando a empresa" with the company. A public
+ *   answer marked await_company hands the request to the company.
  * - Status changes follow ALLOWED transitions; a closed request only comes back through reopen().
  * - A company reply on a request waiting for it, or already resolved, puts it back to "Aberto"; a closed request does
  *   not accept company replies (the company opens a new one).
@@ -34,7 +38,10 @@ class SupportTicketService
         'closed' => [],
     ];
 
-    public function __construct(private AuditLogger $auditLogger) {}
+    public function __construct(
+        private AuditLogger $auditLogger,
+        private OperationalNotifier $notifier,
+    ) {}
 
     public function open(?Tenant $tenant, string $subject, string $description, SupportTicketCategory $category, SupportTicketPriority $priority, string $via, User $actor): SupportTicket
     {
@@ -71,7 +78,7 @@ class SupportTicketService
                 throw ValidationException::withMessages(['note' => 'Este chamado foi encerrado. Abra um novo chamado para continuar.']);
             }
 
-            $this->event($ticket, 'comment', null, null, $note, false, $actor);
+            $reply = $this->event($ticket, 'comment', null, null, $note, false, $actor);
             $changes = ['reply' => true];
 
             if (in_array($ticket->status, [SupportTicketStatus::Waiting, SupportTicketStatus::Resolved], true)) {
@@ -79,6 +86,7 @@ class SupportTicketService
                 $this->event($ticket, $type, $ticket->status->value, SupportTicketStatus::Open->value, null, false, $actor);
                 $changes['status'] = ['de' => $ticket->status->value, 'para' => SupportTicketStatus::Open->value];
                 $ticket->forceFill(['status' => SupportTicketStatus::Open, 'closed_at' => null]);
+                $this->notifier->supportCompanyReplied($ticket, $reply->getKey());
             }
 
             $ticket->forceFill(['last_activity_at' => now()])->save();
@@ -92,7 +100,7 @@ class SupportTicketService
      * Follow-up by the platform team: a reply (seen by the company) or an internal note, a controlled status change,
      * priority, person responsible and due date. Only the given fields change.
      *
-     * @param  array{note?: string|null, internal?: bool, status?: SupportTicketStatus|null, priority?: SupportTicketPriority|null, assigned_to?: User|null, assign?: bool, due_at?: CarbonInterface|null, set_due?: bool}  $data
+     * @param  array{note?: string|null, internal?: bool, await_company?: bool, status?: SupportTicketStatus|null, priority?: SupportTicketPriority|null, assigned_to?: User|null, assign?: bool, due_at?: CarbonInterface|null, set_due?: bool}  $data
      */
     public function platformUpdate(SupportTicket $ticket, array $data, User $actor): SupportTicket
     {
@@ -100,13 +108,24 @@ class SupportTicketService
             $ticket = $this->locked($ticket);
             $changes = [];
 
+            $status = $data['status'] ?? null;
+
             if (filled($data['note'] ?? null)) {
                 $internal = (bool) ($data['internal'] ?? false);
-                $this->event($ticket, $internal ? 'internal' : 'comment', null, null, (string) $data['note'], $internal, $actor);
+                $event = $this->event($ticket, $internal ? 'internal' : 'comment', null, null, (string) $data['note'], $internal, $actor);
                 $changes[$internal ? 'internal_note' : 'reply'] = true;
-            }
 
-            $status = $data['status'] ?? null;
+                if (! $internal) {
+                    $this->notifier->supportAnswered($ticket, $event->getKey(), $actor);
+
+                    // A public answer that asks something of the company hands the next action to it, unless another status was chosen.
+                    $keepsStatus = $status === null || $status === $ticket->status;
+
+                    if (($data['await_company'] ?? false) === true && $keepsStatus && in_array($ticket->status, [SupportTicketStatus::Open, SupportTicketStatus::InProgress], true)) {
+                        $status = SupportTicketStatus::Waiting;
+                    }
+                }
+            }
 
             if ($status !== null && $status !== $ticket->status) {
                 if (! in_array($status->value, self::ALLOWED[$ticket->status->value], true)) {
@@ -186,7 +205,7 @@ class SupportTicketService
         return SupportTicket::query()->with('tenant')->whereKey($ticket->getKey())->lockForUpdate()->firstOrFail();
     }
 
-    private function event(SupportTicket $ticket, string $type, ?string $from, ?string $to, ?string $note, bool $internal, User $actor): void
+    private function event(SupportTicket $ticket, string $type, ?string $from, ?string $to, ?string $note, bool $internal, User $actor): SupportTicketEvent
     {
         $event = new SupportTicketEvent;
         $event->forceFill([
@@ -198,5 +217,7 @@ class SupportTicketService
             'note' => $note,
             'is_internal' => $internal,
         ])->save();
+
+        return $event;
     }
 }

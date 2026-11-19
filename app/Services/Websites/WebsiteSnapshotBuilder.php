@@ -66,6 +66,7 @@ class WebsiteSnapshotBuilder
                 'address' => $setting?->address,
                 'city' => $setting?->city,
                 'state' => $setting?->state,
+                'google_review_url' => $setting->settings['google_review_url'] ?? null,
             ],
             'seo' => [
                 'title' => $draft['seo']['title'] ?? null,

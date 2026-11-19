@@ -6,7 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { show as subscriptionShow, start as startSubscription } from '@/routes/rootadmin/subscriptions';
+import { index as supportIndex, show as supportShow } from '@/routes/rootadmin/support';
 import { status as tenantStatus } from '@/routes/rootadmin/tenants';
+import { index as usersIndex } from '@/routes/rootadmin/users';
 import type { Paginator } from '@/types';
 
 type Props = {
@@ -39,6 +41,7 @@ type Props = {
         assistant_enabled: boolean;
     };
     history: { id: number; action: string; user: string | null; created_at: string | null }[];
+    support: { open: number; recent: { id: number; subject: string; status_label: string; last_activity_at: string | null }[] };
     users: Paginator<{
         id: number;
         name: string | null;
@@ -56,7 +59,7 @@ const actionLabel: Record<string, string> = {
     'tenant.activated': 'Empresa ativada',
 };
 
-export default function TenantShow({ tenant, settings, operations, history, users, subscription }: Props) {
+export default function TenantShow({ tenant, settings, operations, history, users, subscription, support }: Props) {
     const isActive = tenant.status === 'active';
 
     const form = useForm({
@@ -203,10 +206,35 @@ export default function TenantShow({ tenant, settings, operations, history, user
                     </CardContent>
                 </Card>
 
+                <Card className="border-vs-border/70 shadow-sm">
+                    <CardHeader>
+                        <CardTitle className="text-vs-text">Chamados de suporte</CardTitle>
+                        <CardDescription>{support.open} em aberto. Os mais recentes:</CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-2 text-sm">
+                        {support.recent.length === 0 ? (
+                            <p className="text-vs-muted">Nenhum chamado desta empresa.</p>
+                        ) : (
+                            <ul className="grid gap-1">
+                                {support.recent.map((ticket) => (
+                                    <li key={ticket.id} className="flex flex-wrap justify-between gap-2 text-vs-text">
+                                        <Link href={supportShow.url({ ticket: ticket.id })} className="text-vs-link hover:underline">#{ticket.id} · {ticket.subject}</Link>
+                                        <span className="text-vs-muted">{ticket.status_label} · {ticket.last_activity_at}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                        <Link href={supportIndex.url({ query: { tenant_id: tenant.id, status: 'todos' } })} className="text-vs-link hover:underline">Ver todos os chamados da empresa</Link>
+                    </CardContent>
+                </Card>
+
                 <Card className="overflow-hidden border-vs-border/70 shadow-sm">
                     <CardHeader>
                         <CardTitle className="text-vs-text">Usuários vinculados</CardTitle>
-                        <CardDescription>Sem senhas ou dados de acesso. Alterações de permissão não são feitas por esta tela.</CardDescription>
+                        <CardDescription>
+                            Sem senhas ou dados de acesso. Alterações de permissão não são feitas por esta tela.{' '}
+                            <Link href={usersIndex.url({ query: { tenant_id: tenant.id } })} className="text-vs-link hover:underline">Gerir acessos em Usuários e Acessos</Link>
+                        </CardDescription>
                     </CardHeader>
                     <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Usuários vinculados à empresa">
                         <table className="w-full min-w-[640px] text-left text-sm">

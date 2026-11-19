@@ -21,6 +21,18 @@ enum SupportTicketStatus: string
         };
     }
 
+    /**
+     * Who has to act next: the platform team, the company, or nobody (finished).
+     */
+    public function nextActionBy(): ?string
+    {
+        return match ($this) {
+            self::Open, self::InProgress => 'team',
+            self::Waiting => 'company',
+            self::Resolved, self::Closed => null,
+        };
+    }
+
     public function isFinal(): bool
     {
         return $this === self::Resolved || $this === self::Closed;

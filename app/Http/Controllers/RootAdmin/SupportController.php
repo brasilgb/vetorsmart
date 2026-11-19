@@ -134,6 +134,7 @@ class SupportController extends Controller
         $support->platformUpdate($ticket, [
             'note' => $data['note'] ?? null,
             'internal' => $request->boolean('internal'),
+            'await_company' => $request->boolean('await_company'),
             'status' => isset($data['status']) ? SupportTicketStatus::from($data['status']) : null,
             'priority' => isset($data['priority']) ? SupportTicketPriority::from($data['priority']) : null,
             'assign' => $request->has('assigned_to'),
@@ -210,6 +211,7 @@ class SupportController extends Controller
             'category_label' => $ticket->category->label(),
             'status' => $ticket->status->value,
             'status_label' => $ticket->status->label(),
+            'next_action' => $ticket->status->nextActionBy(),
             'priority' => $ticket->priority->value,
             'priority_label' => $ticket->priority->label(),
             'opened_via' => $ticket->opened_via,

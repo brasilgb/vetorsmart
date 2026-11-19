@@ -4,6 +4,7 @@ namespace App\Http\Controllers\RootAdmin;
 
 use App\Enums\MembershipStatus;
 use App\Enums\ServiceMode;
+use App\Enums\SupportTicketStatus;
 use App\Enums\TenantStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\RootAdmin\UpdateTenantStatusRequest;
@@ -11,6 +12,7 @@ use App\Models\AssistantSetting;
 use App\Models\AuditLog;
 use App\Models\Segment;
 use App\Models\Subscription;
+use App\Models\SupportTicket;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TenantUser;
@@ -144,6 +146,15 @@ class TenantController extends Controller
             'subscription' => ($subscription = Subscription::query()->forTenant($tenant)->first(['id', 'status'])) === null ? null : [
                 'id' => $subscription->id,
                 'status_label' => $subscription->status->label(),
+            ],
+            'support' => [
+                'open' => SupportTicket::query()->where('tenant_id', $tenant->id)->whereNotIn('status', [SupportTicketStatus::Resolved->value, SupportTicketStatus::Closed->value])->count(),
+                'recent' => SupportTicket::query()->where('tenant_id', $tenant->id)->latest('id')->limit(5)->get()->map(fn (SupportTicket $ticket): array => [
+                    'id' => $ticket->id,
+                    'subject' => $ticket->subject,
+                    'status_label' => $ticket->status->label(),
+                    'last_activity_at' => PlatformTime::dateTime($ticket->last_activity_at),
+                ])->all(),
             ],
             'history' => $history->map(fn (AuditLog $entry): array => [
                 'id' => $entry->id,

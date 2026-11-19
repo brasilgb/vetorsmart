@@ -28,6 +28,7 @@ type Settings = {
     confirmation_policy: string;
     currency: string;
     date_format: string;
+    google_review_url: string | null;
 };
 
 type Props = {
@@ -64,6 +65,7 @@ export default function SettingsIndex({ settings, segments, canEdit }: Props) {
         address: settings.address ?? '',
         city: settings.city ?? '',
         state: settings.state ?? '',
+        google_review_url: settings.google_review_url ?? '',
     });
 
     const identity = useForm({ brand_color: settings.brand_color });
@@ -137,6 +139,11 @@ export default function SettingsIndex({ settings, segments, canEdit }: Props) {
                         <Field id="whatsapp" label="WhatsApp" error={company.errors.whatsapp}>
                             <Input id="whatsapp" value={company.data.whatsapp} disabled={disabled} onChange={(e) => company.setData('whatsapp', e.target.value)} className="h-10" />
                         </Field>
+                        <div className="md:col-span-2">
+                            <Field id="google_review_url" label="Link de avaliação no Google" error={company.errors.google_review_url} hint="Copie em “Pedir avaliações” no Perfil da Empresa do Google. Aparece no seu site como “Avalie-nos no Google”.">
+                                <Input id="google_review_url" type="url" inputMode="url" placeholder="https://g.page/r/..." value={company.data.google_review_url} disabled={disabled} onChange={(e) => company.setData('google_review_url', e.target.value)} className="h-10" />
+                            </Field>
+                        </div>
                         <div className="md:col-span-2">
                             <Field id="address" label="Endereço" error={company.errors.address}>
                                 <Input id="address" value={company.data.address} disabled={disabled} onChange={(e) => company.setData('address', e.target.value)} className="h-10" />

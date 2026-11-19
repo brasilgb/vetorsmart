@@ -10,6 +10,7 @@ use App\Models\Appointment;
 use App\Models\AssistantConversation;
 use App\Models\Customer;
 use App\Models\ServiceRequest;
+use App\Models\SupportTicket;
 use App\Models\Tenant;
 use App\Models\TenantNotification;
 use App\Models\TenantSetting;
@@ -18,7 +19,9 @@ use App\Models\User;
 use App\Notifications\OperationalMail;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 /**
  * Operational notices of a company: a notice in the panel for each active member, an e-mail copy when the member
@@ -182,6 +185,68 @@ class OperationalNotifier
      * A billing notice to the company's owners (trial ending, payment pending, financial suspension, reactivation).
      * Administrative and therefore always sent by e-mail. The key makes each notice happen once.
      */
+    /**
+     * The platform team answered a support request publicly: owners and admins of the company get a notice in the panel
+     * and an e-mail. Only the number, the subject and the link go out, never the content of the answer. Once per answer
+     * (the event id is the key); a failure is logged and never blocks the request.
+     */
+    public function supportAnswered(SupportTicket $ticket, int $eventId, User $actor): void
+    {
+        $tenant = $ticket->tenant;
+
+        if ($tenant === null) {
+            return;
+        }
+
+        $this->afterCommit("support.answered:{$eventId}", $tenant->getKey(), function () use ($ticket, $tenant, $actor): void {
+            try {
+                $tenant->loadMissing('settings');
+                $this->notifyTeam($tenant, NotificationCategory::AdminNotice, $actor,
+                    title: "Resposta da equipe VetorSmart no chamado #{$ticket->getKey()}",
+                    body: 'Assunto: '.$ticket->subject.'. Abra o chamado no painel para ler a resposta.',
+                    path: route('tenant.support.show', ['ticket' => $ticket->getKey()], false),
+                    roles: [TenantRole::Owner, TenantRole::Admin],
+                );
+            } catch (Throwable $exception) {
+                Log::warning('Aviso de resposta de suporte não enviado.', ['ticket_id' => $ticket->getKey(), 'error' => $exception->getMessage()]);
+            }
+        });
+    }
+
+    /**
+     * The company answered a request that was waiting for it (or reopened a resolved one): the person responsible is
+     * warned by e-mail, or every active platform administrator when nobody is assigned. Once per answer; a failure is
+     * logged and never blocks the request.
+     */
+    public function supportCompanyReplied(SupportTicket $ticket, int $eventId): void
+    {
+        $this->afterCommit("support.company_replied:{$eventId}", $ticket->tenant_id, function () use ($ticket): void {
+            try {
+                $assignee = $ticket->assignee;
+                $recipients = $assignee !== null && $assignee->isRootAdmin()
+                    ? collect([$assignee])
+                    : User::query()->where('is_root_admin', true)->where('status', UserStatus::Active->value)->get();
+
+                $recipients = $recipients->filter(fn (User $user): bool => $user->hasVerifiedEmail());
+
+                if ($recipients->isEmpty()) {
+                    return;
+                }
+
+                Notification::send($recipients, new OperationalMail(
+                    subjectLine: "Empresa respondeu o chamado #{$ticket->getKey()} · VetorSmart",
+                    heading: "A empresa respondeu o chamado #{$ticket->getKey()}",
+                    lines: ['Empresa: '.($ticket->tenant->name ?? '—').'.', 'Assunto: '.$ticket->subject.'.', 'O chamado voltou para a equipe.'],
+                    actionText: 'Abrir no RootAdmin',
+                    actionUrl: config('platform.public_url').route('rootadmin.support.show', ['ticket' => $ticket->getKey()], false),
+                    closing: 'VetorSmart · Central de Suporte.',
+                ));
+            } catch (Throwable $exception) {
+                Log::warning('Aviso de resposta da empresa não enviado.', ['ticket_id' => $ticket->getKey(), 'error' => $exception->getMessage()]);
+            }
+        });
+    }
+
     public function billingNotice(Tenant $tenant, string $key, string $title, string $body): void
     {
         $this->afterCommit('billing:'.$key, $tenant->getKey(), function () use ($tenant, $title, $body): void {

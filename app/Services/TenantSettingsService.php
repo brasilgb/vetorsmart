@@ -28,6 +28,13 @@ class TenantSettingsService
         $settingChanges = array_diff_key($attributes, array_flip(self::TENANT_FIELDS));
 
         $setting = TenantSetting::query()->forTenant($tenant)->firstOrFail();
+
+        // Preferences live in the settings JSON: merge them, so updating one key never drops the others.
+        if (array_key_exists('google_review_url', $settingChanges)) {
+            $settingChanges['settings'] = [...($setting->settings ?? []), ...($settingChanges['settings'] ?? []), 'google_review_url' => $settingChanges['google_review_url'] ?: null];
+            unset($settingChanges['google_review_url']);
+        }
+
         $setting->fill($settingChanges);
         $changedSettings = array_keys($setting->getDirty());
         $setting->save();

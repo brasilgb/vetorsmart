@@ -40,6 +40,25 @@ class UpdateTenantSettingsRequest extends FormRequest
             'settings' => ['sometimes', 'array'],
             'settings.currency' => ['sometimes', 'string', 'in:BRL'],
             'settings.date_format' => ['sometimes', 'string', 'in:d/m/Y,Y-m-d'],
+            // Shown on the public site: only an https address of Google itself, so the button never leads elsewhere.
+            'google_review_url' => ['sometimes', 'nullable', 'string', 'max:500', 'url:https', function (string $attribute, mixed $value, \Closure $fail): void {
+                $host = strtolower((string) parse_url((string) $value, PHP_URL_HOST));
+
+                if ($host !== '' && ! preg_match('/(^|\.)(google\.com(\.br)?|g\.page|goo\.gl)$/', $host)) {
+                    $fail('Use o link de avaliação gerado pelo Google (google.com, g.page ou goo.gl).');
+                }
+            }],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'google_review_url.url' => 'Informe o link completo, começando com https://.',
+            'google_review_url.max' => 'O link pode ter até 500 caracteres.',
         ];
     }
 

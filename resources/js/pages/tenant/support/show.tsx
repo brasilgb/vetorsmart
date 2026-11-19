@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { index as supportIndex, reply as supportReply } from '@/routes/tenant/support';
-import { statusTone } from './index';
+import { nextActionLabel, statusTone } from './index';
 
 type Ticket = {
     id: number;
@@ -14,6 +14,7 @@ type Ticket = {
     status: string;
     status_label: string;
     is_closed: boolean;
+    next_action: string | null;
     opened_by: string | null;
     opened_at: string | null;
     closed_at: string | null;
@@ -48,6 +49,9 @@ export default function SupportShow({ ticket, events }: { ticket: Ticket; events
                     <h1 className="mt-1 text-2xl font-semibold break-words text-vs-text">#{ticket.id} · {ticket.subject}</h1>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-vs-muted">
                         <Badge variant="outline" className={statusTone[ticket.status] ?? ''}>{ticket.status_label}</Badge>
+                        {ticket.next_action && (
+                            <span className={ticket.next_action === 'company' ? 'font-medium text-amber-700 dark:text-amber-400' : ''}>{nextActionLabel[ticket.next_action]} ·</span>
+                        )}
                         <span>{ticket.category_label} · aberto por {ticket.opened_by ?? '—'} em {ticket.opened_at}{ticket.closed_at && ` · finalizado em ${ticket.closed_at}`}</span>
                     </div>
                 </div>

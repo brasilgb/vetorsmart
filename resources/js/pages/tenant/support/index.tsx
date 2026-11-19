@@ -10,7 +10,10 @@ import { Input } from '@/components/ui/input';
 import { index as supportIndex, show as supportShow, store as supportStore } from '@/routes/tenant/support';
 import type { Paginator } from '@/types';
 
-type Ticket = { id: number; subject: string; category_label: string; status: string; status_label: string; is_final: boolean; opened_at: string | null; last_activity_at: string | null };
+type Ticket = { id: number; subject: string; category_label: string; status: string; status_label: string; is_final: boolean; next_action: string | null; opened_at: string | null; last_activity_at: string | null };
+
+/** Who has to act next, in the words of the company. */
+export const nextActionLabel: Record<string, string> = { team: 'Com a equipe VetorSmart', company: 'Aguardando sua resposta' };
 
 type Props = { filter: string; categories: { value: string; label: string }[]; tickets: Paginator<Ticket> };
 
@@ -85,7 +88,12 @@ export default function SupportIndex({ filter, categories, tickets }: Props) {
                                                 <Link href={supportShow.url({ ticket: ticket.id })} className="font-medium text-vs-link hover:underline">#{ticket.id} · {ticket.subject}</Link>
                                                 <p className="text-vs-muted">{ticket.category_label} · aberto em {ticket.opened_at} · atualizado em {ticket.last_activity_at}</p>
                                             </div>
-                                            <Badge variant="outline" className={statusTone[ticket.status] ?? ''}>{ticket.status_label}</Badge>
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {ticket.next_action && (
+                                                    <span className={ticket.next_action === 'company' ? 'text-xs font-medium text-amber-700 dark:text-amber-400' : 'text-xs text-vs-muted'}>{nextActionLabel[ticket.next_action]}</span>
+                                                )}
+                                                <Badge variant="outline" className={statusTone[ticket.status] ?? ''}>{ticket.status_label}</Badge>
+                                            </div>
                                         </div>
                                     </Card>
                                 </li>

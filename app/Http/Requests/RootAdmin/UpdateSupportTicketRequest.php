@@ -21,6 +21,7 @@ class UpdateSupportTicketRequest extends FormRequest
         return [
             'note' => ['nullable', 'string', 'max:5000', 'required_without_all:status,priority,assigned_to,due_at'],
             'internal' => ['boolean'],
+            'await_company' => ['boolean'],
             'status' => ['nullable', Rule::enum(SupportTicketStatus::class)],
             'priority' => ['nullable', Rule::enum(SupportTicketPriority::class)],
             'assigned_to' => ['nullable', 'integer', Rule::exists('users', 'id')],

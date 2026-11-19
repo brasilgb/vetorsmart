@@ -20,6 +20,7 @@ type Ticket = {
     category_label: string;
     status: string;
     status_label: string;
+    next_action: string | null;
     priority: string;
     priority_label: string;
     opened_via: string;
@@ -45,6 +46,9 @@ type Props = {
     tickets: Paginator<Ticket>;
     signals: { suspended: Signal[]; domains: Signal[]; charges: Signal[]; assistant: Signal[] };
 };
+
+/** Who has to act next, from the platform team point of view. */
+export const nextActionLabel: Record<string, string> = { team: 'Próxima ação: equipe', company: 'Próxima ação: empresa' };
 
 export const priorityTone: Record<string, string> = {
     urgent: 'border-vs-danger text-vs-danger',
@@ -156,6 +160,7 @@ export default function SupportIndex({ filters, statuses, priorities, categories
                                                 </p>
                                             </div>
                                             <div className="flex flex-wrap gap-2">
+                                                {ticket.next_action && <span className="self-center text-xs text-vs-muted">{nextActionLabel[ticket.next_action]}</span>}
                                                 {ticket.overdue && <Badge variant="outline" className="border-vs-danger text-vs-danger">Atrasado</Badge>}
                                                 <Badge variant="outline" className={priorityTone[ticket.priority] ?? ''}>{ticket.priority_label}</Badge>
                                                 <Badge variant="outline" className="border-vs-border text-vs-text">{ticket.status_label}</Badge>

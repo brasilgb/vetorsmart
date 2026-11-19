@@ -38,6 +38,7 @@ class TenantSettingResource extends JsonResource
             'confirmation_policy' => $this->confirmation_policy->value,
             'currency' => $preferences['currency'] ?? 'BRL',
             'date_format' => $preferences['date_format'] ?? 'd/m/Y',
+            'google_review_url' => $preferences['google_review_url'] ?? null,
             'settings' => $preferences,
         ];
     }
