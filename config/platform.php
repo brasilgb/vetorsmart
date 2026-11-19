@@ -130,4 +130,10 @@ return [
     | no deadline, so no existing user is locked out unexpectedly (for example while SMTP is not operational).
     */
     'legacy_email_grace_until' => env('PLATFORM_LEGACY_EMAIL_GRACE_UNTIL'),
+
+    /*
+    | Password of the fictitious demonstration accounts created by VetorSmartDemoSeeder (local and testing only). Set
+    | it in the local .env; it is never committed. Without it the seeder refuses to run.
+    */
+    'demo_password' => env('VETORSMART_DEMO_PASSWORD'),
 ];
