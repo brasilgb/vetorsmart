@@ -107,7 +107,7 @@ test('the search by service ignores accents, case and extra spaces, and only lis
         ->and(listedNames(portal(['q' => 'instalações'])))->toEqualCanonicalizing(['Clima Total', 'Luz Forte'])
         ->and(listedNames(portal(['q' => 'eletricistas'])))->toBe(['Luz Forte']);
 
-    portal(['q' => 'encanador'])->assertOk()->assertSee('Nenhum prestador encontrado');
+    portal(['q' => 'encanador'])->assertOk()->assertSee('Nenhum profissional encontrado');
 });
 
 test('the search by city and state matches the city first and then the service region, never another state', function () {
@@ -194,7 +194,7 @@ test('results are paginated on the server with a bounded page', function () {
         portalCompany(['name' => "Empresa {$index}", 'slug' => "empresa-{$index}", 'segment' => $this->climate, 'services' => ['Limpeza de split']]);
     }
 
-    $first = portal(['q' => 'limpeza'])->assertSee('13 prestadores encontrados')->assertSee('pagina=2', false);
+    $first = portal(['q' => 'limpeza'])->assertSee('13 profissionais encontrados')->assertSee('pagina=2', false);
     $second = portal(['q' => 'limpeza', 'pagina' => 2]);
 
     expect(listedNames($first))->toHaveCount(12)
@@ -202,7 +202,7 @@ test('results are paginated on the server with a bounded page', function () {
         ->and(array_intersect(listedNames($first), listedNames($second)))->toBe([]);
 
     portal(['q' => 'limpeza', 'pagina' => 51])->assertStatus(422)->assertSee('Refine a busca para ver mais resultados.');
-    portal(['uf' => 'XX'])->assertStatus(422)->assertSee('Escolha uma UF válida.');
+    portal(['uf' => 'XX'])->assertStatus(422)->assertSee('Escolha uma UF da lista.');
     portal(['q' => str_repeat('a', 81)])->assertStatus(422);
 });
 
@@ -211,7 +211,7 @@ test('result pages are not indexed, and the cards lead to the company site with 
     $service = $company['services'][0];
 
     portal(['q' => 'split'])->assertHeader('X-Robots-Tag', 'noindex, follow')
-        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total?origem=portal"', false)
+        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total?origem=portal&amp;servico='.$service->id.'"', false)
         ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$service->id.'"', false);
 
     $this->get('/climatizacao/clima-total?origem=portal')->assertOk()
@@ -270,4 +270,81 @@ test('a result page runs the same number of queries for one company or for a ful
     }
 
     expect($count())->toBe($one);
+});
+
+/*
+| PORTAL-02: consumer experience.
+*/
+
+test('the home presents eligible professionals, only categories with companies, how it works, and is indexable', function () {
+    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    portalCompany(['name' => 'Fora do portal', 'slug' => 'fora', 'segment' => $this->electric, 'listed' => false, 'services' => ['Tomadas']]);
+
+    $home = portal()->assertOk()->assertHeaderMissing('X-Robots-Tag')
+        ->assertSee('Encontre profissionais na sua região')
+        ->assertSee('Encontrar profissionais')
+        ->assertSee('Profissionais no portal')
+        ->assertSee('Como funciona')
+        ->assertSee('href="/?categoria=climatizacao"', false)
+        ->assertDontSee('href="/?categoria=eletricistas"', false)
+        ->assertSee('"@type":"WebSite"', false);
+
+    expect(listedNames($home))->toBe(['Clima Total']);
+});
+
+test('the home shows six professionals and links to the full list, which is not indexed', function () {
+    foreach (range(1, 7) as $index) {
+        portalCompany(['name' => "Empresa {$index}", 'slug' => "empresa-{$index}", 'segment' => $this->climate, 'services' => ['Limpeza de split']]);
+    }
+
+    expect(listedNames(portal()->assertSee('href="/?pagina=1"', false)))->toHaveCount(6);
+    expect(listedNames(portal(['pagina' => 1])->assertHeader('X-Robots-Tag', 'noindex, follow')))->toHaveCount(7);
+});
+
+test('active filters are shown, each one can be removed and all can be cleared, keeping the search in the URL', function () {
+    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+
+    portal(['q' => 'split', 'cidade' => 'Campinas', 'uf' => 'SP'])->assertOk()
+        ->assertSee('href="/?cidade=Campinas&amp;uf=SP" aria-label="Remover filtro Serviço: split"', false)
+        ->assertSee('href="/?q=split&amp;uf=SP" aria-label="Remover filtro Município: Campinas"', false)
+        ->assertSee('<a class="clear" href="/"', false)
+        ->assertSee('value="split"', false)
+        ->assertSee('Oferece: Instalação de split');
+});
+
+test('an empty result offers wider searches, each removing one restriction', function () {
+    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+
+    portal(['q' => 'split', 'cidade' => 'Sorocaba', 'uf' => 'SP'])->assertOk()
+        ->assertSee('Nenhum profissional encontrado')
+        ->assertSee('<a href="/?q=split&amp;uf=SP">Ver todo o estado (SP)</a>', false)
+        ->assertSee('<a href="/?pagina=1">Ver todos os profissionais do portal</a>', false);
+});
+
+test('only a category page with companies is indexable and listed in the sitemap; combined filters are not', function () {
+    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+
+    portal(['categoria' => 'climatizacao'])->assertOk()->assertHeaderMissing('X-Robots-Tag')
+        ->assertSee('<link rel="canonical" href="https://'.config('platform.portal_host').'/?categoria=climatizacao">', false)
+        ->assertSee('<title>Climatização · Portal Regional VetorSmart</title>', false);
+    portal(['categoria' => 'eletricistas'])->assertHeader('X-Robots-Tag', 'noindex, follow');
+    portal(['categoria' => 'climatizacao', 'cidade' => 'Campinas'])->assertHeader('X-Robots-Tag', 'noindex, follow');
+
+    portal([], '/sitemap.xml')->assertSee('/?categoria=climatizacao', false)->assertDontSee('eletricistas', false);
+});
+
+test('a card without logo shows the segment placeholder, and "Ver profissional" keeps service and origin up to the request button', function () {
+    $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split', 'Limpeza']]);
+    $other = portalCompany(['name' => 'Luz Forte', 'slug' => 'luz-forte', 'segment' => $this->electric, 'services' => ['Tomadas']]);
+    $split = $company['services'][0];
+
+    portal(['q' => 'instalação split'])->assertSee('class="avatar placeholder"', false)
+        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total?origem=portal&amp;servico='.$split->id.'">Ver profissional', false);
+
+    $this->get('/climatizacao/clima-total?origem=portal&servico='.$split->id)->assertOk()
+        ->assertSee('<a class="cta" href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$split->id.'">Solicitar atendimento</a>', false);
+
+    // A service of another company in the address never changes the company nor gets pre-selected.
+    $this->get('/climatizacao/clima-total?origem=portal&servico='.$other['services'][0]->id)->assertOk()
+        ->assertSee('<a class="cta" href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal">Solicitar atendimento</a>', false);
 });

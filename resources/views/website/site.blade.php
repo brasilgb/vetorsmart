@@ -195,7 +195,7 @@
                 @if ($links['request'] || $links['assistant'] || $whatsDigits !== '')
                     <div class="actions">
                         @if ($links['request'])
-                            <a class="cta" href="{{ $requestLink() }}">Solicitar atendimento</a>
+                            <a class="cta" href="{{ $requestLink($preferredService ?? null) }}">Solicitar atendimento</a>
                         @endif
                         @if ($links['assistant'])
                             <a class="cta secondary" href="{{ $links['assistant'] }}">Agendar online</a>

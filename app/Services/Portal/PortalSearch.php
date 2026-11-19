@@ -40,7 +40,7 @@ class PortalSearch
      * @param  array{q?: string|null, cidade?: string|null, uf?: string|null, categoria?: string|null, nome?: string|null}  $filters
      * @return LengthAwarePaginator<int, PortalListing>
      */
-    public function search(array $filters, int $page, string $seed): LengthAwarePaginator
+    public function search(array $filters, int $page, string $seed, int $perPage = self::PER_PAGE): LengthAwarePaginator
     {
         $tokens = PortalText::tokens($filters['q'] ?? null);
         $city = PortalText::normalize($filters['cidade'] ?? null);
@@ -95,7 +95,7 @@ class PortalSearch
             ->orderByDesc('portal_listings.completeness')
             ->orderBy('tie')
             ->orderBy('portal_listings.id')
-            ->paginate(self::PER_PAGE, ['*'], 'pagina', min(max($page, 1), self::MAX_PAGE));
+            ->paginate(min(max($perPage, 1), self::PER_PAGE), ['*'], 'pagina', min(max($page, 1), self::MAX_PAGE));
     }
 
     /**
@@ -114,6 +114,17 @@ class PortalSearch
             ->map(fn (PortalListing $listing): string => $listing->city.' - '.$listing->state)
             ->unique()
             ->all());
+    }
+
+    /**
+     * Slugs of the segments that have at least one company in the portal right now, so the page never offers a
+     * category that leads to an empty list (and only those category pages are indexable).
+     *
+     * @return list<string>
+     */
+    public function categoriesWithProviders(): array
+    {
+        return array_values(array_map('strval', $this->eligible()->distinct()->orderBy('segments.slug')->pluck('segments.slug')->all()));
     }
 
     /**

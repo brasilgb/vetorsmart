@@ -235,6 +235,9 @@ class SiteController extends Controller
         $shareImage = $content['hero']['file'] ?? $content['logo']['file'] ?? null;
         // A visit that came from the Regional Portal keeps that attribution on the way to the request form.
         $origin = request()->query('origem') === 'portal' ? '?origem=portal' : '';
+        // The service chosen in the portal pre-selects the main request button, only when this company published it.
+        $chosen = request()->integer('servico');
+        $preferredService = collect((array) ($content['services'] ?? []))->contains(fn (mixed $service): bool => is_array($service) && ($service['id'] ?? null) === $chosen) ? $chosen : null;
 
         $response = response()->view('website.site', [
             'content' => $content,
@@ -245,6 +248,7 @@ class SiteController extends Controller
             'noindex' => $noindex,
             'homolog' => $tenant->isHomolog(),
             'preview' => false,
+            'preferredService' => $preferredService,
             'page' => $page,
             'links' => [
                 'home' => $home.$origin,
