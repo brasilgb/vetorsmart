@@ -137,6 +137,7 @@ class ServiceRequestController extends Controller
             'appointments' => $record->appointments->map(fn ($appointment): array => [
                 'id' => $appointment->id,
                 'starts_at' => $tenant->toLocal($appointment->starts_at)->format('d/m/Y H:i'),
+                'date' => $tenant->toLocal($appointment->starts_at)->format('Y-m-d'),
                 'professional' => $appointment->professional?->name,
                 'status' => $appointment->status->label(),
             ])->values()->all(),

@@ -263,21 +263,29 @@ class OperationalNotifier
 
     /**
      * Claim the event key once the transaction commits, then run the notifier. A key already claimed is skipped.
+     *
+     * A notice is a consequence of an operation that is already saved: when it fails (queue or mail unavailable, a
+     * missing relation), the failure is logged without personal data and never reaches the caller. Otherwise a visitor
+     * would see an error for a request that was registered, and a second send could duplicate it.
      */
     private function afterCommit(string $key, ?int $tenantId, callable $notify): void
     {
         DB::afterCommit(function () use ($key, $tenantId, $notify): void {
-            $claimed = DB::table('notification_deliveries')->insertOrIgnore([
-                'dedupe_key' => $key,
-                'tenant_id' => $tenantId,
-                'created_at' => now(),
-            ]);
+            try {
+                $claimed = DB::table('notification_deliveries')->insertOrIgnore([
+                    'dedupe_key' => $key,
+                    'tenant_id' => $tenantId,
+                    'created_at' => now(),
+                ]);
 
-            if ($claimed === 0) {
-                return;
+                if ($claimed === 0) {
+                    return;
+                }
+
+                $notify();
+            } catch (Throwable $exception) {
+                Log::warning('Operational notice not delivered.', ['key' => $key, 'tenant_id' => $tenantId, 'error' => $exception::class]);
             }
-
-            $notify();
         });
     }
 

@@ -3,14 +3,14 @@ import { EmptyState } from '@/components/vetor-smart/empty-state';
 import { PageHeader } from '@/components/vetor-smart/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-type Figures = { requests: number; appointments_done: number; completed: number; conversion: number | null; active_services: number };
+type Figures = { requests: number; appointments_done: number; completed: number; cancelled: number; conversion: number | null; active_services: number };
 
 type Props = {
     period: string;
     previousPeriod: string;
     current: Figures;
     previous: Figures;
-    comparison: { requests: number | null; appointments_done: number | null; completed: number | null; conversion: number | null };
+    comparison: { requests: number | null; appointments_done: number | null; completed: number | null; cancelled: number | null; conversion: number | null };
     services: { active: number; on_site: number; site: string };
     seo: { title: boolean; description: boolean; canonical: string | null; indexable: boolean };
     evolution: { month: string; requests: number; appointments_done: number; completed: number }[];
@@ -20,24 +20,27 @@ type Props = {
     previousOrigins: OriginRow[];
 };
 
-type OriginRow = { origin: string; label: string; received: number; scheduled: number; completed: number };
+type OriginRow = { origin: string; label: string; received: number; scheduled: number; completed: number; cancelled: number };
 
-function Delta({ value, unit = '%' }: { value: number | null; unit?: string }) {
+/** Change against the previous month. With "inverse", a rise is bad (cancellations) and shows in red. */
+function Delta({ value, unit = '%', inverse = false }: { value: number | null; unit?: string; inverse?: boolean }) {
     if (value === null) {
         return <span className="text-xs text-vs-muted">sem base de comparação</span>;
     }
 
-    const tone = value > 0 ? 'text-emerald-700 dark:text-emerald-400' : value < 0 ? 'text-vs-danger' : 'text-vs-muted';
+    const good = inverse ? value < 0 : value > 0;
+    const bad = inverse ? value > 0 : value < 0;
+    const tone = good ? 'text-emerald-700 dark:text-emerald-400' : bad ? 'text-vs-danger' : 'text-vs-muted';
 
     return <span className={`text-xs font-medium ${tone}`}>{value > 0 ? '+' : ''}{value}{unit} vs. mês anterior</span>;
 }
 
-function Metric({ label, value, delta, unit }: { label: string; value: string | number; delta: number | null; unit?: string }) {
+function Metric({ label, value, delta, unit, inverse = false }: { label: string; value: string | number; delta: number | null; unit?: string; inverse?: boolean }) {
     return (
         <Card className="border-vs-border/70 p-4 shadow-sm">
             <p className="text-sm text-vs-muted">{label}</p>
             <p className="mt-1 text-2xl font-semibold text-vs-text">{value}</p>
-            <Delta value={delta} unit={unit} />
+            <Delta value={delta} unit={unit} inverse={inverse} />
         </Card>
     );
 }
@@ -56,10 +59,11 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader title="Meu Crescimento" description={`Números reais da sua empresa em ${period}, comparados com ${previousPeriod}. Visitas e posição em buscadores não são medidas pela VetorSmart.`} />
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                     <Metric label="Solicitações recebidas" value={current.requests} delta={comparison.requests} />
                     <Metric label="Agendamentos realizados" value={current.appointments_done} delta={comparison.appointments_done} />
                     <Metric label="Serviços concluídos" value={current.completed} delta={comparison.completed} />
+                    <Metric label="Cancelados ou não realizados" value={current.cancelled} delta={comparison.cancelled} inverse />
                     <Metric
                         label="Taxa de conversão"
                         value={current.conversion === null ? 'Dados insuficientes' : `${current.conversion}%`}
@@ -128,7 +132,7 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                     )}
                     <Card className="overflow-hidden border-vs-border/70 shadow-sm">
                         <div className="overflow-x-auto" tabIndex={0} role="region" aria-labelledby="origens">
-                            <table className="w-full min-w-[480px] text-left text-sm">
+                            <table className="w-full min-w-[600px] text-left text-sm">
                                 <caption className="sr-only">Solicitações recebidas em {period} por origem, e quantas delas foram agendadas e concluídas</caption>
                                 <thead className="bg-vs-surface text-vs-muted">
                                     <tr>
@@ -136,6 +140,7 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                                         <th scope="col" className="px-4 py-3 font-medium">Recebidas</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Agendadas</th>
                                         <th scope="col" className="px-4 py-3 font-medium">Concluídas</th>
+                                        <th scope="col" className="px-4 py-3 font-medium">Canceladas ou não realizadas</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -145,6 +150,7 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                                             <td className="px-4 py-3 text-vs-text">{row.received}</td>
                                             <td className="px-4 py-3 text-vs-text">{row.scheduled}</td>
                                             <td className="px-4 py-3 text-vs-text">{row.completed}</td>
+                                            <td className="px-4 py-3 text-vs-text">{row.cancelled}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -152,7 +158,7 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                         </div>
                     </Card>
                     <p className="text-xs text-vs-muted">
-                        Contamos as solicitações recebidas no mês e acompanhamos cada uma: "agendadas" teve ao menos um agendamento; "concluídas" teve o serviço concluído. Cliques e visitas não são contados. A receita por origem não é exibida porque o valor cobrado em cada atendimento não é registrado no VetorSmart.
+                        Contamos as solicitações recebidas no mês e acompanhamos cada uma: "agendadas" teve ao menos um agendamento; "concluídas" teve o serviço concluído; "canceladas ou não realizadas" foi encerrada sem o serviço. Cliques e visitas não são contados. A receita por origem não é exibida porque o valor cobrado em cada atendimento não é registrado no VetorSmart.
                     </p>
                 </section>
 

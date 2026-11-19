@@ -58,7 +58,7 @@ class GrowthController extends Controller
 
     /**
      * @param  array<string, Collection<int|string, int>>  $activity
-     * @return array{requests: int, appointments_done: int, completed: int, conversion: int|null, active_services: int}
+     * @return array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, active_services: int}
      */
     private function figures(array $activity, int $tenantId, GrowthMetrics $metrics): array
     {
@@ -69,6 +69,7 @@ class GrowthController extends Controller
             'requests' => $requests,
             'appointments_done' => (int) ($activity['appointments_done'][$tenantId] ?? 0),
             'completed' => $completed,
+            'cancelled' => (int) ($activity['cancelled'][$tenantId] ?? 0),
             'conversion' => $metrics->conversion($requests, $completed),
             'active_services' => (int) ($activity['active_services'][$tenantId] ?? 0),
         ];
@@ -77,8 +78,8 @@ class GrowthController extends Controller
     /**
      * Change against the previous month, only where the previous month has data (otherwise there is nothing to compare).
      *
-     * @param  array{requests: int, appointments_done: int, completed: int, conversion: int|null, active_services: int}  $now
-     * @param  array{requests: int, appointments_done: int, completed: int, conversion: int|null, active_services: int}  $before
+     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, active_services: int}  $now
+     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, active_services: int}  $before
      * @return array<string, int|null>
      */
     private function comparison(array $now, array $before): array
@@ -89,6 +90,7 @@ class GrowthController extends Controller
             'requests' => $delta($now['requests'], $before['requests']),
             'appointments_done' => $delta($now['appointments_done'], $before['appointments_done']),
             'completed' => $delta($now['completed'], $before['completed']),
+            'cancelled' => $delta($now['cancelled'], $before['cancelled']),
             'conversion' => $now['conversion'] !== null && $before['conversion'] !== null ? $now['conversion'] - $before['conversion'] : null,
         ];
     }

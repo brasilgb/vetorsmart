@@ -24,6 +24,12 @@ return [
     'portal_host' => env('PLATFORM_PORTAL_HOST', 'portal.'.env('PLATFORM_TENANT_BASE_DOMAIN', 'vetorsmart.test')),
 
     /*
+    | Seconds a second send of the same public request form waits for the first one to finish registering before being
+    | told to try again (see App\Http\Controllers\Site\SiteRequestController).
+    */
+    'site_request_lock_wait' => (int) env('PLATFORM_SITE_REQUEST_LOCK_WAIT', 10),
+
+    /*
     | Time zone used to present platform-level records (RootAdmin console, audit trail). Instants stay in UTC
     | in the database; companies keep their own time zone for their own screens.
     */

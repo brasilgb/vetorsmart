@@ -108,7 +108,7 @@ class SiteRequestController extends Controller
         $lock = Cache::lock($key.':lock', 15);
 
         try {
-            $lock->block(10);
+            $lock->block((int) config('platform.site_request_lock_wait', 10));
         } catch (LockTimeoutException) {
             return $back->withInput($request->except('website'))->withErrors(['envio' => 'Sua solicitação ainda está sendo registrada. Aguarde alguns segundos e tente novamente.']);
         }

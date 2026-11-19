@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { index as requestsIndex, triage, schedule, start, complete, notPerformed, cancel } from '@/routes/tenant/requests';
+import { index as agendaIndex } from '@/routes/tenant/agenda';
 import { OriginLabel } from './index';
 
 type RequestDetail = {
@@ -36,7 +37,7 @@ type RequestDetail = {
 type Props = {
     request: RequestDetail;
     events: { id: number; type: string; to_status: string | null; note: string | null; user: string | null; at: string }[];
-    appointments: { id: number; starts_at: string; professional: string | null; status: string }[];
+    appointments: { id: number; starts_at: string; date: string; professional: string | null; status: string }[];
     services: { id: number; name: string; duration_minutes: number | null }[];
     professionals: { id: number; name: string; service_ids: number[] }[];
 };
@@ -92,6 +93,8 @@ export default function RequestShow({ request, events, appointments, services, p
                                 {appointments.map((appointment) => (
                                     <li key={appointment.id} className="rounded-md border border-vs-border/70 p-3">
                                         {appointment.starts_at} · {appointment.professional ?? '—'} · <span className="font-medium">{appointment.status}</span>
+                                        {' · '}
+                                        <Link href={agendaIndex.url({ query: { view: 'day', date: appointment.date } })} className="font-medium text-vs-link hover:underline">Ver na agenda</Link>
                                     </li>
                                 ))}
                             </ul>

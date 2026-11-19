@@ -33,13 +33,15 @@ class GrowthMetrics
      * Activity of each company in the period.
      *
      * @param  Collection<int, int>  $tenantIds
-     * @return array{requests: Collection<int|string, int>, completed: Collection<int|string, int>, appointments: Collection<int|string, int>, appointments_done: Collection<int|string, int>, active_services: Collection<int|string, int>}
+     * @return array{requests: Collection<int|string, int>, completed: Collection<int|string, int>, cancelled: Collection<int|string, int>, appointments: Collection<int|string, int>, appointments_done: Collection<int|string, int>, active_services: Collection<int|string, int>}
      */
     public function activity(Collection $tenantIds, CarbonImmutable $from, CarbonImmutable $to): array
     {
         return [
             'requests' => $this->countBy(ServiceRequest::query()->whereIn('tenant_id', $tenantIds)->whereBetween('created_at', [$from, $to])),
             'completed' => $this->countBy(ServiceRequest::query()->whereIn('tenant_id', $tenantIds)->where('status', RequestStatus::Completed->value)->whereBetween('closed_at', [$from, $to])),
+            // Closed without the service: cancelled or not performed, counted when it was closed (never a conversion).
+            'cancelled' => $this->countBy(ServiceRequest::query()->whereIn('tenant_id', $tenantIds)->whereIn('status', [RequestStatus::Cancelled->value, RequestStatus::NotPerformed->value])->whereBetween('closed_at', [$from, $to])),
             'appointments' => $this->countBy(Appointment::query()->whereIn('tenant_id', $tenantIds)->whereBetween('created_at', [$from, $to])),
             'appointments_done' => $this->countBy(Appointment::query()->whereIn('tenant_id', $tenantIds)->where('status', AppointmentStatus::Completed->value)->whereBetween('starts_at', [$from, $to])),
             'active_services' => $this->countBy(Service::query()->whereIn('tenant_id', $tenantIds)->where('active', true)),
@@ -49,9 +51,10 @@ class GrowthMetrics
     /**
      * Requests of one company received in the period, by origin, followed as a cohort: how many of them reached an
      * appointment (at least one was booked, whatever happened to it later) and how many were completed. A booking is
-     * never counted as a completed service, and nothing here is a click or a visit: only recorded requests.
+     * never counted as a completed service, a request closed without the service (cancelled or not performed) is counted
+     * apart, and nothing here is a click or a visit: only recorded requests.
      *
-     * @return list<array{origin: string, label: string, received: int, scheduled: int, completed: int}>
+     * @return list<array{origin: string, label: string, received: int, scheduled: int, completed: int, cancelled: int}>
      */
     public function byOrigin(int $tenantId, CarbonImmutable $from, CarbonImmutable $to): array
     {
@@ -61,6 +64,7 @@ class GrowthMetrics
             ->groupBy('origin')
             ->selectRaw('origin, COUNT(*) AS received')
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS completed', [RequestStatus::Completed->value])
+            ->selectRaw('SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) AS cancelled', [RequestStatus::Cancelled->value, RequestStatus::NotPerformed->value])
             ->selectRaw('SUM(CASE WHEN EXISTS (SELECT 1 FROM appointments WHERE appointments.tenant_id = service_requests.tenant_id AND appointments.service_request_id = service_requests.id) THEN 1 ELSE 0 END) AS scheduled')
             ->toBase()
             ->get()
@@ -76,6 +80,7 @@ class GrowthMetrics
                 'received' => (int) ($row->received ?? 0),
                 'scheduled' => (int) ($row->scheduled ?? 0),
                 'completed' => (int) ($row->completed ?? 0),
+                'cancelled' => (int) ($row->cancelled ?? 0),
             ];
         }
 
