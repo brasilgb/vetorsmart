@@ -3,8 +3,11 @@
 use App\Enums\BillingSource;
 use App\Enums\MembershipStatus;
 use App\Enums\PaymentMethod;
+use App\Enums\SubscriptionStatus;
+use App\Models\AuditLog;
 use App\Models\BillingCharge;
 use App\Models\BillingSetting;
+use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
@@ -16,8 +19,8 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 
 /**
- * User seats: three included in the plan plus the additional seats contracted. Registering users and contracting
- * seats are separate; Efí is always Http::fake.
+ * User seats: three included in the plan plus the additional seats contracted. No complementary charge exists, so
+ * a seat is never active before it is paid. Efí is always Http::fake.
  */
 beforeEach(function () {
     Notification::fake();
@@ -34,6 +37,7 @@ beforeEach(function () {
     $this->owner = User::factory()->create();
     TenantUser::factory()->owner()->create(['tenant_id' => $this->tenant->id, 'user_id' => $this->owner->id]);
     $this->subscription = app(SubscriptionService::class)->startTrial($this->tenant, BillingSource::System);
+    $this->root = User::factory()->rootAdmin()->create();
 });
 
 function newTeamMember(int $index): array
@@ -41,14 +45,26 @@ function newTeamMember(int $index): array
     return ['name' => "Pessoa {$index}", 'email' => "pessoa{$index}@example.test", 'password' => 'Senha-Forte-2026', 'password_confirmation' => 'Senha-Forte-2026', 'role' => 'operator'];
 }
 
-function fillSeats(Tenant $tenant, int $count): void
+function fillSeats(Tenant $tenant, int $count, MembershipStatus $status = MembershipStatus::Active): void
 {
     for ($index = 0; $index < $count; $index++) {
-        TenantUser::factory()->create(['tenant_id' => $tenant->id, 'user_id' => User::factory()->create()->id, 'status' => MembershipStatus::Active]);
+        TenantUser::factory()->create(['tenant_id' => $tenant->id, 'user_id' => User::factory()->create()->id, 'status' => $status]);
     }
 }
 
-test('a user beyond the contracted seats is refused with the reason', function () {
+/**
+ * Contract the given cycle during the trial and pay it: a paid period is running afterwards.
+ */
+function paidPeriod(Subscription $subscription, User $owner, User $root, string $interval = 'monthly'): BillingCharge
+{
+    test()->actingAs($owner)->post('/assinatura/contratar', ['method' => 'pix', 'interval' => $interval]);
+    $charge = BillingCharge::query()->where('subscription_id', $subscription->id)->latest('id')->firstOrFail();
+    app(ChargeService::class)->settleManually($charge, $root, 'Pagamento de homologação');
+
+    return $charge;
+}
+
+test('a user beyond the seats is refused with the reason', function () {
     fillSeats($this->tenant, 2);
 
     $this->actingAs($this->owner)->post('/equipe', newTeamMember(1))
@@ -78,46 +94,118 @@ test('reactivating a user beyond the seats is refused', function () {
     expect($inactive->fresh()->status)->toBe(MembershipStatus::Inactive);
 });
 
-test('a contracted seat allows one more user at once, without changing an open charge', function () {
+test('registered inactive users are never charged', function () {
+    fillSeats($this->tenant, 5, MembershipStatus::Inactive);
+
     $charge = app(ChargeService::class)->openFor($this->subscription, PaymentMethod::Pix);
+
+    expect($charge->extra_users)->toBe(0)
+        ->and($charge->amount_cents)->toBe(13990);
+});
+
+test('in the trial without an open charge more seats apply at once and go into the first charge', function () {
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 1])->assertRedirect('/assinatura');
+    fillSeats($this->tenant, 2);
+
+    $this->actingAs($this->owner)->post('/equipe', newTeamMember(1))->assertSessionHasNoErrors();
+
+    $charge = app(ChargeService::class)->openFor($this->subscription->fresh(), PaymentMethod::Pix);
+    expect($charge->extra_users)->toBe(1)
+        ->and($charge->amount_cents)->toBe(13990 + 1990);
+});
+
+test('with a paid period, more seats are charged in the renewal of each cycle and become active only when it is paid', function (string $interval, int $price, int $months) {
+    paidPeriod($this->subscription, $this->owner, $this->root, $interval);
     fillSeats($this->tenant, 2);
 
     $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 1])->assertRedirect('/assinatura');
-    $this->actingAs($this->owner)->post('/equipe', newTeamMember(1))->assertSessionHasNoErrors();
+
+    expect($this->subscription->fresh()->extra_seats)->toBe(0)
+        ->and($this->subscription->fresh()->scheduled_extra_seats)->toBe(1);
+    $this->actingAs($this->owner)->post('/equipe', newTeamMember(1))->assertSessionHasErrors('seats');
+
+    $this->travelTo($this->subscription->fresh()->current_period_end->copy()->subDays(3));
+    app(BillingCycle::class)->run();
+    $renewal = BillingCharge::query()->where('subscription_id', $this->subscription->id)->latest('id')->firstOrFail();
+
+    expect($renewal->extra_users)->toBe(1)
+        ->and($renewal->amount_cents)->toBe($price + 1990 * $months);
+    $this->actingAs($this->owner)->post('/equipe', newTeamMember(2))->assertSessionHasErrors('seats');
+
+    app(ChargeService::class)->settleManually($renewal, $this->root, 'Pagamento de homologação');
+
+    expect($this->subscription->fresh()->extra_seats)->toBe(1)
+        ->and($this->subscription->fresh()->scheduled_extra_seats)->toBeNull();
+    $this->actingAs($this->owner)->post('/equipe', newTeamMember(3))->assertSessionHasNoErrors();
+})->with([
+    'mensal' => ['monthly', 13990, 1],
+    'semestral' => ['semiannual', 71940, 6],
+    'anual' => ['annual', 131880, 12],
+]);
+
+test('an open charge is never changed: the seats go into the following charge', function () {
+    $charge = app(ChargeService::class)->openFor($this->subscription, PaymentMethod::Pix);
+
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 2]);
 
     expect($charge->fresh()->amount_cents)->toBe(13990)
-        ->and($this->subscription->fresh()->extra_seats)->toBe(1);
+        ->and($charge->fresh()->extra_users)->toBe(0)
+        ->and($this->subscription->fresh()->scheduled_extra_seats)->toBe(2);
+
+    app(ChargeService::class)->settleManually($charge, $this->root, 'Pagamento de homologação');
+
+    expect($this->subscription->fresh()->extra_seats)->toBe(0)
+        ->and($this->subscription->fresh()->scheduled_extra_seats)->toBe(2);
 });
 
-test('with a paid period running a seat reduction waits for the next period and its charge', function () {
+test('a renewal left unpaid never activates the seats, and no change is accepted while payment is pending', function () {
     app(SubscriptionService::class)->choosePaymentMethod($this->subscription, PaymentMethod::Pix, $this->owner);
-    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 2]);
-    $charge = app(ChargeService::class)->openFor($this->subscription->fresh(), PaymentMethod::Pix);
-    app(ChargeService::class)->settleManually($charge, User::factory()->rootAdmin()->create(), 'Pagamento de homologação');
+    paidPeriod($this->subscription, $this->owner, $this->root);
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 1]);
 
-    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 0])->assertRedirect('/assinatura');
-
-    $subscription = $this->subscription->fresh();
-    expect($charge->amount_cents)->toBe(13990 + 2 * 1990)
-        ->and($subscription->extra_seats)->toBe(2)
-        ->and($subscription->scheduled_extra_seats)->toBe(0);
-
-    $this->travelTo($charge->period_end->copy()->subDays(3));
+    $this->travelTo($this->subscription->fresh()->current_period_end->copy()->addDay());
     app(BillingCycle::class)->run();
 
-    $renewal = BillingCharge::query()->where('id', '!=', $charge->id)->sole();
-    expect($renewal->amount_cents)->toBe(13990)
-        ->and($renewal->extra_users)->toBe(0)
-        ->and($this->subscription->fresh()->extra_seats)->toBe(0);
+    $subscription = $this->subscription->fresh();
+    expect($subscription->status)->toBe(SubscriptionStatus::PastDue)
+        ->and($subscription->extra_seats)->toBe(0);
+
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 3])
+        ->assertSessionHasErrors(['extra_seats' => 'Regularize a assinatura (pagamento pendente, suspensão ou cancelamento) antes de alterar as vagas.']);
 });
 
-test('while a reduction waits, activations respect the reduced limit', function () {
-    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 1]);
-    app(ChargeService::class)->openFor($this->subscription->fresh(), PaymentMethod::Pix);
-    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 0]);
-    fillSeats($this->tenant, 2);
+test('asking twice for the same seats records one change and charges them once', function () {
+    paidPeriod($this->subscription, $this->owner, $this->root);
 
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 2]);
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 2]);
+
+    expect($this->subscription->events()->where('type', 'seats_change_scheduled')->count())->toBe(1)
+        ->and(AuditLog::query()->where('action', 'subscription.seats_changed')->count())->toBe(1);
+
+    $this->travelTo($this->subscription->fresh()->current_period_end->copy()->subDays(3));
+    app(BillingCycle::class)->run();
+    app(BillingCycle::class)->run();
+
+    expect(BillingCharge::query()->where('subscription_id', $this->subscription->id)->where('extra_users', 2)->count())->toBe(1);
+});
+
+test('a reduction waits for the paid renewal, and activations respect it meanwhile', function () {
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 2]);
+    paidPeriod($this->subscription, $this->owner, $this->root);
+    expect($this->subscription->fresh()->extra_seats)->toBe(2);
+
+    $this->actingAs($this->owner)->post('/assinatura/vagas', ['extra_seats' => 0])->assertRedirect('/assinatura');
+    fillSeats($this->tenant, 2);
     $this->actingAs($this->owner)->post('/equipe', newTeamMember(1))->assertSessionHasErrors('seats');
+
+    $this->travelTo($this->subscription->fresh()->current_period_end->copy()->subDays(3));
+    app(BillingCycle::class)->run();
+    $renewal = BillingCharge::query()->where('subscription_id', $this->subscription->id)->latest('id')->firstOrFail();
+    app(ChargeService::class)->settleManually($renewal, $this->root, 'Pagamento de homologação');
+
+    expect($renewal->amount_cents)->toBe(13990)
+        ->and($this->subscription->fresh()->extra_seats)->toBe(0);
 });
 
 test('seats cannot be reduced below the active users', function () {
@@ -146,4 +234,14 @@ test('a company without subscription has no user limit', function () {
     fillSeats($legacy, 5);
 
     $this->actingAs($legacyOwner)->post('/equipe', newTeamMember(1))->assertSessionHasNoErrors();
+});
+
+test('Minha Assinatura tells which seat rule applies now', function () {
+    $this->actingAs($this->owner)->get('/assinatura')
+        ->assertInertia(fn ($page) => $page->where('subscription.seats_change_mode', 'now'));
+
+    app(ChargeService::class)->openFor($this->subscription, PaymentMethod::Pix);
+
+    $this->actingAs($this->owner)->get('/assinatura')
+        ->assertInertia(fn ($page) => $page->where('subscription.seats_change_mode', 'next_charge'));
 });
