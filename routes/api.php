@@ -45,15 +45,18 @@ Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
         Route::patch('settings', [TenantSettingsController::class, 'update'])->name('api.v1.tenant.settings.update');
 
         Route::get('users', [TenantUserController::class, 'index'])->name('api.v1.tenant.users.index');
-        Route::post('users', [TenantUserController::class, 'store'])->name('api.v1.tenant.users.store');
+        Route::post('users', [TenantUserController::class, 'store'])->middleware('verified.strict')->name('api.v1.tenant.users.store');
         Route::patch('users/{membershipId}', [TenantUserController::class, 'update'])
             ->whereNumber('membershipId')
+            ->middleware('verified.strict')
             ->name('api.v1.tenant.users.update');
         Route::post('users/{membershipId}/activate', [TenantUserController::class, 'activate'])
             ->whereNumber('membershipId')
+            ->middleware('verified.strict')
             ->name('api.v1.tenant.users.activate');
         Route::delete('users/{membershipId}', [TenantUserController::class, 'destroy'])
             ->whereNumber('membershipId')
+            ->middleware('verified.strict')
             ->name('api.v1.tenant.users.destroy');
 
         Route::apiResource('customers', CustomerController::class)
@@ -89,7 +92,7 @@ Route::prefix('v1')->middleware(['web', 'auth'])->group(function () {
             ->name('api.v1.tenant.professionals.services.sync');
     });
 
-    Route::prefix('admin')->middleware(['verified', 'can:platform-admin'])->group(function () {
+    Route::prefix('admin')->middleware(['verified.strict', 'can:platform-admin'])->group(function () {
         Route::get('tenants', [AdminTenantController::class, 'index'])->name('api.v1.admin.tenants.index');
         Route::get('tenants/{tenant}', [AdminTenantController::class, 'show'])->name('api.v1.admin.tenants.show');
         Route::post('tenants/{tenant}/activate', [AdminTenantController::class, 'activate'])->name('api.v1.admin.tenants.activate');

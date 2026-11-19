@@ -3,7 +3,9 @@
 use App\Enums\UserStatus;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Notifications\VerifyEmailNotification;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 
 test('the command provisions a root admin with a hidden password', function () {
     $this->artisan('platform:root-admin', ['email' => 'root@abrasil.test', '--name' => 'Root Admin'])
@@ -19,15 +21,18 @@ test('the command provisions a root admin with a hidden password', function () {
         ->and($root->isRootAdmin())->toBeTrue();
 });
 
-test('a root admin created by the command reaches the console without the e-mail confirmation', function () {
+test('a root admin created by the command confirms the e-mail before the console opens', function () {
+    Notification::fake();
+
     $this->artisan('platform:root-admin', ['email' => 'root.novo@abrasil.test', '--name' => 'Root Novo'])
         ->expectsQuestion('Senha (mínimo 8 caracteres)', 'senha-muito-segura-123')
         ->assertSuccessful();
 
     $root = User::query()->where('email', 'root.novo@abrasil.test')->firstOrFail();
 
-    expect($root->hasVerifiedEmail())->toBeTrue();
-    $this->actingAs($root)->get('/rootadmin')->assertOk();
+    expect($root->hasVerifiedEmail())->toBeFalse();
+    Notification::assertSentTo($root, VerifyEmailNotification::class);
+    $this->actingAs($root)->get('/rootadmin')->assertRedirect(route('verification.notice'));
 });
 
 test('promoting an existing unverified user keeps the confirmation pending', function () {

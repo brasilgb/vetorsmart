@@ -32,8 +32,10 @@ class ProfileController extends Controller
     {
         $request->user()->fill($request->validated());
 
+        // A new address is never confirmed, and it ends any legacy access: the new address goes through the link.
         if ($request->user()->isDirty('email')) {
             $request->user()->email_verified_at = null;
+            $request->user()->email_verification_legacy_at = null;
         }
 
         $request->user()->save();

@@ -85,14 +85,16 @@ test('the confirmation link opens the panel', function () {
     $this->get(route('dashboard'))->assertOk();
 });
 
-test('a confirmation link for another account is refused', function () {
+test('a confirmation link for another account confirms nothing and explains the refusal', function () {
     $this->post(route('register.store'), registrationPayload());
 
     $user = User::query()->where('email', 'ana@example.com')->firstOrFail();
     $other = User::factory()->unverified()->create();
     $link = URL::temporarySignedRoute('verification.verify', now()->addHour(), ['id' => $other->id, 'hash' => sha1($other->email)]);
 
-    $this->get($link)->assertForbidden();
+    $this->get($link)
+        ->assertRedirect(route('verification.notice'))
+        ->assertSessionHas('verification_error');
 
     expect($user->fresh()->hasVerifiedEmail())->toBeFalse()
         ->and($other->fresh()->hasVerifiedEmail())->toBeFalse();

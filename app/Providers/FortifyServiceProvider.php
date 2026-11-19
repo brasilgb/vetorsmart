@@ -106,6 +106,8 @@ class FortifyServiceProvider extends ServiceProvider
 
         Fortify::verifyEmailView(fn (Request $request) => Inertia::render('auth/verify-email', [
             'status' => $request->session()->get('status'),
+            'error' => $request->session()->get('verification_error'),
+            'legacy' => $request->user() instanceof User && $request->user()->hasLegacyEmailAccess(),
         ]));
     }
 
@@ -114,6 +116,13 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureRateLimiting(): void
     {
+        // Confirmation links and resends: a few per minute and per hour for each account, so the resend button cannot be
+        // used to flood an inbox or the mail server.
+        RateLimiter::for('verification', fn (Request $request): array => [
+            Limit::perMinute(3)->by('verification:'.($request->user()?->getAuthIdentifier() ?? $request->ip())),
+            Limit::perHour(10)->by('verification-hour:'.($request->user()?->getAuthIdentifier() ?? $request->ip())),
+        ]);
+
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 

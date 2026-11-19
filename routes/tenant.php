@@ -69,10 +69,10 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
     Route::post('profissionais/{professional}/ativar', [ProfessionalController::class, 'activate'])->whereNumber('professional')->name('tenant.professionals.activate');
 
     Route::get('equipe', [TeamController::class, 'index'])->name('tenant.team.index');
-    Route::post('equipe', [TeamController::class, 'store'])->name('tenant.team.store');
-    Route::patch('equipe/{membership}', [TeamController::class, 'update'])->whereNumber('membership')->name('tenant.team.update');
-    Route::post('equipe/{membership}/ativar', [TeamController::class, 'activate'])->whereNumber('membership')->name('tenant.team.activate');
-    Route::delete('equipe/{membership}', [TeamController::class, 'deactivate'])->whereNumber('membership')->name('tenant.team.deactivate');
+    Route::post('equipe', [TeamController::class, 'store'])->middleware('verified.strict')->name('tenant.team.store');
+    Route::patch('equipe/{membership}', [TeamController::class, 'update'])->whereNumber('membership')->middleware('verified.strict')->name('tenant.team.update');
+    Route::post('equipe/{membership}/ativar', [TeamController::class, 'activate'])->whereNumber('membership')->middleware('verified.strict')->name('tenant.team.activate');
+    Route::delete('equipe/{membership}', [TeamController::class, 'deactivate'])->whereNumber('membership')->middleware('verified.strict')->name('tenant.team.deactivate');
 
     Route::get('configuracoes', [SettingsController::class, 'show'])->name('tenant.settings.show');
     Route::patch('configuracoes', [SettingsController::class, 'update'])->name('tenant.settings.update');
@@ -109,10 +109,10 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
 */
 Route::middleware(['auth', 'verified', 'tenant.resolve'])->group(function () {
     Route::get('assinatura', [SubscriptionController::class, 'show'])->name('tenant.subscription.show');
-    Route::post('assinatura/contratar', [SubscriptionController::class, 'contract'])->middleware('throttle:10,1')->name('tenant.subscription.contract');
-    Route::post('assinatura/ciclo', [SubscriptionController::class, 'interval'])->middleware('throttle:10,1')->name('tenant.subscription.interval');
-    Route::post('assinatura/vagas', [SubscriptionController::class, 'seats'])->middleware('throttle:10,1')->name('tenant.subscription.seats');
-    Route::post('assinatura/creditos-ia', [SubscriptionController::class, 'buyCredits'])->middleware('throttle:10,1')->name('tenant.subscription.credits');
-    Route::post('assinatura/cancelar', [SubscriptionController::class, 'cancel'])->name('tenant.subscription.cancel');
-    Route::post('assinatura/retomar', [SubscriptionController::class, 'resume'])->name('tenant.subscription.resume');
+    Route::post('assinatura/contratar', [SubscriptionController::class, 'contract'])->middleware('verified.strict')->middleware('throttle:10,1')->name('tenant.subscription.contract');
+    Route::post('assinatura/ciclo', [SubscriptionController::class, 'interval'])->middleware('verified.strict')->middleware('throttle:10,1')->name('tenant.subscription.interval');
+    Route::post('assinatura/vagas', [SubscriptionController::class, 'seats'])->middleware('verified.strict')->middleware('throttle:10,1')->name('tenant.subscription.seats');
+    Route::post('assinatura/creditos-ia', [SubscriptionController::class, 'buyCredits'])->middleware('verified.strict')->middleware('throttle:10,1')->name('tenant.subscription.credits');
+    Route::post('assinatura/cancelar', [SubscriptionController::class, 'cancel'])->middleware('verified.strict')->name('tenant.subscription.cancel');
+    Route::post('assinatura/retomar', [SubscriptionController::class, 'resume'])->middleware('verified.strict')->name('tenant.subscription.resume');
 });

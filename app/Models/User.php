@@ -21,6 +21,7 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at
+ * @property Carbon|null $email_verification_legacy_at
  * @property string $password
  * @property UserStatus $status
  * @property bool $is_root_admin
@@ -51,6 +52,27 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isRootAdmin(): bool
     {
         return $this->is_root_admin && $this->isActive();
+    }
+
+    /**
+     * Legacy access: the account existed before e-mail confirmation started and has not confirmed its address yet. It
+     * keeps the access it already had to the panel (no lockout on deploy), but it is NOT a confirmed address: sensitive
+     * operations (RootAdmin, billing, team management) still require the real confirmation. It ends when the address
+     * is confirmed, when the e-mail is changed, or after PLATFORM_LEGACY_EMAIL_GRACE_UNTIL, when that date is set.
+     */
+    public function hasLegacyEmailAccess(): bool
+    {
+        if ($this->hasVerifiedEmail() || $this->email_verification_legacy_at === null) {
+            return false;
+        }
+
+        $graceUntil = config('platform.legacy_email_grace_until');
+
+        if (! is_string($graceUntil) || preg_match('/^\d{4}-\d{2}-\d{2}$/', $graceUntil) !== 1) {
+            return true;
+        }
+
+        return now()->lte(Carbon::parse($graceUntil)->endOfDay());
     }
 
     /**
@@ -99,6 +121,7 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return [
             'email_verified_at' => 'datetime',
+            'email_verification_legacy_at' => 'datetime',
             'password' => 'hashed',
             'status' => UserStatus::class,
             'is_root_admin' => 'boolean',

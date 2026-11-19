@@ -2,16 +2,29 @@ import { Form, Head } from '@inertiajs/react';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
-import { logout } from '@/routes';
+import { dashboard, logout } from '@/routes';
 import { send } from '@/routes/verification';
 
 /**
  * Shown while the e-mail of the account is not confirmed. The private areas stay closed until the link is opened.
  */
-export default function VerifyEmail({ status }: { status?: string }) {
+export default function VerifyEmail({ status, error, legacy = false }: { status?: string; error?: string | null; legacy?: boolean }) {
     return (
         <>
             <Head title="Confirmar e-mail" />
+
+            {error && (
+                <p role="alert" className="mb-4 rounded-md bg-vs-danger-soft px-3 py-2 text-center text-sm text-vs-danger">
+                    {error}
+                </p>
+            )}
+
+            {legacy && (
+                <p className="mb-4 rounded-md bg-vs-surface px-3 py-2 text-center text-sm text-vs-text">
+                    Sua conta existe desde antes da confirmação de e-mail. O painel continua liberado; a gestão da equipe, a assinatura e a
+                    administração da plataforma exigem a confirmação.
+                </p>
+            )}
 
             {status === 'verification-link-sent' && (
                 <p role="status" className="mb-4 rounded-md bg-vs-surface px-3 py-2 text-center text-sm text-vs-text">
@@ -32,7 +45,12 @@ export default function VerifyEmail({ status }: { status?: string }) {
                 )}
             </Form>
 
-            <p className="mt-6 text-center text-sm text-vs-muted">
+            <p className="mt-6 flex justify-center gap-4 text-center text-sm text-vs-muted">
+                {legacy && (
+                    <TextLink href={dashboard()} className="font-medium text-vs-blue">
+                        Voltar ao painel
+                    </TextLink>
+                )}
                 <TextLink href={logout()} as="button" className="font-medium text-vs-blue">
                     Sair
                 </TextLink>

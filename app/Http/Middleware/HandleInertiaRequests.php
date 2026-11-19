@@ -49,6 +49,8 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'auth' => [
                 'user' => $request->user(),
+                // Legacy account (created before e-mail confirmation): the panel stays open, with a reminder to confirm.
+                'emailConfirmationPending' => $request->user() instanceof User && $request->user()->hasLegacyEmailAccess(),
             ],
             'tenant' => fn () => $this->activeTenant($request),
             'tenants' => fn () => $this->switchableTenants($request),

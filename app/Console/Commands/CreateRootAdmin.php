@@ -86,10 +86,10 @@ class CreateRootAdmin extends Command
                 'status' => UserStatus::Active,
             ]);
             $user->is_root_admin = true;
-            // The address is typed by the platform operator in the server terminal, so it counts as confirmed:
-            // a new administrator is not locked behind the e-mail confirmation the public registration requires.
-            $user->forceFill(['email_verified_at' => now()]);
+            // Being typed by the operator or holding the RootAdmin role does not prove the address belongs to the
+            // person: the new administrator confirms it through the link before the RootAdmin opens (verified.strict).
             $user->save();
+            $user->sendEmailVerificationNotification();
             $created = true;
         }
 
