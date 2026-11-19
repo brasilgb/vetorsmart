@@ -3,9 +3,13 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Enums\CustomerStatus;
+use App\Enums\MembershipStatus;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestStatus;
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Tenant\Operations\AssignServiceRequestRequest;
+use App\Http\Requests\Tenant\Operations\RealizedAmountRequest;
 use App\Http\Requests\Tenant\Operations\ReasonRequest;
 use App\Http\Requests\Tenant\Operations\ScheduleAppointmentRequest;
 use App\Http\Requests\Tenant\Operations\StoreServiceRequestRequest;
@@ -14,11 +18,16 @@ use App\Models\Customer;
 use App\Models\Professional;
 use App\Models\Service;
 use App\Models\ServiceRequest;
+use App\Models\TenantUser;
+use App\Models\User;
 use App\Services\AppointmentScheduler;
 use App\Services\ServiceRequestService;
 use App\Services\Tenancy\TenantContext;
+use App\Support\Money;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -35,7 +44,7 @@ class ServiceRequestController extends Controller
 
         $query = ServiceRequest::query()
             ->forTenant($context->requireTenant())
-            ->with(['customer:id,name', 'service:id,name', 'tenant:id,timezone'])
+            ->with(['customer:id,name', 'service:id,name', 'tenant:id,timezone', 'assignee:id,name'])
             ->latest('id');
 
         $status = $request->string('status')->value();
@@ -50,8 +59,32 @@ class ServiceRequestController extends Controller
             $query->where('origin', $origin);
         }
 
+        $tenant = $context->requireTenant();
+        $assignees = $this->assignees($tenant->id);
+        $responsible = $request->string('responsavel')->value();
+
+        match (true) {
+            $responsible === 'nenhum' => $query->whereNull('assigned_user_id'),
+            $responsible === 'meus' => $query->where('assigned_user_id', $request->user()?->getKey()),
+            ctype_digit($responsible) && collect($assignees)->contains('id', (int) $responsible) => $query->where('assigned_user_id', (int) $responsible),
+            default => $responsible = '',
+        };
+
+        // Period of arrival, in the company's own calendar.
+        $from = $this->localDate($request->string('de')->value());
+        $until = $this->localDate($request->string('ate')->value());
+
+        if ($from !== null) {
+            $query->where('created_at', '>=', $tenant->startOfLocalDay($from)->utc());
+        }
+
+        if ($until !== null) {
+            $query->where('created_at', '<', $tenant->startOfLocalDay($until)->addDay()->utc());
+        }
+
         return Inertia::render('tenant/requests/index', [
-            'filters' => ['status' => $status, 'origem' => RequestOrigin::tryFrom($origin) !== null ? $origin : ''],
+            'filters' => ['status' => $status, 'origem' => RequestOrigin::tryFrom($origin) !== null ? $origin : '', 'responsavel' => $responsible, 'de' => $from ?? '', 'ate' => $until ?? ''],
+            'assignees' => $assignees,
             'statuses' => $this->statusOptions(),
             'origins' => array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item->label()], RequestOrigin::cases()),
             'requests' => $query->paginate(15)->withQueryString()->through(fn (ServiceRequest $serviceRequest): array => $this->row($serviceRequest)),
@@ -102,7 +135,7 @@ class ServiceRequestController extends Controller
 
         $this->authorize('view', $record);
 
-        $record->load(['customer:id,name,phone,whatsapp', 'service:id,name,duration_minutes', 'professional:id,name', 'events.user:id,name', 'appointments.professional:id,name']);
+        $record->load(['assignee:id,name', 'customer:id,name,phone,whatsapp', 'service:id,name,duration_minutes', 'professional:id,name', 'events.user:id,name', 'appointments.professional:id,name']);
 
         $tenant = $context->requireTenant();
 
@@ -125,6 +158,12 @@ class ServiceRequestController extends Controller
                 'can_complete' => $record->status === RequestStatus::InProgress,
                 'can_close_unperformed' => in_array($record->status, [RequestStatus::Scheduled, RequestStatus::InProgress], true),
                 'can_cancel' => $record->status->isOpen(),
+                'assigned_user_id' => $record->assigned_user_id,
+                'can_assign' => $record->status->isOpen() && Gate::allows('assign', $record),
+                'realized_amount' => $record->realized_amount_cents === null ? null : Money::format($record->realized_amount_cents),
+                'realized_amount_input' => $record->realized_amount_cents === null ? '' : Money::plain($record->realized_amount_cents),
+                'realized_amount_recorded_at' => $record->realized_amount_recorded_at === null ? null : $tenant->toLocal($record->realized_amount_recorded_at)->format('d/m/Y H:i'),
+                'can_record_amount' => $record->status === RequestStatus::Completed && Gate::allows('recordAmount', $record),
             ],
             'events' => $record->events->map(fn ($event): array => [
                 'id' => $event->id,
@@ -141,6 +180,7 @@ class ServiceRequestController extends Controller
                 'professional' => $appointment->professional?->name,
                 'status' => $appointment->status->label(),
             ])->values()->all(),
+            'assignees' => $this->assignees($record->tenant_id),
             'services' => Service::query()->forTenant($record->tenant_id)->where('active', true)->orderBy('name')->get(['id', 'name', 'duration_minutes'])->all(),
             'professionals' => Professional::query()->forTenant($record->tenant_id)->where('active', true)->orderBy('name')
                 ->with('services:id')->get(['id', 'name'])
@@ -185,9 +225,44 @@ class ServiceRequestController extends Controller
         return $this->transition($request, $context, $serviceRequest, fn (ServiceRequest $record) => $requests->start($record, $this->actor($request)), 'Atendimento iniciado.');
     }
 
-    public function complete(Request $request, TenantContext $context, ServiceRequestService $requests, int $serviceRequest): RedirectResponse
+    public function complete(RealizedAmountRequest $request, TenantContext $context, ServiceRequestService $requests, int $serviceRequest): RedirectResponse
     {
-        return $this->transition($request, $context, $serviceRequest, fn (ServiceRequest $record) => $requests->complete($record, $this->actor($request)), 'Atendimento concluído.');
+        return $this->transition($request, $context, $serviceRequest, fn (ServiceRequest $record) => $requests->complete($record, $this->actor($request), $request->cents()), 'Atendimento concluído.');
+    }
+
+    /**
+     * Choose or change the member responsible for the request (owners and admins).
+     */
+    public function assign(AssignServiceRequestRequest $request, TenantContext $context, ServiceRequestService $requests, int $serviceRequest): RedirectResponse
+    {
+        $record = $this->findRequest($context, $serviceRequest);
+        $this->authorize('assign', $record);
+
+        $userId = $request->validated('assigned_user_id');
+        $assignee = $userId === null ? null : User::query()->find((int) $userId);
+
+        if ($userId !== null && $assignee === null) {
+            throw ValidationException::withMessages(['assigned_user_id' => ['Escolha uma pessoa ativa da equipe desta empresa.']]);
+        }
+
+        $requests->assign($record, $assignee, $this->actor($request));
+        Inertia::flash('toast', ['type' => 'success', 'message' => $assignee === null ? 'Solicitação sem responsável.' : 'Responsável definido: '.$assignee->name.'.']);
+
+        return back();
+    }
+
+    /**
+     * Record or correct the realized amount of a completed service.
+     */
+    public function amount(RealizedAmountRequest $request, TenantContext $context, ServiceRequestService $requests, int $serviceRequest): RedirectResponse
+    {
+        $record = $this->findRequest($context, $serviceRequest);
+        $this->authorize('recordAmount', $record);
+
+        $requests->recordRealizedAmount($record, $request->cents(), $this->actor($request));
+        Inertia::flash('toast', ['type' => 'success', 'message' => $request->cents() === null ? 'Valor realizado marcado como não informado.' : 'Valor realizado registrado.']);
+
+        return back();
     }
 
     public function notPerformed(ReasonRequest $request, TenantContext $context, ServiceRequestService $requests, int $serviceRequest): RedirectResponse
@@ -228,6 +303,7 @@ class ServiceRequestController extends Controller
             'priority' => $serviceRequest->priority->label(),
             'origin' => $serviceRequest->origin->value,
             'origin_label' => $serviceRequest->origin->label(),
+            'assignee' => $serviceRequest->assignee?->name,
             'status' => $serviceRequest->status->value,
             'status_label' => $serviceRequest->status->label(),
             'created_at' => $serviceRequest->tenant->toLocal($serviceRequest->created_at)->format('d/m/Y H:i'),
@@ -243,6 +319,33 @@ class ServiceRequestController extends Controller
             fn (RequestStatus $status): array => ['value' => $status->value, 'label' => $status->label()],
             RequestStatus::cases(),
         );
+    }
+
+    /**
+     * Active members of the company who can be responsible for a request.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    private function assignees(int $tenantId): array
+    {
+        return array_values(TenantUser::query()
+            ->forTenant($tenantId)
+            ->where('status', MembershipStatus::Active->value)
+            ->whereHas('user', fn ($query) => $query->where('status', UserStatus::Active->value))
+            ->with('user:id,name')
+            ->get()
+            ->map(fn (TenantUser $member): array => ['id' => (int) $member->user_id, 'name' => (string) $member->user?->name])
+            ->sortBy('name')
+            ->values()
+            ->all());
+    }
+
+    /**
+     * A date typed in a filter (Y-m-d), or null when it is not one.
+     */
+    private function localDate(string $value): ?string
+    {
+        return preg_match('/^\d{4}-\d{2}-\d{2}$/', $value) === 1 && checkdate((int) substr($value, 5, 2), (int) substr($value, 8, 2), (int) substr($value, 0, 4)) ? $value : null;
     }
 
     private function findRequest(TenantContext $context, int $serviceRequestId): ServiceRequest

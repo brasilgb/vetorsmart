@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Notifications\OperationalMail;
 use App\Services\Assistant\AssistantProvider;
 use App\Services\Assistant\Providers\NullAssistantProvider;
 use App\Services\Tenancy\TenantContext;
@@ -13,6 +14,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Events\CommandStarting;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Events\NotificationSent;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -47,6 +49,20 @@ class AppServiceProvider extends ServiceProvider
         $this->configureTrustedProxies();
         $this->configureRateLimiters();
         $this->guardDatabaseSafety();
+        $this->trackOperationalMail();
+    }
+
+    /**
+     * An operational e-mail accepted by the mail server counts as sent on its notice (notification_deliveries). Only the
+     * mail channel reports this, after a real send: nothing is marked as delivered in advance.
+     */
+    protected function trackOperationalMail(): void
+    {
+        Event::listen(NotificationSent::class, function (NotificationSent $event): void {
+            if ($event->channel === 'mail' && $event->notification instanceof OperationalMail && $event->notification->deliveryKey !== null) {
+                DB::table('notification_deliveries')->where('dedupe_key', $event->notification->deliveryKey)->increment('mail_sent', 1, ['updated_at' => now()]);
+            }
+        });
     }
 
     /**

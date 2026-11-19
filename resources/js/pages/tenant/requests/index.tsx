@@ -15,15 +15,17 @@ type Row = {
     priority: string;
     origin: string;
     origin_label: string;
+    assignee: string | null;
     status: string;
     status_label: string;
     created_at: string;
 };
 
 type Props = {
-    filters: { status: string; origem: string };
+    filters: { status: string; origem: string; responsavel: string; de: string; ate: string };
     statuses: { value: string; label: string }[];
     origins: { value: string; label: string }[];
+    assignees: { id: number; name: string }[];
     requests: Paginator<Row>;
 };
 
@@ -38,7 +40,7 @@ export function OriginLabel({ origin, label }: { origin: string; label: string }
     return <span className="text-vs-muted">{label}</span>;
 }
 
-export default function RequestsIndex({ filters, statuses, origins, requests }: Props) {
+export default function RequestsIndex({ filters, statuses, origins, assignees, requests }: Props) {
     const filter = (changes: Partial<Props['filters']>) => router.get(requestsIndex.url(), { ...filters, ...changes }, { preserveState: true, replace: true });
 
     return (
@@ -52,7 +54,7 @@ export default function RequestsIndex({ filters, statuses, origins, requests }: 
                     action={<Button asChild className="bg-vs-blue text-white hover:bg-vs-blue-hover"><Link href={create.url()}>Nova solicitação</Link></Button>}
                 />
 
-                <div className="grid gap-3 md:grid-cols-[260px_260px_auto]">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(3,minmax(0,220px))_auto_auto]">
                     <select
                         value={filters.status}
                         aria-label="Situação"
@@ -70,6 +72,22 @@ export default function RequestsIndex({ filters, statuses, origins, requests }: 
                             <option key={origin.value} value={origin.value}>{origin.label}</option>
                         ))}
                     </select>
+                    <select value={filters.responsavel} aria-label="Responsável" className={selectClass} onChange={(event) => filter({ responsavel: event.target.value })}>
+                        <option value="">Todos os responsáveis</option>
+                        <option value="meus">Atribuídas a mim</option>
+                        <option value="nenhum">Sem responsável</option>
+                        {assignees.map((member) => (
+                            <option key={member.id} value={member.id}>{member.name}</option>
+                        ))}
+                    </select>
+                    <label className="grid gap-1 text-xs text-vs-muted">
+                        Recebidas de
+                        <input type="date" value={filters.de} max={filters.ate || undefined} onChange={(event) => filter({ de: event.target.value })} className={selectClass} />
+                    </label>
+                    <label className="grid gap-1 text-xs text-vs-muted">
+                        até
+                        <input type="date" value={filters.ate} min={filters.de || undefined} onChange={(event) => filter({ ate: event.target.value })} className={selectClass} />
+                    </label>
                 </div>
 
                 {requests.data.length === 0 ? (
@@ -77,13 +95,14 @@ export default function RequestsIndex({ filters, statuses, origins, requests }: 
                 ) : (
                     <Card className="overflow-hidden border-vs-border/70 shadow-sm">
                         <div className="overflow-x-auto">
-                            <table className="w-full min-w-[760px] text-left text-sm">
+                            <table className="w-full min-w-[880px] text-left text-sm">
                                 <thead className="bg-vs-surface text-vs-muted">
                                     <tr>
                                         <th className="px-4 py-3 font-medium">Nº</th>
                                         <th className="px-4 py-3 font-medium">Cliente</th>
                                         <th className="px-4 py-3 font-medium">Serviço</th>
                                         <th className="px-4 py-3 font-medium">Origem</th>
+                                        <th className="px-4 py-3 font-medium">Responsável</th>
                                         <th className="px-4 py-3 font-medium">Prioridade</th>
                                         <th className="px-4 py-3 font-medium">Situação</th>
                                         <th className="px-4 py-3 font-medium">Criada em</th>
@@ -97,6 +116,7 @@ export default function RequestsIndex({ filters, statuses, origins, requests }: 
                                             <td className="px-4 py-3 text-vs-text">{item.customer ?? '—'}</td>
                                             <td className="px-4 py-3 text-vs-muted">{item.service ?? 'A definir'}</td>
                                             <td className="px-4 py-3"><OriginLabel origin={item.origin} label={item.origin_label} /></td>
+                                            <td className="px-4 py-3 text-vs-muted">{item.assignee ?? '—'}</td>
                                             <td className="px-4 py-3 text-vs-muted">{item.priority}</td>
                                             <td className="px-4 py-3 text-vs-text">{item.status_label}</td>
                                             <td className="px-4 py-3 text-vs-muted">{item.created_at}</td>

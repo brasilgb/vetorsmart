@@ -6,6 +6,8 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * An operational e-mail (to the company's team or to its customer), sent through the queue only after the database
@@ -21,6 +23,11 @@ class OperationalMail extends Notification implements ShouldQueue
     public $tries = 3;
 
     /**
+     * Key of the operational notice (notification_deliveries) this e-mail belongs to, so its real outcome is recorded.
+     */
+    public ?string $deliveryKey = null;
+
+    /**
      * @param  list<string>  $lines
      */
     public function __construct(
@@ -34,6 +41,17 @@ class OperationalMail extends Notification implements ShouldQueue
         public ?string $closing = null,
     ) {
         $this->afterCommit();
+    }
+
+    /**
+     * The last attempt failed (the mail server kept refusing): the notice records one more e-mail failed. Never counted
+     * as delivered. The job itself stays in failed_jobs and can be retried with queue:retry.
+     */
+    public function failed(Throwable $exception): void
+    {
+        if ($this->deliveryKey !== null) {
+            DB::table('notification_deliveries')->where('dedupe_key', $this->deliveryKey)->increment('mail_failed', 1, ['updated_at' => now()]);
+        }
     }
 
     /**

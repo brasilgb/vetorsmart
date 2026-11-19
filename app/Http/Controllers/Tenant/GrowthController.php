@@ -2,88 +2,157 @@
 
 namespace App\Http\Controllers\Tenant;
 
+use App\Enums\MembershipStatus;
+use App\Enums\RequestOrigin;
+use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
+use App\Models\TenantUser;
 use App\Services\Growth\GrowthMetrics;
 use App\Services\Tenancy\TenantContext;
+use App\Support\Money;
 use Carbon\CarbonImmutable;
-use Illuminate\Support\Collection;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * Meu Crescimento: real figures of the authenticated company only (the tenant always comes from TenantContext):
- * requests, appointments, completed services, conversion (from five requests), services active and on the site, the
- * last six months and the comparison with the previous month. No visits, traffic, revenue or search ranking.
+ * requests, appointments, completed and cancelled services, conversion (from five requests), declared revenue, origin
+ * of the requests and the last six months, compared with the previous period of the same length.
+ *
+ * Filters: period (months in the company's time zone), origin and responsible. Revenue is the amount the company
+ * declared for completed services: unknown amounts are counted apart and never added as zero. Amounts are integer
+ * cents, formatted on the server. No visits, traffic or search ranking.
  */
 class GrowthController extends Controller
 {
-    public function __invoke(TenantContext $context, GrowthMetrics $metrics): Response
+    /**
+     * Period presets: months covered, counting the current one (0 = the previous month alone).
+     *
+     * @var array<string, array{label: string, months: int}>
+     */
+    private const array PERIODS = [
+        'mes' => ['label' => 'Este mês', 'months' => 1],
+        'mes-anterior' => ['label' => 'Mês anterior', 'months' => 0],
+        '3-meses' => ['label' => 'Últimos 3 meses', 'months' => 3],
+        '6-meses' => ['label' => 'Últimos 6 meses', 'months' => 6],
+        '12-meses' => ['label' => 'Últimos 12 meses', 'months' => 12],
+    ];
+
+    public function __invoke(Request $request, TenantContext $context, GrowthMetrics $metrics): Response
     {
         $tenant = $context->requireTenant();
         Gate::authorize('viewGrowth', $tenant);
 
-        $ids = collect([$tenant->id]);
-        $current = CarbonImmutable::now($tenant->timezone)->startOfMonth();
-        $previous = $current->subMonth();
+        $period = array_key_exists($request->string('periodo')->value(), self::PERIODS) ? $request->string('periodo')->value() : 'mes';
+        $origin = RequestOrigin::tryFrom($request->string('origem')->value());
+        $assignees = $this->assignees($tenant->id);
+        $responsibleInput = $request->string('responsavel')->value();
+        $responsible = match (true) {
+            $responsibleInput === 'nenhum' => 'none',
+            ctype_digit($responsibleInput) && in_array((int) $responsibleInput, array_column($assignees, 'id'), true) => (int) $responsibleInput,
+            default => null,
+        };
 
-        $month = fn (CarbonImmutable $start): array => $this->figures($metrics->activity($ids, $start->utc(), $start->endOfMonth()->utc()), $tenant->id, $metrics);
-        $now = $month($current);
-        $before = $month($previous);
+        [$from, $to, $previousFrom, $previousTo] = $this->window($period, CarbonImmutable::now($tenant->timezone));
+
+        $now = $this->figures($metrics->tenantFigures($tenant->id, $from->utc(), $to->utc(), $origin, $responsible), $metrics);
+        $before = $this->figures($metrics->tenantFigures($tenant->id, $previousFrom->utc(), $previousTo->utc(), $origin, $responsible), $metrics);
+
+        $ids = collect([$tenant->id]);
+        $activity = $metrics->activity($ids, $from->utc(), $to->utc());
         ['websites' => $websites, 'versions' => $versions] = $metrics->sites($ids);
         $site = $metrics->site($tenant, $websites->get($tenant->id), $versions);
-        $evolution = $metrics->evolution($tenant->id, collect());
+        $evolution = $metrics->evolution($tenant->id, collect(), $tenant->timezone);
 
         return Inertia::render('tenant/growth/index', [
-            'period' => $current->format('m/Y'),
-            'previousPeriod' => $previous->format('m/Y'),
+            'period' => $this->label($from, $to),
+            'previousPeriod' => $this->label($previousFrom, $previousTo),
+            'filters' => [
+                'periodo' => $period,
+                'origem' => $origin->value ?? '',
+                'responsavel' => $responsible === 'none' ? 'nenhum' : ($responsible === null ? '' : (string) $responsible),
+            ],
+            'options' => [
+                'periods' => array_map(fn (string $key, array $preset): array => ['value' => $key, 'label' => $preset['label']], array_keys(self::PERIODS), self::PERIODS),
+                'origins' => array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item->label()], RequestOrigin::cases()),
+                'assignees' => $assignees,
+            ],
             'current' => $now,
             'previous' => $before,
             'comparison' => $this->comparison($now, $before),
-            'services' => ['active' => $now['active_services'], 'on_site' => $site['public_services'], 'site' => $site['site']],
+            'services' => ['active' => (int) ($activity['active_services'][$tenant->id] ?? 0), 'on_site' => $site['public_services'], 'site' => $site['site']],
             'seo' => $site['seo'],
             'evolution' => array_map(fn (array $row): array => [
                 'month' => $row['month'],
                 'requests' => $row['requests'],
                 'appointments_done' => $row['appointments_done'],
                 'completed' => $row['completed'],
+                'revenue' => $row['revenue_cents'] > 0 ? Money::format($row['revenue_cents']) : null,
+                'revenue_unknown' => $row['revenue_unknown'],
             ], $evolution),
             'hasActivity' => array_sum(array_map(fn (array $row): int => $row['requests'] + $row['appointments_done'] + $row['completed'], $evolution)) > 0,
             'minRequestsForConversion' => GrowthMetrics::MIN_REQUESTS_FOR_CONVERSION,
-            // Requests of the month by origin (Regional Portal included), followed until appointment and completion.
-            'origins' => $metrics->byOrigin($tenant->id, $current->utc(), $current->endOfMonth()->utc()),
-            'previousOrigins' => $metrics->byOrigin($tenant->id, $previous->utc(), $previous->endOfMonth()->utc()),
+            // Requests of the period by origin, followed until appointment, completion or closing without the service.
+            'origins' => $origin === null ? $metrics->byOrigin($tenant->id, $from->utc(), $to->utc(), $responsible) : array_values(array_filter($metrics->byOrigin($tenant->id, $from->utc(), $to->utc(), $responsible), fn (array $row): bool => $row['origin'] === $origin->value)),
+            'previousOrigins' => $metrics->byOrigin($tenant->id, $previousFrom->utc(), $previousTo->utc(), $responsible),
+            'revenueByOrigin' => array_map(fn (array $row): array => [
+                ...$row,
+                'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null,
+            ], array_values(array_filter($metrics->revenueByOrigin($tenant->id, $from->utc(), $to->utc(), $responsible), fn (array $row): bool => $origin === null || $row['origin'] === $origin->value))),
         ]);
     }
 
     /**
-     * @param  array<string, Collection<int|string, int>>  $activity
-     * @return array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, active_services: int}
+     * Start and end of the chosen period and of the previous one of the same length, in the company's time zone.
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable, 2: CarbonImmutable, 3: CarbonImmutable}
      */
-    private function figures(array $activity, int $tenantId, GrowthMetrics $metrics): array
+    private function window(string $period, CarbonImmutable $now): array
     {
-        $requests = (int) ($activity['requests'][$tenantId] ?? 0);
-        $completed = (int) ($activity['completed'][$tenantId] ?? 0);
+        $months = self::PERIODS[$period]['months'];
+        $end = $months === 0 ? $now->startOfMonth()->subMonth()->endOfMonth() : $now->endOfMonth();
+        $length = max(1, $months);
+        $start = $end->startOfMonth()->subMonths($length - 1);
 
+        return [$start, $end, $start->subMonths($length), $start->subSecond()];
+    }
+
+    private function label(CarbonImmutable $from, CarbonImmutable $to): string
+    {
+        return $from->format('m/Y') === $to->format('m/Y') ? $from->format('m/Y') : $from->format('m/Y').' a '.$to->format('m/Y');
+    }
+
+    /**
+     * @param  array{requests: int, completed: int, cancelled: int, appointments_done: int, revenue_cents: int, revenue_known: int, revenue_unknown: int}  $figures
+     * @return array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int}
+     */
+    private function figures(array $figures, GrowthMetrics $metrics): array
+    {
         return [
-            'requests' => $requests,
-            'appointments_done' => (int) ($activity['appointments_done'][$tenantId] ?? 0),
-            'completed' => $completed,
-            'cancelled' => (int) ($activity['cancelled'][$tenantId] ?? 0),
-            'conversion' => $metrics->conversion($requests, $completed),
-            'active_services' => (int) ($activity['active_services'][$tenantId] ?? 0),
+            'requests' => $figures['requests'],
+            'appointments_done' => $figures['appointments_done'],
+            'completed' => $figures['completed'],
+            'cancelled' => $figures['cancelled'],
+            'conversion' => $metrics->conversion($figures['requests'], $figures['completed']),
+            'revenue' => $figures['revenue_known'] > 0 ? Money::format($figures['revenue_cents']) : null,
+            'revenue_cents' => $figures['revenue_cents'],
+            'revenue_known' => $figures['revenue_known'],
+            'revenue_unknown' => $figures['revenue_unknown'],
         ];
     }
 
     /**
-     * Change against the previous month, only where the previous month has data (otherwise there is nothing to compare).
+     * Change against the previous period, only where the previous one has data (otherwise there is nothing to compare).
      *
-     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, active_services: int}  $now
-     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, active_services: int}  $before
+     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int}  $now
+     * @param  array{requests: int, appointments_done: int, completed: int, cancelled: int, conversion: int|null, revenue: string|null, revenue_cents: int, revenue_known: int, revenue_unknown: int}  $before
      * @return array<string, int|null>
      */
     private function comparison(array $now, array $before): array
     {
+        // A percentage of change for display; amounts themselves are never computed in floating point.
         $delta = fn (int $current, int $previous): ?int => $previous > 0 ? (int) round(($current - $previous) * 100 / $previous) : null;
 
         return [
@@ -92,6 +161,27 @@ class GrowthController extends Controller
             'completed' => $delta($now['completed'], $before['completed']),
             'cancelled' => $delta($now['cancelled'], $before['cancelled']),
             'conversion' => $now['conversion'] !== null && $before['conversion'] !== null ? $now['conversion'] - $before['conversion'] : null,
+            // Compared only when both periods have known amounts.
+            'revenue' => $now['revenue_known'] > 0 && $before['revenue_known'] > 0 ? $delta($now['revenue_cents'], $before['revenue_cents']) : null,
         ];
+    }
+
+    /**
+     * Active members who can be responsible for requests, for the responsible filter.
+     *
+     * @return list<array{id: int, name: string}>
+     */
+    private function assignees(int $tenantId): array
+    {
+        return array_values(TenantUser::query()
+            ->forTenant($tenantId)
+            ->where('status', MembershipStatus::Active->value)
+            ->whereHas('user', fn ($query) => $query->where('status', UserStatus::Active->value))
+            ->with('user:id,name')
+            ->get()
+            ->map(fn (TenantUser $member): array => ['id' => (int) $member->user_id, 'name' => (string) $member->user?->name])
+            ->sortBy('name')
+            ->values()
+            ->all());
     }
 }

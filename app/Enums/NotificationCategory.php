@@ -10,6 +10,7 @@ namespace App\Enums;
 enum NotificationCategory: string
 {
     case RequestReceived = 'request_received';
+    case RequestAssigned = 'request_assigned';
     case AppointmentConfirmed = 'appointment_confirmed';
     case AppointmentCancelled = 'appointment_cancelled';
     case AwaitingAttendance = 'awaiting_attendance';
@@ -19,6 +20,7 @@ enum NotificationCategory: string
     {
         return match ($this) {
             self::RequestReceived => 'Nova solicitação recebida',
+            self::RequestAssigned => 'Solicitação atribuída a você',
             self::AppointmentConfirmed => 'Agendamento confirmado',
             self::AppointmentCancelled => 'Agendamento cancelado',
             self::AwaitingAttendance => 'Conversa aguardando atendimento',

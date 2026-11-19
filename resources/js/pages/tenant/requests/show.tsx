@@ -5,7 +5,7 @@ import { ConfirmAction } from '@/components/vetor-smart/confirm-action';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { index as requestsIndex, triage, schedule, start, complete, notPerformed, cancel } from '@/routes/tenant/requests';
+import { index as requestsIndex, triage, schedule, start, complete, notPerformed, cancel, assign, amount } from '@/routes/tenant/requests';
 import { index as agendaIndex } from '@/routes/tenant/agenda';
 import { OriginLabel } from './index';
 
@@ -32,6 +32,13 @@ type RequestDetail = {
     can_complete: boolean;
     can_close_unperformed: boolean;
     can_cancel: boolean;
+    assignee: string | null;
+    assigned_user_id: number | null;
+    can_assign: boolean;
+    realized_amount: string | null;
+    realized_amount_input: string;
+    realized_amount_recorded_at: string | null;
+    can_record_amount: boolean;
 };
 
 type Props = {
@@ -40,6 +47,13 @@ type Props = {
     appointments: { id: number; starts_at: string; date: string; professional: string | null; status: string }[];
     services: { id: number; name: string; duration_minutes: number | null }[];
     professionals: { id: number; name: string; service_ids: number[] }[];
+    assignees: { id: number; name: string }[];
+};
+
+/** Names of history entries that do not change the status. */
+const eventLabels: Record<string, string> = {
+    assigned: 'Responsável alterado',
+    realized_amount: 'Valor realizado',
 };
 
 const priorities = [
@@ -49,10 +63,13 @@ const priorities = [
     { value: 'urgent', label: 'Urgente' },
 ];
 
-export default function RequestShow({ request, events, appointments, services, professionals }: Props) {
+export default function RequestShow({ request, events, appointments, services, professionals, assignees }: Props) {
     const triageForm = useForm({ service_id: request.service_id ? String(request.service_id) : '', priority: request.priority_value });
     const scheduleForm = useForm<Record<string, string>>({ professional_id: '', date: '', time: '' });
     const reasonForm = useForm({ reason: '' });
+    const assignForm = useForm({ assigned_user_id: request.assigned_user_id ? String(request.assigned_user_id) : '' });
+    const completeForm = useForm({ realized_amount: '' });
+    const amountForm = useForm({ realized_amount: request.realized_amount_input });
 
     const chosenService = Number(triageForm.data.service_id || request.service_id || 0);
     const eligibleProfessionals = professionals.filter((professional) => professional.service_ids.includes(chosenService));
@@ -78,6 +95,7 @@ export default function RequestShow({ request, events, appointments, services, p
                             <div><dt className="text-vs-muted">Cliente</dt><dd className="text-vs-text">{request.customer ?? '—'}{request.customer_phone ? ` · ${request.customer_phone}` : ''}</dd></div>
                             <div><dt className="text-vs-muted">Serviço</dt><dd className="text-vs-text">{request.service ?? 'A definir na triagem'}</dd></div>
                             <div><dt className="text-vs-muted">Prioridade</dt><dd className="text-vs-text">{request.priority}</dd></div>
+                            <div><dt className="text-vs-muted">Responsável</dt><dd className="text-vs-text">{request.assignee ?? 'Sem responsável'}</dd></div>
                             <div><dt className="text-vs-muted">Origem</dt><dd><OriginLabel origin={request.origin_value} label={request.origin} /></dd></div>
                             <div><dt className="text-vs-muted">Descrição</dt><dd className="whitespace-pre-line text-vs-text">{request.description}</dd></div>
                             {request.closing_reason && <div><dt className="text-vs-muted">Motivo do encerramento</dt><dd className="text-vs-text">{request.closing_reason}</dd></div>}
@@ -172,13 +190,74 @@ export default function RequestShow({ request, events, appointments, services, p
                     </Card>
                 )}
 
+                {request.can_assign && (
+                    <Card className="grid max-w-3xl gap-3 border-vs-border/70 p-5 shadow-sm">
+                        <h2 className="text-base font-semibold text-vs-text">Responsável pelo atendimento</h2>
+                        <p className="text-sm text-vs-muted">Pessoa da equipe que acompanha esta solicitação. É diferente do profissional do agendamento.</p>
+                        <form
+                            onSubmit={(event) => {
+                                event.preventDefault();
+                                assignForm.patch(assign.url({ serviceRequest: request.id }), { preserveScroll: true });
+                            }}
+                            className="flex flex-wrap items-end gap-3"
+                        >
+                            <Field id="assigned_user_id" label="Responsável" error={assignForm.errors.assigned_user_id}>
+                                <select id="assigned_user_id" value={assignForm.data.assigned_user_id} onChange={(event) => assignForm.setData('assigned_user_id', event.target.value)} className={`${selectClass} min-w-[240px]`}>
+                                    <option value="">Sem responsável</option>
+                                    {assignees.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                                </select>
+                            </Field>
+                            <Button type="submit" disabled={assignForm.processing || assignForm.data.assigned_user_id === (request.assigned_user_id ? String(request.assigned_user_id) : '')} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">
+                                {request.assigned_user_id ? 'Transferir' : 'Definir responsável'}
+                            </Button>
+                        </form>
+                    </Card>
+                )}
+
                 {(request.can_start || request.can_complete) && (
-                    <Card className="flex max-w-3xl flex-wrap gap-3 border-vs-border/70 p-5 shadow-sm">
+                    <Card className="grid max-w-3xl gap-4 border-vs-border/70 p-5 shadow-sm">
                         {request.can_start && (
-                            <Button type="button" onClick={() => router.post(start.url({ serviceRequest: request.id }))} className="bg-vs-blue text-white hover:bg-vs-blue-hover">Iniciar atendimento</Button>
+                            <div><Button type="button" onClick={() => router.post(start.url({ serviceRequest: request.id }))} className="bg-vs-blue text-white hover:bg-vs-blue-hover">Iniciar atendimento</Button></div>
                         )}
                         {request.can_complete && (
-                            <Button type="button" onClick={() => router.post(complete.url({ serviceRequest: request.id }))} className="bg-vs-blue text-white hover:bg-vs-blue-hover">Concluir atendimento</Button>
+                            <form
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    completeForm.post(complete.url({ serviceRequest: request.id }));
+                                }}
+                                className="grid gap-3"
+                            >
+                                <h2 className="text-base font-semibold text-vs-text">Concluir atendimento</h2>
+                                <Field id="complete_amount" label="Valor realizado (opcional)" error={completeForm.errors.realized_amount} hint="Valor que a empresa recebeu por este serviço, por exemplo 1.250,00. Deixe em branco se ainda não souber: você pode informar depois.">
+                                    <Input id="complete_amount" inputMode="decimal" autoComplete="off" value={completeForm.data.realized_amount} onChange={(event) => completeForm.setData('realized_amount', event.target.value)} maxLength={20} className="max-w-[220px]" />
+                                </Field>
+                                <div><Button type="submit" disabled={completeForm.processing} className="bg-vs-blue text-white hover:bg-vs-blue-hover">Concluir atendimento</Button></div>
+                            </form>
+                        )}
+                    </Card>
+                )}
+
+                {request.status === 'completed' && (
+                    <Card className="grid max-w-3xl gap-3 border-vs-border/70 p-5 shadow-sm">
+                        <h2 className="text-base font-semibold text-vs-text">Valor realizado</h2>
+                        <p className="text-sm text-vs-text">
+                            {request.realized_amount ?? 'Não informado'}
+                            {request.realized_amount_recorded_at && <span className="text-vs-muted"> · registrado em {request.realized_amount_recorded_at}</span>}
+                        </p>
+                        <p className="text-xs text-vs-muted">Valor declarado pela empresa para acompanhar o crescimento. Não é comprovante de pagamento.</p>
+                        {request.can_record_amount && (
+                            <form
+                                onSubmit={(event) => {
+                                    event.preventDefault();
+                                    amountForm.patch(amount.url({ serviceRequest: request.id }), { preserveScroll: true });
+                                }}
+                                className="flex flex-wrap items-end gap-3"
+                            >
+                                <Field id="realized_amount" label={request.realized_amount ? 'Corrigir valor (R$)' : 'Informar valor (R$)'} error={amountForm.errors.realized_amount} hint={request.realized_amount ? 'A correção fica registrada no histórico. Deixe em branco para marcar como não informado.' : undefined}>
+                                    <Input id="realized_amount" inputMode="decimal" autoComplete="off" value={amountForm.data.realized_amount} onChange={(event) => amountForm.setData('realized_amount', event.target.value)} maxLength={20} className="max-w-[220px]" />
+                                </Field>
+                                <Button type="submit" variant="outline" disabled={amountForm.processing || amountForm.data.realized_amount === request.realized_amount_input} className="h-10">Salvar valor</Button>
+                            </form>
                         )}
                     </Card>
                 )}
@@ -219,7 +298,7 @@ export default function RequestShow({ request, events, appointments, services, p
                     <ol className="grid gap-2 text-sm">
                         {events.map((event) => (
                             <li key={event.id} className="border-l-2 border-vs-border pl-3">
-                                <span className="font-medium text-vs-text">{event.to_status ?? event.type}</span>
+                                <span className="font-medium text-vs-text">{event.to_status ?? eventLabels[event.type] ?? event.type}</span>
                                 <span className="text-vs-muted"> · {event.at}{event.user ? ` · ${event.user}` : ''}</span>
                                 {event.note && <p className="text-vs-muted">{event.note}</p>}
                             </li>

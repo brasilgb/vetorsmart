@@ -28,8 +28,13 @@ use Illuminate\Validation\ValidationException;
  * @property string|null $closing_reason
  * @property Carbon|null $closed_at
  * @property int|null $created_by_user_id
+ * @property int|null $assigned_user_id
+ * @property Carbon|null $assigned_at
+ * @property int|null $realized_amount_cents amount declared by the company for a completed service; null means unknown
+ * @property Carbon|null $realized_amount_recorded_at
+ * @property int|null $realized_amount_recorded_by
  */
-#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at'])]
+#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at', 'assigned_user_id', 'assigned_at', 'realized_amount_cents', 'realized_amount_recorded_at', 'realized_amount_recorded_by'])]
 class ServiceRequest extends Model
 {
     /** @use HasFactory<ServiceRequestFactory> */
@@ -49,6 +54,16 @@ class ServiceRequest extends Model
     public function service(): BelongsTo
     {
         return $this->belongsTo(Service::class);
+    }
+
+    /**
+     * The member of the company responsible for the request (not the professional of the appointment).
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_user_id');
     }
 
     /**
@@ -118,6 +133,9 @@ class ServiceRequest extends Model
             'priority' => RequestPriority::class,
             'status' => RequestStatus::class,
             'closed_at' => 'datetime',
+            'assigned_at' => 'datetime',
+            'realized_amount_cents' => 'integer',
+            'realized_amount_recorded_at' => 'datetime',
         ];
     }
 }

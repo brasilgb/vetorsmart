@@ -1,19 +1,26 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { selectClass } from '@/components/vetor-smart/field';
+import { index as growthIndex } from '@/routes/tenant/growth';
 import { EmptyState } from '@/components/vetor-smart/empty-state';
 import { PageHeader } from '@/components/vetor-smart/page-header';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
-type Figures = { requests: number; appointments_done: number; completed: number; cancelled: number; conversion: number | null; active_services: number };
+type Figures = { requests: number; appointments_done: number; completed: number; cancelled: number; conversion: number | null; revenue: string | null; revenue_known: number; revenue_unknown: number };
+
+type Option = { value: string; label: string };
 
 type Props = {
     period: string;
     previousPeriod: string;
     current: Figures;
     previous: Figures;
-    comparison: { requests: number | null; appointments_done: number | null; completed: number | null; cancelled: number | null; conversion: number | null };
+    comparison: { requests: number | null; appointments_done: number | null; completed: number | null; cancelled: number | null; conversion: number | null; revenue: number | null };
+    filters: { periodo: string; origem: string; responsavel: string };
+    options: { periods: Option[]; origins: Option[]; assignees: { id: number; name: string }[] };
+    revenueByOrigin: { origin: string; label: string; completed: number; revenue: string | null; revenue_known: number; revenue_unknown: number }[];
     services: { active: number; on_site: number; site: string };
     seo: { title: boolean; description: boolean; canonical: string | null; indexable: boolean };
-    evolution: { month: string; requests: number; appointments_done: number; completed: number }[];
+    evolution: { month: string; requests: number; appointments_done: number; completed: number; revenue: string | null; revenue_unknown: number }[];
     hasActivity: boolean;
     minRequestsForConversion: number;
     origins: OriginRow[];
@@ -22,7 +29,7 @@ type Props = {
 
 type OriginRow = { origin: string; label: string; received: number; scheduled: number; completed: number; cancelled: number };
 
-/** Change against the previous month. With "inverse", a rise is bad (cancellations) and shows in red. */
+/** Change against the previous period. With "inverse", a rise is bad (cancellations) and shows in red. */
 function Delta({ value, unit = '%', inverse = false }: { value: number | null; unit?: string; inverse?: boolean }) {
     if (value === null) {
         return <span className="text-xs text-vs-muted">sem base de comparação</span>;
@@ -32,7 +39,7 @@ function Delta({ value, unit = '%', inverse = false }: { value: number | null; u
     const bad = inverse ? value > 0 : value < 0;
     const tone = good ? 'text-emerald-700 dark:text-emerald-400' : bad ? 'text-vs-danger' : 'text-vs-muted';
 
-    return <span className={`text-xs font-medium ${tone}`}>{value > 0 ? '+' : ''}{value}{unit} vs. mês anterior</span>;
+    return <span className={`text-xs font-medium ${tone}`}>{value > 0 ? '+' : ''}{value}{unit} vs. período anterior</span>;
 }
 
 function Metric({ label, value, delta, unit, inverse = false }: { label: string; value: string | number; delta: number | null; unit?: string; inverse?: boolean }) {
@@ -45,8 +52,10 @@ function Metric({ label, value, delta, unit, inverse = false }: { label: string;
     );
 }
 
-/** Real figures of the company: no visits, traffic, revenue or search ranking. */
-export default function GrowthIndex({ period, previousPeriod, current, comparison, services, seo, evolution, hasActivity, minRequestsForConversion, origins, previousOrigins }: Props) {
+/** Real figures of the company, with the revenue it declared: no visits, traffic or search ranking. */
+export default function GrowthIndex({ period, previousPeriod, current, comparison, filters, options, services, seo, evolution, hasActivity, minRequestsForConversion, origins, previousOrigins, revenueByOrigin }: Props) {
+    const filter = (changes: Partial<Props['filters']>) => router.get(growthIndex.url(), { ...filters, ...changes }, { preserveState: true, preserveScroll: true, replace: true });
+    const shownRevenue = revenueByOrigin.filter((row) => row.completed > 0);
     const portal = origins.find((row) => row.origin === 'portal');
     const portalBefore = previousOrigins.find((row) => row.origin === 'portal');
     const shownOrigins = origins.filter((row) => row.received > 0 || row.origin === 'portal');
@@ -59,7 +68,31 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
             <div className="flex flex-1 flex-col gap-6 p-4 md:p-6">
                 <PageHeader title="Meu Crescimento" description={`Números reais da sua empresa em ${period}, comparados com ${previousPeriod}. Visitas e posição em buscadores não são medidas pela VetorSmart.`} />
 
-                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                <div className="grid gap-3 sm:grid-cols-3 lg:max-w-3xl" role="group" aria-label="Filtros dos indicadores">
+                    <label className="grid gap-1 text-xs text-vs-muted">
+                        Período
+                        <select value={filters.periodo} onChange={(event) => filter({ periodo: event.target.value })} className={selectClass}>
+                            {options.periods.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </select>
+                    </label>
+                    <label className="grid gap-1 text-xs text-vs-muted">
+                        Origem
+                        <select value={filters.origem} onChange={(event) => filter({ origem: event.target.value })} className={selectClass}>
+                            <option value="">Todas as origens</option>
+                            {options.origins.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                        </select>
+                    </label>
+                    <label className="grid gap-1 text-xs text-vs-muted">
+                        Responsável
+                        <select value={filters.responsavel} onChange={(event) => filter({ responsavel: event.target.value })} className={selectClass}>
+                            <option value="">Todos</option>
+                            <option value="nenhum">Sem responsável</option>
+                            {options.assignees.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}
+                        </select>
+                    </label>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
                     <Metric label="Solicitações recebidas" value={current.requests} delta={comparison.requests} />
                     <Metric label="Agendamentos realizados" value={current.appointments_done} delta={comparison.appointments_done} />
                     <Metric label="Serviços concluídos" value={current.completed} delta={comparison.completed} />
@@ -70,9 +103,15 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                         delta={comparison.conversion}
                         unit=" p.p."
                     />
+                    <Card className="border-vs-border/70 p-4 shadow-sm">
+                        <p className="text-sm text-vs-muted">Receita declarada</p>
+                        <p className="mt-1 text-2xl font-semibold text-vs-text">{current.revenue ?? 'Não informada'}</p>
+                        {current.revenue_unknown > 0 && <p className="text-xs text-vs-muted">{current.revenue_unknown} {current.revenue_unknown === 1 ? 'serviço concluído sem valor informado' : 'serviços concluídos sem valor informado'}</p>}
+                        <Delta value={comparison.revenue} />
+                    </Card>
                 </div>
                 <p className="text-xs text-vs-muted">
-                    Conversão = serviços concluídos ÷ solicitações recebidas no mês, exibida a partir de {minRequestsForConversion} solicitações.
+                    Conversão = serviços concluídos ÷ solicitações recebidas no período, exibida a partir de {minRequestsForConversion} solicitações. Receita declarada = soma dos valores que a empresa informou nos serviços concluídos no período; serviços sem valor não entram como zero. Não é comprovante de pagamento.
                 </p>
 
                 <div className="grid gap-4 lg:grid-cols-2">
@@ -158,8 +197,41 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                         </div>
                     </Card>
                     <p className="text-xs text-vs-muted">
-                        Contamos as solicitações recebidas no mês e acompanhamos cada uma: "agendadas" teve ao menos um agendamento; "concluídas" teve o serviço concluído; "canceladas ou não realizadas" foi encerrada sem o serviço. Cliques e visitas não são contados. A receita por origem não é exibida porque o valor cobrado em cada atendimento não é registrado no VetorSmart.
+                        Contamos as solicitações recebidas no período e acompanhamos cada uma: "agendadas" teve ao menos um agendamento; "concluídas" teve o serviço concluído; "canceladas ou não realizadas" foi encerrada sem o serviço. Cliques e visitas não são contados.
                     </p>
+                </section>
+
+                <section aria-labelledby="receita-origem" className="grid gap-3">
+                    <h2 id="receita-origem" className="text-lg font-semibold text-vs-text">Receita declarada por origem em {period}</h2>
+                    {shownRevenue.length === 0 ? (
+                        <EmptyState>Nenhum serviço concluído no período. A receita aparece aqui quando os serviços são concluídos e o valor realizado é informado.</EmptyState>
+                    ) : (
+                        <Card className="overflow-hidden border-vs-border/70 shadow-sm">
+                            <div className="overflow-x-auto" tabIndex={0} role="region" aria-labelledby="receita-origem">
+                                <table className="w-full min-w-[560px] text-left text-sm">
+                                    <caption className="sr-only">Serviços concluídos no período por origem, com a receita informada e os serviços sem valor</caption>
+                                    <thead className="bg-vs-surface text-vs-muted">
+                                        <tr>
+                                            <th scope="col" className="px-4 py-3 font-medium">Origem</th>
+                                            <th scope="col" className="px-4 py-3 font-medium">Serviços concluídos</th>
+                                            <th scope="col" className="px-4 py-3 font-medium">Receita informada</th>
+                                            <th scope="col" className="px-4 py-3 font-medium">Sem valor informado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {shownRevenue.map((row) => (
+                                            <tr key={row.origin} className="border-t border-vs-border/70">
+                                                <th scope="row" className="px-4 py-3 font-medium text-vs-text">{row.label}</th>
+                                                <td className="px-4 py-3 text-vs-text">{row.completed}</td>
+                                                <td className="px-4 py-3 text-vs-text">{row.revenue ?? 'Não informada'}</td>
+                                                <td className="px-4 py-3 text-vs-text">{row.revenue_unknown}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
+                    )}
                 </section>
 
                 <section aria-labelledby="evolucao" className="grid gap-3">
@@ -170,13 +242,14 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                         <Card className="border-vs-border/70 shadow-sm">
                             <CardContent className="pt-6">
                                 <div className="overflow-x-auto" tabIndex={0} role="region" aria-label="Evolução dos últimos seis meses">
-                                    <table className="w-full min-w-[520px] text-left text-sm">
+                                    <table className="w-full min-w-[640px] text-left text-sm">
                                         <thead className="text-vs-muted">
                                             <tr>
                                                 <th className="py-2 pr-4 font-medium">Mês</th>
                                                 <th className="py-2 pr-4 font-medium">Solicitações</th>
                                                 <th className="py-2 pr-4 font-medium">Agendamentos realizados</th>
-                                                <th className="py-2 font-medium">Concluídos</th>
+                                                <th className="py-2 pr-4 font-medium">Concluídos</th>
+                                                <th className="py-2 font-medium">Receita informada</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -191,6 +264,10 @@ export default function GrowthIndex({ period, previousPeriod, current, compariso
                                                             </div>
                                                         </td>
                                                     ))}
+                                                    <td className="py-2 tabular-nums">
+                                                        {row.revenue ?? '—'}
+                                                        {row.revenue_unknown > 0 && <span className="block text-xs text-vs-muted">{row.revenue_unknown} sem valor</span>}
+                                                    </td>
                                                 </tr>
                                             ))}
                                         </tbody>

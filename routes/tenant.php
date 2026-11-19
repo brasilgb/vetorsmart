@@ -47,6 +47,8 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
     Route::post('solicitacoes/{serviceRequest}/concluir', [ServiceRequestController::class, 'complete'])->whereNumber('serviceRequest')->name('tenant.requests.complete');
     Route::post('solicitacoes/{serviceRequest}/nao-realizada', [ServiceRequestController::class, 'notPerformed'])->whereNumber('serviceRequest')->name('tenant.requests.not-performed');
     Route::post('solicitacoes/{serviceRequest}/cancelar', [ServiceRequestController::class, 'cancel'])->whereNumber('serviceRequest')->name('tenant.requests.cancel');
+    Route::patch('solicitacoes/{serviceRequest}/responsavel', [ServiceRequestController::class, 'assign'])->whereNumber('serviceRequest')->name('tenant.requests.assign');
+    Route::patch('solicitacoes/{serviceRequest}/valor', [ServiceRequestController::class, 'amount'])->whereNumber('serviceRequest')->name('tenant.requests.amount');
 
     Route::get('agenda', [AgendaController::class, 'index'])->name('tenant.agenda.index');
     Route::get('agenda/disponibilidade', [AgendaController::class, 'slots'])->name('tenant.agenda.slots');
