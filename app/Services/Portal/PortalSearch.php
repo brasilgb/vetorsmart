@@ -139,6 +139,51 @@ class PortalSearch
     }
 
     /**
+     * Display name of a municipality where at least one participating company is based, or null. Only the companies
+     * based there count: a municipality mentioned only in a service region has no page of its own.
+     */
+    public function municipality(string $state, string $slug): ?string
+    {
+        $name = $this->eligible()
+            ->where('portal_listings.state', $state)
+            ->where('portal_listings.city_search', PortalText::cityFromSlug($slug))
+            ->orderBy('portal_listings.id')
+            ->value('portal_listings.city');
+
+        return is_string($name) ? $name : null;
+    }
+
+    /**
+     * Places with participating companies based there, with the categories present in each one. Bounded by the real
+     * companies, so it never creates a page for an empty municipality.
+     *
+     * @return list<array{state: string, city: string, slug: string, categories: list<string>}>
+     */
+    public function places(): array
+    {
+        $rows = $this->eligible()
+            ->select('portal_listings.state', 'portal_listings.city', 'portal_listings.city_search', 'segments.slug as segment_slug')
+            ->orderBy('portal_listings.state')
+            ->orderBy('portal_listings.city_search')
+            ->orderBy('portal_listings.id')
+            ->toBase()
+            ->get();
+
+        $places = [];
+
+        foreach ($rows as $row) {
+            $key = $row->state.'/'.$row->city_search;
+            $places[$key] ??= ['state' => (string) $row->state, 'city' => (string) $row->city, 'slug' => str_replace(' ', '-', (string) $row->city_search), 'categories' => []];
+
+            if (! in_array($row->segment_slug, $places[$key]['categories'], true)) {
+                $places[$key]['categories'][] = (string) $row->segment_slug;
+            }
+        }
+
+        return array_values($places);
+    }
+
+    /**
      * @return Builder<PortalListing>
      */
     private function eligible(): Builder

@@ -16,12 +16,17 @@ use Illuminate\Support\Facades\Route;
 |--------------------------------------------------------------------------
 |
 | The directory of companies at portal.<domain>. Its own host, registered before the company hostnames, so it is never
-| read as a company. Only these three paths exist there (SiteHostGuard).
+| read as a company. Only its home, its category and region pages, robots and sitemap exist there (SiteHostGuard).
 |
 */
 
 Route::domain((string) config('platform.portal_host'))->group(function () {
     Route::get('/', [PortalController::class, 'index'])->middleware('throttle:portal-search')->name('portal.home');
+    Route::get('/categorias/{categoria}', [PortalController::class, 'category'])->where('categoria', '[a-z0-9]+(?:-[a-z0-9]+)*')->middleware('throttle:portal-search')->name('portal.category');
+    Route::get('/regioes/{uf}/{municipio?}/{categoria?}', [PortalController::class, 'region'])
+        ->where(['uf' => '[A-Za-z]{2}', 'municipio' => '[a-z0-9]+(?:-[a-z0-9]+)*', 'categoria' => '[a-z0-9]+(?:-[a-z0-9]+)*'])
+        ->middleware('throttle:portal-search')
+        ->name('portal.region');
     Route::get('/robots.txt', [PortalController::class, 'robots'])->name('portal.robots');
     Route::get('/sitemap.xml', [PortalController::class, 'sitemap'])->name('portal.sitemap');
 });

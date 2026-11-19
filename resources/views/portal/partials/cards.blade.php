@@ -39,6 +39,10 @@
                         </p>
                     </div>
                 </div>
+                @if (($filters['cidade'] ?? null) !== null && (int) $listing->getAttribute('region_score') === 1)
+                    {{-- Based elsewhere: it appears because its published service region mentions the municipality. --}}
+                    <p class="served">Sediada em {{ $listing->city }} - {{ $listing->state }}; atende {{ $filters['cidade'] }} conforme a região informada pela empresa.</p>
+                @endif
                 @if (is_array($matched))
                     <p class="match">{!! $icon($icons['check']) !!}Oferece: {{ $matched['name'] }}</p>
                 @endif

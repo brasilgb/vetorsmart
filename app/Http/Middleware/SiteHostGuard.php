@@ -32,7 +32,8 @@ class SiteHostGuard
     ];
 
     /**
-     * Paths of the Regional Portal host. Nothing else exists there: no panel, no login, no company site.
+     * Fixed paths of the Regional Portal host, besides its category and region pages. Nothing else exists there: no
+     * panel, no login, no company site.
      *
      * @var array<string, list<string>>
      */
@@ -52,7 +53,10 @@ class SiteHostGuard
         }
 
         if ($request->getHost() === (string) config('platform.portal_host')) {
-            if (! in_array($request->getMethod(), self::PORTAL_PATHS[$request->getPathInfo()] ?? [], true)) {
+            $allowed = self::PORTAL_PATHS[$request->getPathInfo()]
+                ?? (preg_match('#^/(?:categorias/[a-z0-9-]+|regioes/[A-Za-z]{2}(?:/[a-z0-9-]+){0,2})$#', $request->getPathInfo()) === 1 ? ['GET', 'HEAD'] : []);
+
+            if (! in_array($request->getMethod(), $allowed, true)) {
                 abort(404);
             }
 

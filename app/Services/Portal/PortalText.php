@@ -19,6 +19,18 @@ class PortalText
     public const array STATES = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
     /**
+     * Names of the states, for titles and breadcrumbs.
+     *
+     * @var array<string, string>
+     */
+    public const array STATE_NAMES = [
+        'AC' => 'Acre', 'AL' => 'Alagoas', 'AP' => 'Amapá', 'AM' => 'Amazonas', 'BA' => 'Bahia', 'CE' => 'Ceará', 'DF' => 'Distrito Federal',
+        'ES' => 'Espírito Santo', 'GO' => 'Goiás', 'MA' => 'Maranhão', 'MT' => 'Mato Grosso', 'MS' => 'Mato Grosso do Sul', 'MG' => 'Minas Gerais',
+        'PA' => 'Pará', 'PB' => 'Paraíba', 'PR' => 'Paraná', 'PE' => 'Pernambuco', 'PI' => 'Piauí', 'RJ' => 'Rio de Janeiro', 'RN' => 'Rio Grande do Norte',
+        'RS' => 'Rio Grande do Sul', 'RO' => 'Rondônia', 'RR' => 'Roraima', 'SC' => 'Santa Catarina', 'SP' => 'São Paulo', 'SE' => 'Sergipe', 'TO' => 'Tocantins',
+    ];
+
+    /**
      * Words that never decide a search.
      *
      * @var list<string>
@@ -59,6 +71,24 @@ class PortalText
         }
 
         return array_slice(array_keys($tokens), 0, 5);
+    }
+
+    /**
+     * Stable identifier of a municipality inside its state: the normalized name with hyphens ("sao-joao-del-rei").
+     * Spellings that differ only in accents, case or punctuation share the same identifier, and the state in the
+     * address keeps namesakes of different states apart.
+     */
+    public static function citySlug(?string $city): string
+    {
+        return str_replace(' ', '-', self::normalize($city));
+    }
+
+    /**
+     * The normalized name behind a municipality identifier, as stored in portal_listings.city_search.
+     */
+    public static function cityFromSlug(string $slug): string
+    {
+        return str_replace('-', ' ', $slug);
     }
 
     public static function state(?string $state): ?string
