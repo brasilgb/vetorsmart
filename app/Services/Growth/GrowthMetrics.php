@@ -251,40 +251,100 @@ class GrowthMetrics
     }
 
     /**
-     * Requests received in the period by commercial origin (how the customer found the company, JOURNEY-01), apart
-     * from the channel: "portal" only when the arrival through the Regional Portal was verified; every other request is
-     * "not identified" (shown apart, never guessed). Followed until completion, with the value recorded on the
-     * completed ones.
+     * Requests received in the period by commercial origin (how the customer found the company), apart from the
+     * channel, followed as a cohort: completed, conversion and the value recorded on the completed ones.
+     * - portal: arrival through the Regional Portal verified by its signed link;
+     * - campaign: campaign tags of the visit (declared by the link; complementary; never the portal);
+     * - unknown: nothing reliable recorded (shown apart, never guessed; panel requests stay here).
+     * The first reliable record wins (portal, then campaign), as in ServiceRequest::commercialOrigin. "campaigns" splits
+     * the campaign row by source.
      *
-     * @return list<array{discovery: string, label: string, received: int, completed: int, revenue_cents: int, revenue_known: int}>
+     * @return array{origins: list<array{key: string, label: string, received: int, completed: int, conversion: int|null, revenue_cents: int, revenue_known: int}>, campaigns: list<array{source: string, received: int, completed: int, revenue_cents: int, revenue_known: int}>}
      */
-    public function byDiscovery(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
+    public function byCommercialOrigin(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
     {
-        $rows = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
+        $cohort = fn (): Builder => $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)->whereBetween('created_at', [$from, $to]);
+        $figures = fn (Builder $query): Builder => $query
+            ->selectRaw('COUNT(*) AS received')
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS completed', [RequestStatus::Completed->value])
+            ->selectRaw('SUM(CASE WHEN status = ? AND realized_amount_cents IS NOT NULL THEN realized_amount_cents ELSE 0 END) AS revenue_cents', [RequestStatus::Completed->value])
+            ->selectRaw('SUM(CASE WHEN status = ? AND realized_amount_cents IS NOT NULL THEN 1 ELSE 0 END) AS revenue_known', [RequestStatus::Completed->value]);
+
+        $groupExpression = "CASE WHEN discovery = '".DiscoverySource::Portal->value."' THEN 'portal' WHEN utm_source IS NOT NULL THEN 'campaign' ELSE 'unknown' END";
+        $rows = $figures($cohort())->selectRaw($groupExpression.' AS origin_key')->groupByRaw($groupExpression)->toBase()->get()->keyBy('origin_key');
+
+        $origins = [];
+
+        foreach (['portal' => 'Portal Regional', 'campaign' => 'Campanhas (UTM)', 'unknown' => 'Não identificada'] as $key => $label) {
+            $row = $rows->get($key);
+            $received = (int) ($row->received ?? 0);
+            $completed = (int) ($row->completed ?? 0);
+            $origins[] = [
+                'key' => $key,
+                'label' => $label,
+                'received' => $received,
+                'completed' => $completed,
+                'conversion' => $this->conversion($received, $completed),
+                'revenue_cents' => (int) ($row->revenue_cents ?? 0),
+                'revenue_known' => (int) ($row->revenue_known ?? 0),
+            ];
+        }
+
+        $campaigns = $figures($cohort()->where(fn (Builder $query) => $query->whereNull('discovery')->orWhere('discovery', '!=', DiscoverySource::Portal->value))->whereNotNull('utm_source'))
+            ->addSelect('utm_source')
+            ->groupBy('utm_source')
+            ->orderByDesc('received')
+            ->limit(5)
+            ->toBase()
+            ->get()
+            ->map(fn (object $row): array => [
+                'source' => (string) $row->utm_source,
+                'received' => (int) $row->received,
+                'completed' => (int) $row->completed,
+                'revenue_cents' => (int) $row->revenue_cents,
+                'revenue_known' => (int) $row->revenue_known,
+            ])
+            ->values()
+            ->all();
+
+        return ['origins' => $origins, 'campaigns' => array_values($campaigns)];
+    }
+
+    /**
+     * Requests received in the period by entry channel (RequestOrigin::channel), apart from the commercial origin:
+     * the site's request form (whether opened from the portal or not), the site assistant, the panel and the API.
+     * Followed as a cohort, like the commercial origin.
+     *
+     * @return list<array{key: string, label: string, received: int, completed: int, conversion: int|null, revenue_cents: int, revenue_known: int}>
+     */
+    public function byChannel(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, int|string|null $responsible = null): array
+    {
+        $rows = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), null, $responsible)
             ->whereBetween('created_at', [$from, $to])
-            ->groupBy('discovery')
-            ->selectRaw('discovery, COUNT(*) AS received')
+            ->groupBy('origin')
+            ->selectRaw('origin, COUNT(*) AS received')
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS completed', [RequestStatus::Completed->value])
             ->selectRaw('SUM(CASE WHEN status = ? AND realized_amount_cents IS NOT NULL THEN realized_amount_cents ELSE 0 END) AS revenue_cents', [RequestStatus::Completed->value])
             ->selectRaw('SUM(CASE WHEN status = ? AND realized_amount_cents IS NOT NULL THEN 1 ELSE 0 END) AS revenue_known', [RequestStatus::Completed->value])
             ->toBase()
             ->get();
 
-        $result = [];
+        $channels = [];
 
-        foreach ([[DiscoverySource::Portal->value, DiscoverySource::Portal->label()], [null, 'Não identificada']] as [$key, $label]) {
-            $row = $rows->first(fn (object $row): bool => $row->discovery === $key);
-            $result[] = [
-                'discovery' => $key ?? 'unknown',
-                'label' => $label,
-                'received' => (int) ($row->received ?? 0),
-                'completed' => (int) ($row->completed ?? 0),
-                'revenue_cents' => (int) ($row->revenue_cents ?? 0),
-                'revenue_known' => (int) ($row->revenue_known ?? 0),
-            ];
+        foreach (RequestOrigin::cases() as $value) {
+            $channel = $value->channel();
+            $channels[$channel['key']] ??= ['key' => $channel['key'], 'label' => $channel['label'], 'received' => 0, 'completed' => 0, 'conversion' => null, 'revenue_cents' => 0, 'revenue_known' => 0];
+            $row = $rows->first(fn (object $row): bool => $row->origin === $value->value);
+
+            if ($row !== null) {
+                $channels[$channel['key']]['received'] += (int) $row->received;
+                $channels[$channel['key']]['completed'] += (int) $row->completed;
+                $channels[$channel['key']]['revenue_cents'] += (int) $row->revenue_cents;
+                $channels[$channel['key']]['revenue_known'] += (int) $row->revenue_known;
+            }
         }
 
-        return $result;
+        return array_values(array_map(fn (array $channel): array => [...$channel, 'conversion' => $this->conversion($channel['received'], $channel['completed'])], $channels));
     }
 
     /**

@@ -146,6 +146,7 @@ class AssistantOperations
                     'customer_id' => $locked->customer_id,
                     'description' => $summary,
                     'discovery' => $locked->discovery,
+                    'campaign' => ['utm_source' => $locked->utm_source, 'utm_medium' => $locked->utm_medium, 'utm_campaign' => $locked->utm_campaign],
                 ], null, RequestOrigin::Ai);
             } else {
                 $request->forceFill(['description' => $summary])->save();

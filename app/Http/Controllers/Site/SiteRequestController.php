@@ -10,6 +10,7 @@ use App\Models\Service;
 use App\Services\Assistant\AssistantOperations;
 use App\Services\Portal\PortalReferral;
 use App\Services\ServiceRequestService;
+use App\Services\Websites\CampaignTags;
 use App\Services\Websites\PublicSiteContext;
 use App\Services\Websites\SegmentTheme;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -33,10 +34,11 @@ class SiteRequestController extends Controller
 {
     public function __construct(private PublicSiteContext $sites) {}
 
-    public function show(Request $request, PortalReferral $referral): Response
+    public function show(Request $request, PortalReferral $referral, CampaignTags $campaignTags): Response
     {
         $site = $this->sites->forRequest($request) ?? abort(404);
         $referral->capture($request, $site['tenant']);
+        $campaignTags->capture($request, $site['tenant']);
         $content = $site['content'];
         $services = $content['services'] ?? [];
         $chosen = $request->integer('servico');
@@ -56,7 +58,7 @@ class SiteRequestController extends Controller
         ])->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
-    public function store(StoreSiteServiceRequest $request, AssistantOperations $operations, ServiceRequestService $requests, PortalReferral $referral): RedirectResponse
+    public function store(StoreSiteServiceRequest $request, AssistantOperations $operations, ServiceRequestService $requests, PortalReferral $referral, CampaignTags $campaignTags): RedirectResponse
     {
         $site = $this->sites->forRequest($request) ?? abort(404);
         // Attribution comes only from the arrival recorded on the server; any "origem" sent by the browser is ignored.
@@ -80,11 +82,13 @@ class SiteRequestController extends Controller
 
         // The origin is the attribution of the visit (verified portal link); the company always comes from the address.
         $origin = $fromPortal ? RequestOrigin::Portal : RequestOrigin::PublicSite;
+        // Campaign tags of the visit (first touch, kept on the server); complementary only, never a portal proof.
+        $campaign = $campaignTags->current($request, $tenant);
 
-        $register = fn (): int => DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin): int {
+        $register = fn (): int => DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin, $campaign): int {
             $customer = $operations->findOrCreateCustomer($tenant, trim((string) $request->validated('name')), (string) $request->phoneDigits());
 
-            $serviceRequest = $requests->create($tenant, ['customer_id' => $customer->getKey(), 'description' => $description], null, $origin);
+            $serviceRequest = $requests->create($tenant, ['customer_id' => $customer->getKey(), 'description' => $description, 'campaign' => $campaign], null, $origin);
 
             if ($service !== null) {
                 try {

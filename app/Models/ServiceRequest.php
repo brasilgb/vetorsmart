@@ -27,6 +27,9 @@ use Illuminate\Validation\ValidationException;
  * @property string $description
  * @property RequestOrigin $origin
  * @property DiscoverySource|null $discovery how the customer found the company (null = unknown)
+ * @property string|null $utm_source campaign tags of the visit (complementary, declared by the link; never a portal proof)
+ * @property string|null $utm_medium
+ * @property string|null $utm_campaign
  * @property RequestPriority $priority
  * @property RequestStatus $status
  * @property string|null $closing_reason
@@ -38,7 +41,7 @@ use Illuminate\Validation\ValidationException;
  * @property Carbon|null $realized_amount_recorded_at
  * @property int|null $realized_amount_recorded_by
  */
-#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'discovery', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at', 'assigned_user_id', 'assigned_at', 'realized_amount_cents', 'realized_amount_recorded_at', 'realized_amount_recorded_by'])]
+#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'discovery', 'utm_source', 'utm_medium', 'utm_campaign', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at', 'assigned_user_id', 'assigned_at', 'realized_amount_cents', 'realized_amount_recorded_at', 'realized_amount_recorded_by'])]
 class ServiceRequest extends Model
 {
     /** @use HasFactory<ServiceRequestFactory> */
@@ -84,6 +87,27 @@ class ServiceRequest extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ServiceRequestEvent::class)->orderBy('id');
+    }
+
+    /**
+     * Commercial origin of the request (how the customer found the company), from the first reliable record kept at
+     * creation, in this order: the Regional Portal verified by its signed link; the campaign tags of the visit
+     * (declared by the link, complementary); otherwise not identified. Never inferred from the channel or from who
+     * handled the request.
+     *
+     * @return array{key: string, label: string, detail: string|null}
+     */
+    public function commercialOrigin(): array
+    {
+        if ($this->discovery === DiscoverySource::Portal) {
+            return ['key' => 'portal', 'label' => 'Portal Regional', 'detail' => 'chegada confirmada pelo link do portal'];
+        }
+
+        if ($this->utm_source !== null) {
+            return ['key' => 'campaign', 'label' => 'Campanha', 'detail' => implode(' · ', array_filter([$this->utm_source, $this->utm_medium, $this->utm_campaign]))];
+        }
+
+        return ['key' => 'unknown', 'label' => 'Não identificada', 'detail' => null];
     }
 
     /**

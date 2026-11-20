@@ -200,21 +200,31 @@ test('the funnel follows one cohort without double counting, and a later stage a
             ->where('stock', ['requested' => 2, 'triaged' => 1, 'scheduled' => 1, 'in_progress' => 0]));
 });
 
-test('the commercial origin is kept apart from the channel, and unidentified requests are shown apart', function () {
+test('commercial origin and channel are separate views of the same cohort, and unidentified requests are shown apart', function () {
     $now = now()->subMinutes(5);
-    // Portal form: channel and discovery portal. Assistant after a portal arrival: channel AI, discovery portal.
+    // Portal form: origin portal, channel site form. Assistant after a portal arrival: origin portal, channel assistant.
     growthRequest($this->tenant, $this->customer, RequestStatus::Completed, ['created_at' => $now, 'closed_at' => $now, 'origin' => RequestOrigin::Portal, 'discovery' => DiscoverySource::Portal, 'realized_amount_cents' => 20000]);
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Ai, 'discovery' => DiscoverySource::Portal]);
-    // Assistant of a direct visit: AI channel, but never attributed to the portal (or to anything) by passing there.
+    // Assistant of a direct visit: assistant channel, but never attributed to the portal (or anything) without evidence.
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Ai]);
+    // Site form from a tagged link: campaign origin.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Completed, ['created_at' => $now, 'closed_at' => $now, 'origin' => RequestOrigin::PublicSite, 'utm_source' => 'instagram', 'realized_amount_cents' => 5000]);
+    // Panel: unknown origin.
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Panel]);
 
-    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=30-dias')
-        ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('discovery.0', ['discovery' => 'portal', 'label' => 'Portal Regional', 'received' => 2, 'completed' => 1, 'revenue_cents' => 20000, 'revenue_known' => 1, 'revenue' => 'R$ 200,00'])
-            ->where('discovery.1.discovery', 'unknown')
-            ->where('discovery.1.received', 2)
-            ->where('origins', fn ($rows) => collect($rows)->firstWhere('origin', 'ai')['received'] === 2 && collect($rows)->firstWhere('origin', 'portal')['received'] === 1));
+    $page = $this->actingAs($this->owner)->get('/meu-crescimento?periodo=30-dias')->viewData('page')['props'];
+    $origins = collect($page['commercialOrigins'])->keyBy('key');
+    $channels = collect($page['channels'])->keyBy('key');
+
+    expect($origins['portal'])->toMatchArray(['received' => 2, 'completed' => 1, 'revenue' => 'R$ 200,00'])
+        ->and($origins['campaign'])->toMatchArray(['received' => 1, 'completed' => 1, 'revenue' => 'R$ 50,00'])
+        ->and($origins['unknown'])->toMatchArray(['received' => 2, 'completed' => 0, 'revenue' => null])
+        ->and($channels['site_form'])->toMatchArray(['received' => 2, 'completed' => 2])
+        ->and($channels['site_assistant']['received'])->toBe(2)
+        ->and($channels['panel']['received'])->toBe(1)
+        // Both views count the same cohort once.
+        ->and($origins->sum('received'))->toBe(5)->and($channels->sum('received'))->toBe(5)
+        ->and($page['campaigns'][0])->toMatchArray(['source' => 'instagram', 'received' => 1]);
 });
 
 test('rolling periods compare with the same number of days just before, without a percentage over a zero base', function () {

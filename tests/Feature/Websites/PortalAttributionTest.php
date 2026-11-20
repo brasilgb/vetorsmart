@@ -104,3 +104,67 @@ test('the panel never sets a discovery, and the portal origin always implies it'
 
     expect($panel->discovery)->toBeNull()->and($portal->discovery)->toBe(DiscoverySource::Portal);
 });
+
+/*
+| GROWTH-03: campaign tags (UTM) as complementary origin information.
+*/
+
+test('the first tagged page of the visit is kept and reaches the request, as campaign origin', function () {
+    $this->get('/climatizacao/clima-total?utm_source=Instagram&utm_medium=social&utm_campaign=verao-2026')->assertOk();
+    // A later tagged page in the same visit does not replace the first touch.
+    $this->get('/climatizacao/clima-total/solicitar?utm_source=google&utm_medium=cpc')->assertOk();
+    sendFromSite();
+
+    $request = ServiceRequest::query()->sole();
+
+    expect($request->only(['origin', 'discovery', 'utm_source', 'utm_medium', 'utm_campaign']))
+        ->toBe(['origin' => RequestOrigin::PublicSite, 'discovery' => null, 'utm_source' => 'instagram', 'utm_medium' => 'social', 'utm_campaign' => 'verao-2026'])
+        ->and($request->commercialOrigin()['key'])->toBe('campaign');
+});
+
+test('campaign tags never prove the Regional Portal, and malformed tags are dropped', function () {
+    $this->get('/climatizacao/clima-total?utm_source=portal&origem=portal&utm_medium=<script>')->assertOk();
+    sendFromSite();
+
+    $request = ServiceRequest::query()->sole();
+
+    expect($request->only(['origin', 'discovery', 'utm_source', 'utm_medium']))->toBe(['origin' => RequestOrigin::PublicSite, 'discovery' => null, 'utm_source' => 'portal', 'utm_medium' => null])
+        ->and($request->commercialOrigin()['key'])->toBe('campaign');
+});
+
+test('a verified portal arrival wins over campaign tags, and both are kept', function () {
+    $this->get('/climatizacao/clima-total?'.$this->referral->query($this->tenant->id).'&utm_source=newsletter')->assertOk();
+    sendFromSite();
+
+    $request = ServiceRequest::query()->sole();
+
+    expect($request->only(['origin', 'discovery', 'utm_source']))->toBe(['origin' => RequestOrigin::Portal, 'discovery' => DiscoverySource::Portal, 'utm_source' => 'newsletter'])
+        ->and($request->commercialOrigin()['key'])->toBe('portal');
+});
+
+test('campaign tags travel with an assistant conversation up to its request, also after the hand-off', function () {
+    $this->get('/climatizacao/clima-total/atendimento?utm_source=whatsapp-status')->assertOk();
+    $this->postJson('/climatizacao/clima-total/atendimento/conversa')->assertOk();
+    $conversation = AssistantConversation::query()->sole();
+
+    $request = app(AssistantOperations::class)->identifyConversation($this->tenant, $conversation, 'Maria Souza', '19988887777', null, $this->owner);
+
+    expect($request->only(['origin', 'discovery', 'utm_source']))->toBe(['origin' => RequestOrigin::Ai, 'discovery' => null, 'utm_source' => 'whatsapp-status']);
+});
+
+test('a visit without tags and a panel request stay not identified, and the origin never changes with the status', function () {
+    $this->get('/climatizacao/clima-total')->assertOk();
+    sendFromSite();
+    $customer = Customer::factory()->create(['tenant_id' => $this->tenant->id]);
+    $panel = app(ServiceRequestService::class)->create($this->tenant, ['customer_id' => $customer->id, 'description' => 'Pedido.', 'campaign' => ['utm_source' => 'x']], $this->owner);
+
+    $site = ServiceRequest::query()->where('origin', RequestOrigin::PublicSite->value)->sole();
+    $service = Service::query()->forTenant($this->tenant)->firstOrFail();
+    app(ServiceRequestService::class)->triage($site, ['service_id' => $service->id], $this->owner);
+    app(ServiceRequestService::class)->cancel($site->refresh(), 'Cliente desistiu.', $this->owner);
+
+    expect($site->refresh()->commercialOrigin()['key'])->toBe('unknown')
+        ->and($site->only(['origin', 'discovery', 'utm_source']))->toBe(['origin' => RequestOrigin::PublicSite, 'discovery' => null, 'utm_source' => null])
+        // The panel has no visit: campaign tags are refused even if a caller passes them.
+        ->and($panel->only(['origin', 'utm_source']))->toBe(['origin' => RequestOrigin::Panel, 'utm_source' => null]);
+});

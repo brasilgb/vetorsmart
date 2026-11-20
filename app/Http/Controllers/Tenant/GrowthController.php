@@ -90,6 +90,7 @@ class GrowthController extends Controller
         $closed = [...$received, 'data' => 'encerramento'];
 
         $byDays = isset(self::PERIODS[$period]['days']);
+        $commercial = $metrics->byCommercialOrigin($tenant->id, $from->utc(), $to->utc(), $origin, $responsible);
         // Days analysed, for the "without recent service" segment (same rule as the customer portfolio).
         $windowDays = max(1, (int) $from->diffInDays(CarbonImmutable::now($tenant->timezone)) + 1);
 
@@ -99,10 +100,10 @@ class GrowthController extends Controller
             // Funnel of the requests received in the period (conversion), and what is in each stage now (stock).
             'funnel' => $metrics->funnel($tenant->id, $from->utc(), $to->utc(), $origin, $responsible),
             'stock' => $metrics->stock($tenant->id, $origin, $responsible),
-            'discovery' => array_map(fn (array $row): array => [
-                ...$row,
-                'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null,
-            ], $metrics->byDiscovery($tenant->id, $from->utc(), $to->utc(), $origin, $responsible)),
+            // Commercial origin (how the customer found the company) and entry channel, in separate views (GROWTH-03).
+            'commercialOrigins' => array_map(fn (array $row): array => [...$row, 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null], $commercial['origins']),
+            'campaigns' => array_map(fn (array $row): array => [...$row, 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null], $commercial['campaigns']),
+            'channels' => array_map(fn (array $row): array => [...$row, 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null], $metrics->byChannel($tenant->id, $from->utc(), $to->utc(), $responsible)),
             // Customer relationship (CustomerPortfolio, the same rules as the portfolio). It covers the whole company,
             // so the origin and responsible filters do not apply here.
             'relationship' => [...$portfolio->growth($tenant->id, $from->utc(), $to->utc(), $windowDays), 'days' => $windowDays],
@@ -118,7 +119,8 @@ class GrowthController extends Controller
             ],
             'options' => [
                 'periods' => array_map(fn (string $key, array $preset): array => ['value' => $key, 'label' => $preset['label']], array_keys(self::PERIODS), self::PERIODS),
-                'origins' => array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item->label()], RequestOrigin::cases()),
+                // The channel filter keeps the stored values; the portal value is the site form opened from the portal.
+                'origins' => array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item === RequestOrigin::Portal ? 'Site — formulário (vindo do portal)' : $item->channel()['label']], RequestOrigin::cases()),
                 'assignees' => $assignees,
             ],
             'current' => $now,

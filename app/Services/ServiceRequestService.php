@@ -16,6 +16,7 @@ use App\Models\ServiceRequestEvent;
 use App\Models\Tenant;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Websites\CampaignTags;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -29,6 +30,7 @@ class ServiceRequestService
     public function __construct(
         private AuditLogger $auditLogger,
         private OperationalNotifier $notifier,
+        private CampaignTags $campaignTags,
     ) {}
 
     /**
@@ -44,6 +46,9 @@ class ServiceRequestService
                 'origin' => $origin,
                 // Discovery comes only from the server (a verified portal arrival); the portal form implies it.
                 'discovery' => $origin === RequestOrigin::Portal ? DiscoverySource::Portal : (($attributes['discovery'] ?? null) instanceof DiscoverySource ? $attributes['discovery'] : null),
+                // Campaign tags of the visit (complementary, sanitised again here); written once, at creation.
+                // Only the public channels carry a visit (site form, portal form, assistant); the panel never does.
+                ...$this->campaignTags->sanitise(in_array($origin, [RequestOrigin::PublicSite, RequestOrigin::Portal, RequestOrigin::Ai], true) && is_array($attributes['campaign'] ?? null) ? $attributes['campaign'] : []),
                 'priority' => $attributes['priority'] ?? RequestPriority::Normal,
                 'status' => RequestStatus::Requested,
                 'created_by_user_id' => $actor?->getKey(),

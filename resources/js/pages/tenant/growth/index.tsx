@@ -23,6 +23,8 @@ type Option = { value: string; label: string };
 
 type Recommendation = { key: string; tone: 'attention' | 'info' | 'warning'; title: string; description: string; count: number; action: string; href: string };
 
+type OriginFigures = { key: string; label: string; received: number; completed: number; conversion: number | null; revenue: string | null; revenue_known: number };
+
 type OriginRow = { origin: string; label: string; received: number; scheduled: number; completed: number; cancelled: number; href: string };
 
 type Props = {
@@ -37,7 +39,9 @@ type Props = {
     recommendations: Recommendation[];
     funnel: { received: number; triaged: number; scheduled: number; completed: number; lost: number };
     stock: { requested: number; triaged: number; scheduled: number; in_progress: number };
-    discovery: { discovery: string; label: string; received: number; completed: number; revenue: string | null; revenue_known: number }[];
+    commercialOrigins: OriginFigures[];
+    campaigns: { source: string; received: number; completed: number; revenue: string | null }[];
+    channels: OriginFigures[];
     relationship: { new: number; served: number; returning: number; recurring: number; without_recent: number; frequency_days: number | null; days: number };
     customerLinks: { recurring: string; without_recent: string; new: string };
     closingReasons: { reason: string; status: string; total: number }[];
@@ -109,6 +113,32 @@ function Section({ id, title, description, children }: { id: string; title: stri
     );
 }
 
+/** Received, completed, conversion of the cohort and recorded value, per origin or per channel. */
+function OriginList({ rows }: { rows: OriginFigures[] }) {
+    const max = Math.max(0, ...rows.map((row) => row.received));
+
+    if (max === 0) {
+        return <p className="text-sm text-vs-muted">Nenhuma oportunidade no período.</p>;
+    }
+
+    return (
+        <ul className="grid gap-3">
+            {rows.filter((row) => row.received > 0).map((row) => (
+                <li key={row.key} className="grid gap-1 text-sm">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                        <span className="font-medium text-vs-text">{row.label}</span>
+                        <span className="tabular-nums text-vs-text"><strong>{row.received}</strong> <span className="text-vs-muted">recebidas</span></span>
+                    </div>
+                    <Bar value={row.received} max={max} label={`${row.label}: ${row.received} recebidas`} />
+                    <p className="text-xs text-vs-muted">
+                        {row.completed} concluídas · conversão {row.conversion === null ? "com poucos dados" : `${row.conversion}%`} · {row.revenue ?? "sem valor registrado"}
+                    </p>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 const toneClass: Record<Recommendation['tone'], string> = {
     attention: 'border-l-amber-500 dark:border-l-amber-400',
     warning: 'border-l-red-600 dark:border-l-red-400',
@@ -117,7 +147,7 @@ const toneClass: Record<Recommendation['tone'], string> = {
 
 /** Meu Crescimento: results of the company from its own records, organised to support decisions. */
 export default function GrowthIndex(props: Props) {
-    const { period, previousPeriod, current, previous, comparison, filters, options, links, recommendations, funnel, stock, discovery, relationship, customerLinks, closingReasons, revenueByOrigin, services, seo, evolution, hasActivity, minRequestsForConversion, origins, previousOrigins } = props;
+    const { period, previousPeriod, current, previous, comparison, filters, options, links, recommendations, funnel, stock, commercialOrigins, campaigns, channels, relationship, customerLinks, closingReasons, services, seo, evolution, hasActivity, minRequestsForConversion } = props;
     const filter = (changes: Partial<Props['filters']>) => router.get(growthIndex.url(), { ...filters, ...changes }, { preserveState: true, preserveScroll: true, replace: true });
 
     const stages = [
@@ -131,11 +161,8 @@ export default function GrowthIndex(props: Props) {
     const bottleneck = funnel.received > 0 ? drops.reduce((worst, drop) => (drop.lost > worst.lost ? drop : worst), { key: '', lost: 0 }) : { key: '', lost: 0 };
     const percent = (value: number) => (funnel.received > 0 ? `${Math.round((value / funnel.received) * 100)}%` : '—');
 
-    const shownOrigins = origins.filter((row) => row.received > 0);
-    const shownRevenue = revenueByOrigin.filter((row) => row.completed > 0);
     const maxCount = Math.max(0, ...evolution.map((row) => Math.max(row.requests, row.completed)));
     const maxRevenue = Math.max(0, ...evolution.map((row) => row.revenue_cents));
-    const maxOrigin = Math.max(0, ...shownOrigins.map((row) => row.received));
 
     return (
         <>
@@ -273,43 +300,38 @@ export default function GrowthIndex(props: Props) {
                     <p className="text-xs text-vs-muted">Os quadros tracejados mostram a situação de hoje (o que está em cada etapa agora, de qualquer período). Não são taxas de conversão.</p>
                 </Section>
 
-                <Section id="origens" title="Origem das oportunidades" description={`Recebidas de ${period}.`}>
+                <Section id="origens" title="Origem das oportunidades" description={`Oportunidades recebidas de ${period}, acompanhadas até o fim. Origem e canal são visões diferentes: cada oportunidade aparece uma vez em cada uma.`}>
                     <div className="grid gap-4 lg:grid-cols-2">
                         <Card className="grid content-start gap-3 border-vs-border/70 p-5 shadow-sm">
-                            <h3 className="font-semibold text-vs-text">Como o cliente encontrou a empresa</h3>
-                            <ul className="grid gap-3">
-                                {discovery.map((row) => (
-                                    <li key={row.discovery} className="grid gap-1 text-sm">
-                                        <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                            <span className="font-medium text-vs-text">{row.label}</span>
-                                            <span className="tabular-nums text-vs-text"><strong>{row.received}</strong> <span className="text-vs-muted">· {row.completed} concluídas</span></span>
-                                        </div>
-                                        <Bar value={row.received} max={Math.max(...discovery.map((item) => item.received))} label={`${row.label}: ${row.received}`} />
-                                    </li>
-                                ))}
-                            </ul>
-                            <p className="text-xs text-vs-muted">"Portal Regional" só quando a chegada pelo portal foi confirmada pelo link assinado. As demais aparecem como não identificadas: nada é presumido.</p>
+                            <div>
+                                <h3 className="font-semibold text-vs-text">Origem comercial</h3>
+                                <p className="text-xs text-vs-muted">Como o cliente encontrou a empresa.</p>
+                            </div>
+                            <OriginList rows={commercialOrigins} />
+                            {campaigns.length > 0 && (
+                                <div className="grid gap-1 rounded-md bg-vs-surface/60 p-3 text-sm">
+                                    <p className="text-xs font-medium text-vs-muted">Campanhas por fonte</p>
+                                    {campaigns.map((row) => (
+                                        <p key={row.source} className="flex flex-wrap justify-between gap-2 text-vs-text">
+                                            <span className="break-all">{row.source}</span>
+                                            <span className="tabular-nums">{row.received} · {row.completed} concluídas{row.revenue ? ` · ${row.revenue}` : ''}</span>
+                                        </p>
+                                    ))}
+                                </div>
+                            )}
+                            <p className="text-xs text-vs-muted">
+                                Portal Regional: chegada confirmada pelo link assinado do portal. Campanhas: marcações UTM do link que o cliente abriu, informação complementar declarada pelo próprio link. Não identificada: sem registro confiável (inclui as solicitações cadastradas no painel); nada é presumido.
+                            </p>
                         </Card>
                         <Card className="grid content-start gap-3 border-vs-border/70 p-5 shadow-sm">
-                            <h3 className="font-semibold text-vs-text">Por onde a solicitação chegou (canal)</h3>
-                            {shownOrigins.length === 0 ? (
-                                <p className="text-sm text-vs-muted">Nenhuma oportunidade no período.</p>
-                            ) : (
-                                <ul className="grid gap-3">
-                                    {shownOrigins.map((row) => (
-                                        <li key={row.origin} className="grid gap-1 text-sm">
-                                            <div className="flex flex-wrap items-baseline justify-between gap-2">
-                                                <Link href={row.href} className="font-medium text-vs-link hover:underline">{row.label}</Link>
-                                                <span className="tabular-nums text-vs-text">
-                                                    <strong>{row.received}</strong> <span className="text-vs-muted">· {row.scheduled} agendadas · {row.completed} concluídas · antes: {previousOrigins.find((item) => item.origin === row.origin)?.received ?? 0}</span>
-                                                </span>
-                                            </div>
-                                            <Bar value={row.received} max={maxOrigin} label={`${row.label}: ${row.received}`} />
-                                        </li>
-                                    ))}
-                                </ul>
-                            )}
-                            <p className="text-xs text-vs-muted">O canal é por onde a solicitação foi feita (formulário do site, formulário vindo do portal, atendimento IA, painel). Conversas da IA continuam como "Site / IA" quando passam para a equipe.</p>
+                            <div>
+                                <h3 className="font-semibold text-vs-text">Canal de entrada</h3>
+                                <p className="text-xs text-vs-muted">Por onde a solicitação foi recebida.</p>
+                            </div>
+                            <OriginList rows={channels} />
+                            <p className="text-xs text-vs-muted">
+                                O formulário do site conta também os pedidos abertos a partir do portal (a origem deles aparece ao lado). O atendimento virtual é o canal das conversas da IA, mesmo quando a equipe assume depois.
+                            </p>
                         </Card>
                     </div>
                 </Section>
@@ -320,22 +342,15 @@ export default function GrowthIndex(props: Props) {
                         <Metric label="Ticket médio" value={current.ticket ?? '—'} hint="Valor registrado ÷ serviços com valor" />
                         <Metric label="Concluídos sem valor" value={current.revenue_unknown} hint="Fora da soma e do ticket; nunca contados como R$ 0,00" href={current.revenue_unknown > 0 ? links.without_amount : undefined} />
                     </div>
-                    {shownRevenue.length > 0 && (
+                    {channels.some((row) => row.completed > 0) && (
                         <Card className="gap-0 divide-y divide-vs-border/70 border-vs-border/70 p-0 shadow-sm">
-                            {shownRevenue.map((row) => (
-                                <div key={row.origin} className="flex flex-wrap items-baseline justify-between gap-2 p-4 text-sm">
-                                    <span className="font-medium text-vs-text">{row.label}</span>
-                                    <span className="tabular-nums text-vs-text">
-                                        <strong>{row.revenue ?? 'Não informada'}</strong>
-                                        <span className="text-vs-muted"> · {row.completed} concluídos · ticket {row.ticket ?? '—'}{row.revenue_unknown > 0 ? ` · ${row.revenue_unknown} sem valor` : ''}</span>
-                                    </span>
+                            <p className="p-4 text-xs font-medium text-vs-muted">Por origem comercial e por canal das oportunidades recebidas no período (as duas visões somam o mesmo total).</p>
+                            {[...commercialOrigins.map((row) => ({ ...row, kind: "Origem" })), ...channels.map((row) => ({ ...row, kind: "Canal" }))].filter((row) => row.completed > 0).map((row) => (
+                                <div key={`${row.kind}-${row.key}`} className="flex flex-wrap items-baseline justify-between gap-2 p-4 text-sm">
+                                    <span className="font-medium text-vs-text">{row.kind}: {row.label}</span>
+                                    <span className="tabular-nums text-vs-text"><strong>{row.revenue ?? 'Não informada'}</strong><span className="text-vs-muted"> · {row.completed} concluídas · {row.revenue_known} com valor</span></span>
                                 </div>
                             ))}
-                            {discovery.find((row) => row.discovery === 'portal' && row.completed > 0) && (
-                                <p className="p-4 text-xs text-vs-muted">
-                                    Clientes que chegaram pelo Portal Regional (por qualquer canal): {discovery.find((row) => row.discovery === 'portal')?.revenue ?? 'sem valor informado'} em serviços concluídos das oportunidades recebidas no período.
-                                </p>
-                            )}
                         </Card>
                     )}
                 </Section>

@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\AssistantSetting;
 use App\Models\Tenant;
 use App\Services\Portal\PortalReferral;
+use App\Services\Websites\CampaignTags;
 use App\Services\Websites\PublicSiteAddress;
 use App\Services\Websites\SegmentTheme;
 use App\Services\Websites\WebsiteResolver;
@@ -237,6 +238,7 @@ class SiteController extends Controller
         // A visit that came through a signed Regional Portal link is recorded on the server; the links stay clean and the
         // request form and the assistant read that record (PortalReferral), never a parameter of the browser.
         app(PortalReferral::class)->capture(request(), $tenant);
+        app(CampaignTags::class)->capture(request(), $tenant);
         // The service chosen in the portal pre-selects the main request button, only when this company published it.
         $chosen = request()->integer('servico');
         $preferredService = collect((array) ($content['services'] ?? []))->contains(fn (mixed $service): bool => is_array($service) && ($service['id'] ?? null) === $chosen) ? $chosen : null;

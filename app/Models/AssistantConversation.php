@@ -19,8 +19,12 @@ use Illuminate\Support\Carbon;
  * @property ConversationStatus $status
  * @property array<string, mixed>|null $collected
  * @property Carbon|null $last_activity_at
+ * @property DiscoverySource|null $discovery
+ * @property string|null $utm_source campaign tags of the visit, until the request is registered
+ * @property string|null $utm_medium
+ * @property string|null $utm_campaign
  */
-#[Fillable(['tenant_id', 'channel', 'discovery', 'session_hash', 'customer_id', 'state', 'status', 'service_id', 'service_request_id', 'appointment_id', 'handled_by_user_id', 'collected', 'handoff_reason', 'invalid_attempts', 'last_activity_at', 'retention_until'])]
+#[Fillable(['tenant_id', 'channel', 'discovery', 'utm_source', 'utm_medium', 'utm_campaign', 'session_hash', 'customer_id', 'state', 'status', 'service_id', 'service_request_id', 'appointment_id', 'handled_by_user_id', 'collected', 'handoff_reason', 'invalid_attempts', 'last_activity_at', 'retention_until'])]
 class AssistantConversation extends Model
 {
     use BelongsToTenant;
