@@ -231,6 +231,8 @@ class VetorSmartDemoSeeder extends Seeder
             }
         } finally {
             Date::setTestNow();
+            // The block on HTTP calls covers the seeding only; the rest of the same process (a test) is not affected.
+            Http::preventStrayRequests(false);
         }
     }
 

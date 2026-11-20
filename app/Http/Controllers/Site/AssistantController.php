@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Site;
 
 use App\Enums\ConversationStatus;
+use App\Enums\DiscoverySource;
 use App\Enums\DomainKind;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Site\SendAssistantMessageRequest;
@@ -11,6 +12,7 @@ use App\Models\AssistantSetting;
 use App\Models\Tenant;
 use App\Services\Assistant\AssistantConversations;
 use App\Services\Assistant\AssistantFlow;
+use App\Services\Portal\PortalReferral;
 use App\Services\Websites\PublicSiteAddress;
 use App\Services\Websites\WebsiteResolver;
 use Illuminate\Http\JsonResponse;
@@ -29,7 +31,7 @@ class AssistantController extends Controller
 {
     public function __construct(private WebsiteResolver $resolver, private PublicSiteAddress $address) {}
 
-    public function show(Request $request): RedirectResponse|Response
+    public function show(Request $request, PortalReferral $referral): RedirectResponse|Response
     {
         $redirect = $this->redirectFromHost($request);
 
@@ -41,6 +43,7 @@ class AssistantController extends Controller
         $tenant = $site['tenant'];
         $setting = AssistantSetting::query()->forTenant($tenant)->first();
         $content = $site['content'];
+        $referral->capture($request, $tenant);
 
         // The chat is never indexable, for any company; the header repeats what the page markup already says.
         return response()->view('website.atendimento', [
@@ -58,7 +61,7 @@ class AssistantController extends Controller
     /**
      * Start a conversation, or resume the one of this visitor. Returns the current messages.
      */
-    public function start(Request $request, AssistantConversations $conversations, AssistantFlow $flow): JsonResponse
+    public function start(Request $request, AssistantConversations $conversations, AssistantFlow $flow, PortalReferral $referral): JsonResponse
     {
         $site = $this->siteFor($request);
         $tenant = $site['tenant'] ?? null;
@@ -69,6 +72,11 @@ class AssistantController extends Controller
         }
 
         $started = $conversations->start($tenant, $setting, $this->visitorToken($request));
+
+        // A visit that arrived through the portal (recorded on the server) keeps that discovery in the conversation.
+        if ($started['created'] && $referral->fromPortal($request, $tenant)) {
+            $started['conversation']->forceFill(['discovery' => DiscoverySource::Portal])->save();
+        }
 
         if ($started['created']) {
             $flow->greet($tenant, $setting, $started['conversation']);

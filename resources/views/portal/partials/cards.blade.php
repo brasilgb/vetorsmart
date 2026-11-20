@@ -63,8 +63,8 @@
                     </ul>
                 @endif
                 <div class="actions">
-                    <a class="btn primary" href="{{ $base }}/solicitar?origem=portal{{ $serviceQuery }}">Solicitar atendimento<span class="sr-only"> a {{ $listing->business_name }}</span></a>
-                    <a class="btn secondary" href="{{ $base }}?origem=portal{{ $serviceQuery }}">Ver profissional<span class="sr-only">: {{ $listing->business_name }}</span></a>
+                    <a class="btn primary" href="{{ $base }}/solicitar?{{ $portalQuery($listing) }}{{ $serviceQuery }}">Solicitar atendimento<span class="sr-only"> a {{ $listing->business_name }}</span></a>
+                    <a class="btn secondary" href="{{ $base }}?{{ $portalQuery($listing) }}{{ $serviceQuery }}">Ver profissional<span class="sr-only">: {{ $listing->business_name }}</span></a>
                 </div>
             </article>
         </li>

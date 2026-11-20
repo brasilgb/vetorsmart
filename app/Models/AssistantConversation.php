@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Concerns\BelongsToTenant;
 use App\Enums\AssistantState;
 use App\Enums\ConversationStatus;
+use App\Enums\DiscoverySource;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,7 +20,7 @@ use Illuminate\Support\Carbon;
  * @property array<string, mixed>|null $collected
  * @property Carbon|null $last_activity_at
  */
-#[Fillable(['tenant_id', 'channel', 'session_hash', 'customer_id', 'state', 'status', 'service_id', 'service_request_id', 'appointment_id', 'handled_by_user_id', 'collected', 'handoff_reason', 'invalid_attempts', 'last_activity_at', 'retention_until'])]
+#[Fillable(['tenant_id', 'channel', 'discovery', 'session_hash', 'customer_id', 'state', 'status', 'service_id', 'service_request_id', 'appointment_id', 'handled_by_user_id', 'collected', 'handoff_reason', 'invalid_attempts', 'last_activity_at', 'retention_until'])]
 class AssistantConversation extends Model
 {
     use BelongsToTenant;
@@ -28,6 +29,7 @@ class AssistantConversation extends Model
     {
         return [
             'state' => AssistantState::class,
+            'discovery' => DiscoverySource::class,
             'status' => ConversationStatus::class,
             'collected' => 'array',
             'last_activity_at' => 'datetime',

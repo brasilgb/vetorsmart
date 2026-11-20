@@ -141,9 +141,11 @@ class AssistantOperations
                 : ServiceRequest::query()->forTenant($tenant)->whereKey($locked->service_request_id)->lockForUpdate()->first();
 
             if ($request === null || ! $request->status->isOpen()) {
+                // Channel "ai"; how the visitor found the company stays with the conversation, also after a hand-off.
                 $request = $this->requests->create($tenant, [
                     'customer_id' => $locked->customer_id,
                     'description' => $summary,
+                    'discovery' => $locked->discovery,
                 ], null, RequestOrigin::Ai);
             } else {
                 $request->forceFill(['description' => $summary])->save();

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\DiscoverySource;
 use App\Enums\MembershipStatus;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestPriority;
@@ -41,6 +42,8 @@ class ServiceRequestService
                 'customer_id' => $attributes['customer_id'],
                 'description' => $attributes['description'],
                 'origin' => $origin,
+                // Discovery comes only from the server (a verified portal arrival); the portal form implies it.
+                'discovery' => $origin === RequestOrigin::Portal ? DiscoverySource::Portal : (($attributes['discovery'] ?? null) instanceof DiscoverySource ? $attributes['discovery'] : null),
                 'priority' => $attributes['priority'] ?? RequestPriority::Normal,
                 'status' => RequestStatus::Requested,
                 'created_by_user_id' => $actor?->getKey(),
@@ -56,6 +59,7 @@ class ServiceRequestService
 
             $this->auditLogger->record('service_request.created', $tenant, $request, [
                 'origin' => $origin->value,
+                'discovery' => $request->discovery?->value,
             ], $actor);
 
             $this->notifier->requestReceived($request, $actor);

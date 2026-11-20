@@ -18,6 +18,7 @@ use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
 use App\Services\Billing\SubscriptionService;
+use App\Services\Portal\PortalReferral;
 use App\Services\Portal\PortalSearch;
 use App\Services\ServiceRequestService;
 use App\Services\Websites\ReservedPaths;
@@ -80,6 +81,24 @@ function portal(array $query = [], string $path = '/'): TestResponse
     URL::forceRootUrl('http://localhost');
 
     return $response;
+}
+
+/**
+ * The signed query a portal card carries for a company (JOURNEY-01), as written in the HTML when $html.
+ */
+function portalQuery(Tenant $tenant, bool $html = false): string
+{
+    $query = app(PortalReferral::class)->query($tenant->id);
+
+    return $html ? str_replace('&', '&amp;', $query) : $query;
+}
+
+/**
+ * A visit to a page of the company site through a signed portal link: the site records the arrival on the server.
+ */
+function arriveFromPortal(Tenant $tenant, string $path): TestResponse
+{
+    return test()->get($path.(str_contains($path, '?') ? '&' : '?').portalQuery($tenant));
 }
 
 /**
@@ -213,33 +232,41 @@ test('results are paginated on the server with a bounded page', function () {
     portal(['q' => str_repeat('a', 81)])->assertStatus(422);
 });
 
-test('result pages are not indexed, and the cards lead to the company site with the portal origin', function () {
+test('result pages are not indexed, and the cards lead to the company site with the signed portal origin', function () {
+    $this->freezeSecond();
     $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
     $service = $company['services'][0];
+    $signed = portalQuery($company['tenant'], true);
 
     portal(['q' => 'split'])->assertHeader('X-Robots-Tag', 'noindex, follow')
-        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total?origem=portal&amp;servico='.$service->id.'"', false)
-        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$service->id.'"', false);
+        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total?'.$signed.'&amp;servico='.$service->id.'"', false)
+        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?'.$signed.'&amp;servico='.$service->id.'"', false);
 
-    $this->get('/climatizacao/clima-total?origem=portal')->assertOk()
-        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$service->id.'"', false);
+    // On the site the attribution is kept on the server, so its own links stay clean.
+    arriveFromPortal($company['tenant'], '/climatizacao/clima-total')->assertOk()
+        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?servico='.$service->id.'"', false);
 });
 
 test('a request sent from a portal visit keeps the Portal Regional origin, in the right company and service', function () {
     $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
     $service = $company['services'][0];
 
-    $this->get('/climatizacao/clima-total/solicitar?origem=portal&servico='.$service->id)->assertOk()->assertSee('<input type="hidden" name="origem" value="portal">', false);
+    arriveFromPortal($company['tenant'], '/climatizacao/clima-total/solicitar?servico='.$service->id)->assertOk()->assertDontSee('name="origem"', false);
 
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'service_id' => $service->id, 'description' => 'Instalar um split.', 'consent' => '1', 'origem' => 'portal'])
-        ->assertRedirect('https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal');
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'João Lima', 'phone' => '19977776666', 'description' => 'Pedido direto no site.', 'consent' => '1']);
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'service_id' => $service->id, 'description' => 'Instalar um split.', 'consent' => '1'])
+        ->assertRedirect('https://vetorsmart.com.br/climatizacao/clima-total/solicitar');
+
+    // A new visitor (another session) who claims the portal in the form or in the address is a direct visit.
+    $this->flushSession();
+    $this->get('/climatizacao/clima-total/solicitar?origem=portal');
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'João Lima', 'phone' => '19977776666', 'description' => 'Pedido direto no site.', 'consent' => '1', 'origem' => 'portal']);
     $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Ana', 'phone' => '19966665555', 'description' => 'Origem forjada.', 'consent' => '1', 'origem' => 'anuncio'])->assertSessionHasErrors('origem');
 
     $requests = ServiceRequest::query()->orderBy('id')->get();
     expect($requests)->toHaveCount(2)
         ->and($requests[0]->only(['tenant_id', 'origin', 'service_id']))->toBe(['tenant_id' => $company['tenant']->id, 'origin' => RequestOrigin::Portal, 'service_id' => $service->id])
         ->and($requests[1]->origin)->toBe(RequestOrigin::PublicSite)
+        ->and($requests[1]->discovery)->toBeNull()
         ->and(RequestOrigin::Portal->label())->toBe('Portal Regional');
 });
 
@@ -345,15 +372,16 @@ test('a card without logo shows the segment placeholder, and "Ver profissional" 
     $other = portalCompany(['name' => 'Luz Forte', 'slug' => 'luz-forte', 'segment' => $this->electric, 'services' => ['Tomadas']]);
     $split = $company['services'][0];
 
+    $this->freezeSecond();
     portal(['q' => 'instalação split'])->assertSee('class="avatar placeholder"', false)
-        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total?origem=portal&amp;servico='.$split->id.'">Ver profissional', false);
+        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total?'.portalQuery($company['tenant'], true).'&amp;servico='.$split->id.'">Ver profissional', false);
 
-    $this->get('/climatizacao/clima-total?origem=portal&servico='.$split->id)->assertOk()
-        ->assertSee('<a class="cta" href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$split->id.'">Solicitar atendimento</a>', false);
+    arriveFromPortal($company['tenant'], '/climatizacao/clima-total?servico='.$split->id)->assertOk()
+        ->assertSee('<a class="cta" href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?servico='.$split->id.'">Solicitar atendimento</a>', false);
 
     // A service of another company in the address never changes the company nor gets pre-selected.
-    $this->get('/climatizacao/clima-total?origem=portal&servico='.$other['services'][0]->id)->assertOk()
-        ->assertSee('<a class="cta" href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal">Solicitar atendimento</a>', false);
+    arriveFromPortal($company['tenant'], '/climatizacao/clima-total?servico='.$other['services'][0]->id)->assertOk()
+        ->assertSee('<a class="cta" href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar">Solicitar atendimento</a>', false);
 });
 
 /*
@@ -454,12 +482,13 @@ test('friendly addresses exist only on the portal host and their names are reser
 });
 
 test('cards on friendly pages keep the typed service and the portal origin, and the theme switch is offered', function () {
+    $this->freezeSecond();
     $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
     $service = $company['services'][0];
 
     portal(['q' => 'split'], '/regioes/sp/campinas')->assertOk()
         ->assertSee('value="split"', false)
-        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$service->id.'"', false)
+        ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?'.portalQuery($company['tenant'], true).'&amp;servico='.$service->id.'"', false)
         ->assertSee('data-theme-switch hidden', false)
         ->assertSee('data-theme-option="auto"', false)
         ->assertSee("localStorage.getItem('portal-theme')", false);
@@ -470,14 +499,15 @@ test('cards on friendly pages keep the typed service and the portal origin, and 
 */
 
 /**
- * Send the request form of a company site as a visitor, from the portal or not, with an optional send token.
+ * Send the request form of a company site as a visitor, with an optional send token. The portal origin comes only
+ * from an earlier arrival through a signed portal link (arriveFromPortal), never from this form.
  *
  * @param  array<string, mixed>  $overrides
  */
 function sendSiteRequest(string $site, array $overrides = []): TestResponse
 {
     return test()->post('/'.$site.'/solicitar', [
-        'name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Preciso de uma instalação.', 'consent' => '1', 'origem' => 'portal',
+        'name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Preciso de uma instalação.', 'consent' => '1',
         ...$overrides,
     ]);
 }
@@ -487,19 +517,19 @@ test('the journey from the portal ends in the panel of the right company, with s
     $other = portalCompany(['name' => 'Luz Forte', 'slug' => 'luz-forte', 'segment' => $this->electric, 'services' => ['Tomadas']]);
     $service = $company['services'][0];
 
-    // 1-3. Search, card, site: the links carry the service and the portal origin.
-    $requestLink = 'https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal&amp;servico='.$service->id;
+    // 1-3. Search, card, site: the links carry the service and the signed portal origin.
+    $this->freezeSecond();
+    $requestLink = 'https://vetorsmart.com.br/climatizacao/clima-total/solicitar?'.portalQuery($company['tenant'], true).'&amp;servico='.$service->id;
     portal(['q' => 'split'])->assertSee('href="'.$requestLink.'"', false);
 
-    // 4-5. The form keeps both, plus a one-time send token.
-    $form = $this->get('/climatizacao/clima-total/solicitar?origem=portal&servico='.$service->id)->assertOk()
-        ->assertSee('<input type="hidden" name="origem" value="portal">', false)
+    // 4-5. The form opened from the card keeps the service, plus a one-time send token; the origin stays on the server.
+    $form = arriveFromPortal($company['tenant'], '/climatizacao/clima-total/solicitar?servico='.$service->id)->assertOk()
         ->assertSee('<option value="'.$service->id.'" selected>', false);
     preg_match('/name="envio" value="([A-Za-z0-9]{40})"/', (string) $form->getContent(), $token);
 
     // 6-7. Sent once, confirmed only after it is saved.
     sendSiteRequest('climatizacao/clima-total', ['service_id' => $service->id, 'envio' => $token[1]])
-        ->assertRedirect('https://vetorsmart.com.br/climatizacao/clima-total/solicitar?origem=portal')
+        ->assertRedirect('https://vetorsmart.com.br/climatizacao/clima-total/solicitar')
         ->assertSessionHas('site_request_sent', true);
 
     $request = ServiceRequest::query()->sole();
@@ -522,6 +552,7 @@ test('the company comes only from the address, and a service of another company 
     $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
     $other = portalCompany(['name' => 'Luz Forte', 'slug' => 'luz-forte', 'segment' => $this->electric, 'services' => ['Tomadas']]);
 
+    arriveFromPortal($company['tenant'], '/climatizacao/clima-total');
     sendSiteRequest('climatizacao/clima-total', ['service_id' => $other['services'][0]->id, 'tenant_id' => $other['tenant']->id])->assertRedirect();
 
     expect(ServiceRequest::query()->sole()->only(['tenant_id', 'service_id', 'origin']))
@@ -554,22 +585,27 @@ test('a failed registration never confirms, and the same form can be sent again'
 });
 
 test('invalid data never confirms and keeps the send token and the portal origin for the corrected send', function () {
-    portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
     $token = str_repeat('d', 40);
+    arriveFromPortal($company['tenant'], '/climatizacao/clima-total/solicitar');
 
-    $this->from('/climatizacao/clima-total/solicitar?origem=portal')
-        ->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria', 'phone' => '123', 'description' => 'Preciso de ajuda.', 'origem' => 'portal', 'envio' => $token])
+    $this->from('/climatizacao/clima-total/solicitar')
+        ->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria', 'phone' => '123', 'description' => 'Preciso de ajuda.', 'envio' => $token])
         ->assertSessionHasErrors(['phone', 'consent'])->assertSessionMissing('site_request_sent');
 
-    $this->get('/climatizacao/clima-total/solicitar?origem=portal')
+    $this->get('/climatizacao/clima-total/solicitar')
         ->assertSee('name="envio" value="'.$token.'"', false)
-        ->assertSee('<input type="hidden" name="origem" value="portal">', false)
         ->assertDontSee('Solicitação recebida.');
     expect(ServiceRequest::query()->count())->toBe(0);
+
+    // The corrected send still counts as a portal visit: the arrival is kept on the server, not in the form.
+    sendSiteRequest('climatizacao/clima-total', ['envio' => $token])->assertSessionHas('site_request_sent', true);
+    expect(ServiceRequest::query()->sole()->origin)->toBe(RequestOrigin::Portal);
 });
 
 test('the origin recorded at creation never changes along triage and scheduling', function () {
     $company = portalCompany(['name' => 'Clima Total', 'slug' => 'clima-total', 'segment' => $this->climate, 'services' => ['Instalação de split']]);
+    arriveFromPortal($company['tenant'], '/climatizacao/clima-total');
     sendSiteRequest('climatizacao/clima-total');
     $request = ServiceRequest::query()->sole();
 

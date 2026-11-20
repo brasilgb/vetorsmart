@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Concerns\BelongsToTenant;
 use App\Enums\AppointmentStatus;
+use App\Enums\DiscoverySource;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestPriority;
 use App\Enums\RequestStatus;
@@ -25,6 +26,7 @@ use Illuminate\Validation\ValidationException;
  * @property int|null $professional_id
  * @property string $description
  * @property RequestOrigin $origin
+ * @property DiscoverySource|null $discovery how the customer found the company (null = unknown)
  * @property RequestPriority $priority
  * @property RequestStatus $status
  * @property string|null $closing_reason
@@ -36,7 +38,7 @@ use Illuminate\Validation\ValidationException;
  * @property Carbon|null $realized_amount_recorded_at
  * @property int|null $realized_amount_recorded_by
  */
-#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at', 'assigned_user_id', 'assigned_at', 'realized_amount_cents', 'realized_amount_recorded_at', 'realized_amount_recorded_by'])]
+#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'discovery', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at', 'assigned_user_id', 'assigned_at', 'realized_amount_cents', 'realized_amount_recorded_at', 'realized_amount_recorded_by'])]
 class ServiceRequest extends Model
 {
     /** @use HasFactory<ServiceRequestFactory> */
@@ -159,6 +161,7 @@ class ServiceRequest extends Model
     {
         return [
             'origin' => RequestOrigin::class,
+            'discovery' => DiscoverySource::class,
             'priority' => RequestPriority::class,
             'status' => RequestStatus::class,
             'closed_at' => 'datetime',

@@ -12,6 +12,7 @@ use App\Models\TenantNotification;
 use App\Models\TenantSetting;
 use App\Models\TenantUser;
 use App\Models\User;
+use App\Services\Portal\PortalReferral;
 use App\Services\Websites\WebsiteService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Cache;
@@ -47,13 +48,17 @@ beforeEach(function () {
 });
 
 /**
- * A visitor request from the portal, with a send token.
+ * A visitor request from the portal, with a send token: the visitor arrives through the signed link of a portal card
+ * (the site records the arrival on the server) and sends the form.
  */
 function journeyRequest(string $token, int $serviceId): void
 {
+    $tenant = Tenant::query()->where('slug', 'clima-total')->sole();
+    test()->get('/climatizacao/clima-total/solicitar?'.app(PortalReferral::class)->query($tenant->id))->assertOk();
+
     test()->post('/climatizacao/clima-total/solicitar', [
         'name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1',
-        'origem' => 'portal', 'service_id' => $serviceId, 'envio' => $token,
+        'service_id' => $serviceId, 'envio' => $token,
     ])->assertSessionHas('site_request_sent', true);
 }
 
@@ -128,7 +133,7 @@ test('a second send while the first is still registering never confirms and crea
     $lock = Cache::lock('site-request:'.$this->tenant->id.':'.hash('sha256', $token).':lock', 15);
     $lock->get();
 
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1', 'origem' => 'portal', 'envio' => $token])
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1', 'envio' => $token])
         ->assertSessionHasErrors(['envio' => 'Sua solicitação ainda está sendo registrada. Aguarde alguns segundos e tente novamente.'])
         ->assertSessionMissing('site_request_sent');
     expect(ServiceRequest::query()->count())->toBe(0);

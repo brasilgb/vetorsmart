@@ -335,6 +335,7 @@ class ServiceRequestController extends Controller
             'priority' => $serviceRequest->priority->label(),
             'origin' => $serviceRequest->origin->value,
             'origin_label' => $serviceRequest->origin->label(),
+            'discovery' => $serviceRequest->discovery?->label(),
             'assignee' => $serviceRequest->assignee?->name,
             'status' => $serviceRequest->status->value,
             'status_label' => $serviceRequest->status->label(),

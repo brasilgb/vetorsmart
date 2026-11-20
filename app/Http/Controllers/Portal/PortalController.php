@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\PortalListing;
+use App\Services\Portal\PortalReferral;
 use App\Services\Portal\PortalSearch;
 use App\Services\Portal\PortalText;
 use App\Services\Websites\SegmentTheme;
@@ -225,6 +226,8 @@ class PortalController extends Controller
             'home' => $this->home(),
             'assets' => rtrim((string) config('platform.public_url'), '/'),
             'siteBase' => fn (PortalListing $listing): string => $this->siteBase($listing),
+            // Signed attribution of the link (see PortalReferral): the site can trust that the visit came from here.
+            'portalQuery' => fn (PortalListing $listing): string => app(PortalReferral::class)->query((int) $listing->tenant_id),
         ];
     }
 

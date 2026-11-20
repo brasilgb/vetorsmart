@@ -8,6 +8,7 @@ use App\Http\Requests\Site\StoreSiteServiceRequest;
 use App\Models\AssistantSetting;
 use App\Models\Service;
 use App\Services\Assistant\AssistantOperations;
+use App\Services\Portal\PortalReferral;
 use App\Services\ServiceRequestService;
 use App\Services\Websites\PublicSiteContext;
 use App\Services\Websites\SegmentTheme;
@@ -22,8 +23,9 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * "Solicitar atendimento" of a public company site: the visitor leaves name, phone and what they need, and the
- * request enters the company's triage queue with origin "Site público" (or "Portal Regional" when the visitor came
- * from the portal through ?origem=portal). The page is never indexed. It is rate limited
+ * request enters the company's triage queue with origin "Site público" (or "Portal Regional" when the visit arrived
+ * through a signed portal link, recorded on the server by PortalReferral; the browser cannot claim it). The page is
+ * never indexed. It is rate limited
  * per visitor and company, has a hidden trap field for robots, and confirms only after the request is saved. The
  * visitor never sees any record of the company beyond the published site.
  */
@@ -31,9 +33,10 @@ class SiteRequestController extends Controller
 {
     public function __construct(private PublicSiteContext $sites) {}
 
-    public function show(Request $request): Response
+    public function show(Request $request, PortalReferral $referral): Response
     {
         $site = $this->sites->forRequest($request) ?? abort(404);
+        $referral->capture($request, $site['tenant']);
         $content = $site['content'];
         $services = $content['services'] ?? [];
         $chosen = $request->integer('servico');
@@ -45,7 +48,6 @@ class SiteRequestController extends Controller
             'chosen' => in_array($chosen, $this->publishedServiceIds($content), true) ? $chosen : null,
             'home' => $site['on_host'] ? $site['base'].'/' : $site['base'],
             'action' => $site['base'].'/solicitar',
-            'fromPortal' => $request->query('origem') === 'portal' || old('origem') === 'portal',
             'assistant' => AssistantSetting::query()->forTenant($site['tenant'])->value('enabled') ? $site['base'].'/atendimento' : null,
             'sent' => (bool) $request->session()->get('site_request_sent', false),
             // One token per form shown: a second send of the same form (double click, reload, slow network) is recognised.
@@ -54,11 +56,12 @@ class SiteRequestController extends Controller
         ])->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
-    public function store(StoreSiteServiceRequest $request, AssistantOperations $operations, ServiceRequestService $requests): RedirectResponse
+    public function store(StoreSiteServiceRequest $request, AssistantOperations $operations, ServiceRequestService $requests, PortalReferral $referral): RedirectResponse
     {
         $site = $this->sites->forRequest($request) ?? abort(404);
-        $fromPortal = $request->validated('origem') === 'portal';
-        $back = redirect()->to($site['base'].'/solicitar'.($fromPortal ? '?origem=portal' : ''));
+        // Attribution comes only from the arrival recorded on the server; any "origem" sent by the browser is ignored.
+        $fromPortal = $referral->fromPortal($request, $site['tenant']);
+        $back = redirect()->to($site['base'].'/solicitar');
 
         // A filled trap field is a robot: it sees the same confirmation, and nothing is saved.
         if (filled($request->validated('website'))) {
@@ -75,7 +78,7 @@ class SiteRequestController extends Controller
             filled($request->validated('email')) ? 'E-mail informado: '.$request->validated('email') : null,
         ])));
 
-        // The origin is the visitor's attribution only (link from the portal); the company always comes from the address.
+        // The origin is the attribution of the visit (verified portal link); the company always comes from the address.
         $origin = $fromPortal ? RequestOrigin::Portal : RequestOrigin::PublicSite;
 
         $register = fn (): int => DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin): int {
