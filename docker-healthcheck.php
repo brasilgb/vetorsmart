@@ -48,6 +48,11 @@ try {
     $fail('banco de dados inacessível (código '.$e->getCode().')');
 }
 
+// As imagens dos sites são lidas em JPG/PNG/WebP e gravadas em WebP: sem esses formatos no GD, todo envio falha.
+if (! function_exists('imagewebp') || ! function_exists('imagecreatefromjpeg') || empty(gd_info()['WebP Support'])) {
+    $fail('extensão GD sem suporte a JPEG ou WebP');
+}
+
 // PID 1 identifica o papel: no container web é o PHP-FPM, que precisa aceitar conexões FastCGI.
 $command = (string) @file_get_contents('/proc/1/cmdline');
 

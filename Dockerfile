@@ -1,5 +1,8 @@
 FROM php:8.4-fpm
-RUN apt-get update && apt-get install -y --no-install-recommends git curl libpng-dev libonig-dev libxml2-dev libzip-dev zip unzip && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache && rm -rf /var/lib/apt/lists/*
+# GD com JPEG e WebP: as imagens dos sites (logomarca, fotos) chegam em JPG/PNG/WebP e são regravadas em WebP.
+RUN apt-get update && apt-get install -y --no-install-recommends git curl libpng-dev libjpeg62-turbo-dev libwebp-dev libonig-dev libxml2-dev libzip-dev zip unzip \
+ && docker-php-ext-configure gd --with-jpeg --with-webp \
+ && docker-php-ext-install pdo_mysql mbstring exif pcntl bcmath gd zip opcache && rm -rf /var/lib/apt/lists/*
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 # Node 22 para o build do front. O Vite roda `php artisan wayfinder:generate`, por isso o build
 # precisa do PHP e do vendor no mesmo estágio. Node e node_modules são removidos ao final.

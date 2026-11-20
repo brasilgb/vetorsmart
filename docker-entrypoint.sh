@@ -26,6 +26,10 @@ esac
 mkdir -p "$APP_DIR/storage/app/public/products"
 chown www-data:www-data "$APP_DIR/storage/app/public" "$APP_DIR/storage/app/public/products"
 
+# Imagens dos sites das empresas (disco privado, servidas só quando referenciadas): também um volume persistente.
+mkdir -p "$APP_DIR/storage/app/private/websites"
+chown www-data:www-data "$APP_DIR/storage/app/private/websites"
+
 # O build do front fica num volume compartilhado, lido pelo Nginx. Só o container web publica nele:
 # worker e scheduler não servem assets, e três cópias simultâneas no mesmo volume são desnecessárias.
 # Um comando avulso só copia quando não há build algum (container sem o volume), para não publicar
