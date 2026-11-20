@@ -1,35 +1,16 @@
 import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { ConfirmAction } from '@/components/vetor-smart/confirm-action';
-import { Field, selectClass } from '@/components/vetor-smart/field';
+import { Field } from '@/components/vetor-smart/field';
 import { PageHeader } from '@/components/vetor-smart/page-header';
 import { StatusBadge } from '@/components/vetor-smart/status-badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { draft as websiteDraft, portal as portalUpdate, preview, publish, unpublish } from '@/routes/tenant/website';
+import { SiteQuestions, type QuestionsProps, type SiteDraft } from '@/components/vetor-smart/website/site-questions';
+import { portal as portalUpdate, preview, publish, unpublish } from '@/routes/tenant/website';
 import { store as domainStore, verify, primary, destroy as domainDestroy } from '@/routes/tenant/website/domains';
 import { update as subdomainUpdate } from '@/routes/tenant/website/subdomain';
-import { destroy as imageDestroy, store as imageStore } from '@/routes/tenant/website/images';
-import { media as previewMedia } from '@/routes/tenant/website/preview';
-
-type Draft = {
-    headline: string | null;
-    about: string | null;
-    differentials: string[];
-    accent_color: string;
-    font: string;
-    service_ids: number[];
-    professional_ids: number[];
-    show_professionals: boolean;
-    show_hours: boolean;
-    show_prices?: boolean;
-    logo?: SiteImage | null;
-    hero?: SiteImage | null;
-    seo: { title: string | null; description: string | null; indexable: boolean };
-};
-
-type SiteImage = { file: string; width: number; height: number };
 
 type Domain = {
     id: number;
@@ -66,8 +47,11 @@ type Props = {
         address_issue: string | null;
         version: number | null;
     };
-    draft: Draft;
-    options: { services: { id: number; name: string }[]; professionals: { id: number; name: string }[]; colors: { value: string; label: string }[] };
+    draft: SiteDraft;
+    options: QuestionsProps['options'] & { colors: { value: string; label: string }[] };
+    business: QuestionsProps['business'];
+    location: QuestionsProps['location'];
+    seoSuggestion: QuestionsProps['seoSuggestion'];
     domains: Domain[];
     canEdit: boolean;
     segment: string | null;
@@ -76,32 +60,22 @@ type Props = {
 };
 
 const tabs = [
+    { key: 'questions', label: 'Montar o site' },
     { key: 'overview', label: 'Visão geral' },
-    { key: 'appearance', label: 'Aparência' },
-    { key: 'content', label: 'Conteúdo' },
-    { key: 'services', label: 'Serviços' },
-    { key: 'domains', label: 'Domínios' },
-    { key: 'seo', label: 'SEO' },
-    { key: 'portal', label: 'Portal Regional' },
     { key: 'publish', label: 'Publicação' },
+    { key: 'domains', label: 'Domínios' },
+    { key: 'portal', label: 'Portal Regional' },
 ];
 
 /**
- * Meu Site. Each section saves only its own fields to the draft. Visitors see the
- * site only after an explicit publication; the server enforces every permission.
+ * Meu Site. The site is built by answering plain questions (SiteQuestions); each answer saves only its own fields to
+ * the draft. Visitors see the site only after an explicit publication; the server enforces every permission.
  */
-export default function WebsiteIndex({ website, draft, options, domains, canEdit, segment, serviceRegion, portal }: Props) {
-    const [tab, setTab] = useState('overview');
-    const disabled = !canEdit;
+export default function WebsiteIndex({ website, draft, options, business, location, seoSuggestion, domains, canEdit, segment, portal }: Props) {
+    const [tab, setTab] = useState('questions');
 
-    const appearance = useForm({ section: 'appearance', accent_color: draft.accent_color, font: draft.font });
-    const content = useForm({ section: 'content', headline: draft.headline ?? '', about: draft.about ?? '', differentials: draft.differentials, show_hours: draft.show_hours });
-    const services = useForm({ section: 'services', service_ids: draft.service_ids, show_professionals: draft.show_professionals, show_prices: draft.show_prices ?? true, professional_ids: draft.professional_ids });
-    const seo = useForm({ section: 'seo', seo: { title: draft.seo.title ?? '', description: draft.seo.description ?? '', indexable: draft.seo.indexable } });
     const domain = useForm({ hostname: '' });
     const subdomain = useForm({ subdomain: website.subdomain?.label ?? '' });
-
-    const toggle = (list: number[], id: number) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
 
     return (
         <>
@@ -145,105 +119,17 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                     </Card>
                 )}
 
-                {tab === 'appearance' && (
-                    <Card className="grid gap-5 border-vs-border/70 p-6 shadow-sm">
-                        <h2 className="text-base font-semibold text-vs-text">Aparência</h2>
-                        <form onSubmit={(e) => { e.preventDefault(); appearance.patch(websiteDraft.url(), { preserveScroll: true }); }} className="grid gap-5 md:grid-cols-2">
-                            <div className="md:col-span-2 flex flex-wrap gap-3" role="radiogroup" aria-label="Cor principal">
-                                {options.colors.map((color) => (
-                                    <label key={color.value} className={`flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm ${appearance.data.accent_color === color.value ? 'border-vs-blue ring-2 ring-vs-blue/30' : 'border-vs-border'}`}>
-                                        <input type="radio" name="accent" value={color.value} checked={appearance.data.accent_color === color.value} disabled={disabled} onChange={() => appearance.setData('accent_color', color.value)} className="sr-only" />
-                                        <span className="size-5 rounded-full border border-vs-border" style={{ backgroundColor: color.value }} aria-hidden="true" />
-                                        {color.label}
-                                    </label>
-                                ))}
-                            </div>
-                            <Field id="font" label="Tipografia" error={appearance.errors.font}>
-                                <select id="font" value={appearance.data.font} disabled={disabled} onChange={(e) => appearance.setData('font', e.target.value)} className={selectClass}>
-                                    <option value="sans">Sem serifa (moderna)</option>
-                                    <option value="serif">Com serifa (clássica)</option>
-                                </select>
-                            </Field>
-                            {canEdit && <div className="md:col-span-2"><Button type="submit" disabled={appearance.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar aparência</Button></div>}
-                        </form>
-                        <div className="grid gap-5 border-t border-vs-border/70 pt-5 md:grid-cols-2">
-                            <ImageField kind="logo" label="Logotipo" hint="Aparece ao lado do nome, no topo do site. Prefira fundo transparente (PNG ou WebP)." image={draft.logo ?? null} canEdit={canEdit} />
-                            <ImageField kind="hero" label="Imagem principal" hint="Aparece ao lado do título na página inicial. Use uma foto real do seu trabalho, na horizontal." image={draft.hero ?? null} canEdit={canEdit} />
-                        </div>
-                        <p className="text-xs text-vs-muted">JPG, PNG ou WebP de até 2 MB. As imagens são otimizadas automaticamente e só aparecem no site após a publicação.</p>
-                    </Card>
-                )}
-
-                {tab === 'content' && (
-                    <Card className="grid gap-5 border-vs-border/70 p-6 shadow-sm">
-                        <h2 className="text-base font-semibold text-vs-text">Conteúdo</h2>
-                        <form onSubmit={(e) => { e.preventDefault(); content.patch(websiteDraft.url(), { preserveScroll: true }); }} className="grid gap-5">
-                            <Field id="headline" label="Título principal" error={content.errors.headline}>
-                                <Input id="headline" value={content.data.headline} disabled={disabled} onChange={(e) => content.setData('headline', e.target.value)} className="h-10" />
-                            </Field>
-                            <Field id="about" label="Texto institucional" error={content.errors.about}>
-                                <textarea id="about" rows={4} value={content.data.about} disabled={disabled} onChange={(e) => content.setData('about', e.target.value)} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
-                            </Field>
-                            <div className="grid gap-2">
-                                <p className="text-sm font-medium text-vs-text">Diferenciais (até 6)</p>
-                                {content.data.differentials.map((item, index) => (
-                                    <div key={index} className="flex gap-2">
-                                        <Input aria-label={`Diferencial ${index + 1}`} value={item} disabled={disabled} onChange={(e) => content.setData('differentials', content.data.differentials.map((x, i) => (i === index ? e.target.value : x)))} className="h-10" />
-                                        {!disabled && <Button type="button" variant="ghost" onClick={() => content.setData('differentials', content.data.differentials.filter((_, i) => i !== index))}>Remover</Button>}
-                                    </div>
-                                ))}
-                                {!disabled && content.data.differentials.length < 6 && (
-                                    <Button type="button" variant="outline" className="w-fit" onClick={() => content.setData('differentials', [...content.data.differentials, ''])}>Adicionar diferencial</Button>
-                                )}
-                            </div>
-                            <label className="flex items-center gap-3 text-sm text-vs-text">
-                                <input type="checkbox" checked={content.data.show_hours} disabled={disabled} onChange={(e) => content.setData('show_hours', e.target.checked)} className="size-4 accent-vs-blue" />
-                                Mostrar horários de funcionamento (cadastrados em Configurações)
-                            </label>
-                            <p className="text-xs text-vs-muted">Telefone, WhatsApp, e-mail, endereço e link de avaliação do Google vêm de Configurações, sem duplicação.</p>
-                            <p className="text-xs text-vs-muted">
-                                Região atendida: {serviceRegion ? <strong className="text-vs-text">{serviceRegion}</strong> : 'não informada'} (definida em Atendimento IA).
-                            </p>
-                            {canEdit && <div><Button type="submit" disabled={content.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar conteúdo</Button></div>}
-                        </form>
-                    </Card>
-                )}
-
-                {tab === 'services' && (
-                    <Card className="grid gap-5 border-vs-border/70 p-6 shadow-sm">
-                        <h2 className="text-base font-semibold text-vs-text">Serviços publicados</h2>
-                        <p className="text-sm text-vs-muted">Os serviços são cadastrados em Serviços. Aqui você escolhe quais aparecem no site.</p>
-                        {options.services.length === 0 ? <p className="text-sm text-vs-muted">Nenhum serviço ativo cadastrado.</p> : (
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {options.services.map((service) => (
-                                    <label key={service.id} className="flex items-center gap-3 rounded-md border border-vs-border/70 px-3 py-2 text-sm text-vs-text">
-                                        <input type="checkbox" checked={services.data.service_ids.includes(service.id)} disabled={disabled} onChange={() => services.setData('service_ids', toggle(services.data.service_ids, service.id))} className="size-4 accent-vs-blue" />
-                                        {service.name}
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        <label className="flex items-center gap-3 text-sm text-vs-text">
-                            <input type="checkbox" checked={services.data.show_prices} disabled={disabled} onChange={(e) => services.setData('show_prices', e.target.checked)} className="size-4 accent-vs-blue" />
-                            Mostrar valores dos serviços no site
-                        </label>
-                        <p className="-mt-3 text-xs text-vs-muted">Cada serviço publicado tem o botão "Solicitar este serviço", que leva ao formulário de solicitação do site.</p>
-                        <label className="flex items-center gap-3 text-sm text-vs-text">
-                            <input type="checkbox" checked={services.data.show_professionals} disabled={disabled} onChange={(e) => services.setData('show_professionals', e.target.checked)} className="size-4 accent-vs-blue" />
-                            Mostrar profissionais no site
-                        </label>
-                        {services.data.show_professionals && (
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {options.professionals.map((person) => (
-                                    <label key={person.id} className="flex items-center gap-3 rounded-md border border-vs-border/70 px-3 py-2 text-sm text-vs-text">
-                                        <input type="checkbox" checked={services.data.professional_ids.includes(person.id)} disabled={disabled} onChange={() => services.setData('professional_ids', toggle(services.data.professional_ids, person.id))} className="size-4 accent-vs-blue" />
-                                        {person.name}
-                                    </label>
-                                ))}
-                            </div>
-                        )}
-                        {canEdit && <div><Button type="button" disabled={services.processing} onClick={() => services.patch(websiteDraft.url(), { preserveScroll: true })} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar serviços</Button></div>}
-                    </Card>
+                {tab === 'questions' && (
+                    <SiteQuestions
+                        draft={draft}
+                        options={options}
+                        business={business}
+                        location={location}
+                        seoSuggestion={seoSuggestion}
+                        siteUrl={website.canonical_url ?? website.public_url}
+                        segment={segment}
+                        canEdit={canEdit}
+                    />
                 )}
 
                 {tab === 'domains' && (
@@ -321,26 +207,6 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                     </div>
                 )}
 
-                {tab === 'seo' && (
-                    <Card className="grid gap-5 border-vs-border/70 p-6 shadow-sm">
-                        <h2 className="text-base font-semibold text-vs-text">SEO</h2>
-                        <form onSubmit={(e) => { e.preventDefault(); seo.patch(websiteDraft.url(), { preserveScroll: true }); }} className="grid gap-5">
-                            <Field id="seo-title" label="Título da página" error={seo.errors['seo.title']}>
-                                <Input id="seo-title" value={seo.data.seo.title} disabled={disabled} onChange={(e) => seo.setData('seo', { ...seo.data.seo, title: e.target.value })} className="h-10" />
-                            </Field>
-                            <Field id="seo-description" label="Descrição" error={seo.errors['seo.description']} hint="Até 160 caracteres.">
-                                <textarea id="seo-description" rows={2} value={seo.data.seo.description} disabled={disabled} onChange={(e) => seo.setData('seo', { ...seo.data.seo, description: e.target.value })} className="w-full rounded-md border border-input bg-card p-3 text-sm text-vs-text disabled:opacity-60" />
-                            </Field>
-                            <label className="flex items-center gap-3 text-sm text-vs-text">
-                                <input type="checkbox" checked={seo.data.seo.indexable} disabled={disabled} onChange={(e) => seo.setData('seo', { ...seo.data.seo, indexable: e.target.checked })} className="size-4 accent-vs-blue" />
-                                Permitir que buscadores indexem o site
-                            </label>
-                            <p className="text-xs text-vs-muted">Não garantimos posição em buscadores. Prévias nunca são indexadas.</p>
-                            {canEdit && <div><Button type="submit" disabled={seo.processing} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">Salvar SEO</Button></div>}
-                        </form>
-                    </Card>
-                )}
-
                 {tab === 'portal' && <PortalSection portal={portal} canEdit={canEdit} />}
 
                 {tab === 'publish' && (
@@ -348,7 +214,8 @@ export default function WebsiteIndex({ website, draft, options, domains, canEdit
                         <h2 className="text-base font-semibold text-vs-text">Publicação</h2>
                         <p className="text-sm text-vs-muted">Salve as alterações e veja a prévia antes de publicar. Publicar cria uma nova versão; retirar do ar mantém os dados e o histórico.</p>
                         <div className="flex flex-wrap gap-3">
-                            <a href={preview.url()} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center rounded-md border border-vs-border px-4 text-sm font-medium text-vs-text hover:bg-muted">Visualizar prévia</a>
+                            <a href={preview.url()} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center rounded-md border border-vs-border px-4 text-sm font-medium text-vs-text hover:bg-muted">Prévia no computador</a>
+                            <a href={preview.url({ query: { dispositivo: 'celular' } })} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center rounded-md border border-vs-border px-4 text-sm font-medium text-vs-text hover:bg-muted">Prévia no celular</a>
                             {canEdit && (
                                 <Button type="button" className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover" onClick={() => router.post(publish.url(), {}, { preserveScroll: true })}>Publicar</Button>
                             )}
@@ -426,59 +293,6 @@ function SiteNotice({ website }: { website: Props['website'] }) {
         <p role="status" className="rounded-md border border-amber-300 bg-amber-50 p-3 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100">
             {message}
         </p>
-    );
-}
-
-/**
- * Logo or main image of the draft: shows the current one (served only to the company, through the preview), sends a new
- * one or removes it. The server validates type and size and re-encodes the file.
- */
-function ImageField({ kind, label, hint, image, canEdit }: { kind: 'logo' | 'hero'; label: string; hint: string; image: SiteImage | null; canEdit: boolean }) {
-    const form = useForm<{ image: File | null }>({ image: null });
-    const inputId = `image-${kind}`;
-
-    return (
-        <div className="grid content-start gap-3">
-            <p className="text-sm font-medium text-vs-text">{label}</p>
-            <p className="text-xs text-vs-muted">{hint}</p>
-            {image ? (
-                <img
-                    src={previewMedia.url({ file: image.file })}
-                    alt={`${label} atual`}
-                    width={image.width || undefined}
-                    height={image.height || undefined}
-                    className={`rounded-md border border-vs-border/70 bg-muted object-contain ${kind === 'logo' ? 'h-16 w-auto max-w-[200px]' : 'aspect-video w-full max-w-sm object-cover'}`}
-                />
-            ) : (
-                <p className="text-sm text-vs-muted">Nenhuma imagem enviada.</p>
-            )}
-            {canEdit && (
-                <form
-                    onSubmit={(event) => {
-                        event.preventDefault();
-                        form.post(imageStore.url({ kind }), { preserveScroll: true, forceFormData: true, onSuccess: () => form.reset() });
-                    }}
-                    className="grid gap-2"
-                >
-                    <label htmlFor={inputId} className="sr-only">{`Escolher ${label.toLowerCase()}`}</label>
-                    <Input id={inputId} type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => form.setData('image', event.target.files?.[0] ?? null)} className="h-10" aria-invalid={form.errors.image ? true : undefined} aria-describedby={form.errors.image ? `${inputId}-error` : undefined} />
-                    {form.errors.image && <p id={`${inputId}-error`} className="text-sm text-vs-danger">{form.errors.image}</p>}
-                    <div className="flex flex-wrap gap-2">
-                        <Button type="submit" disabled={form.processing || form.data.image === null} className="h-10 bg-vs-blue text-white hover:bg-vs-blue-hover">{form.processing ? 'Enviando…' : 'Enviar'}</Button>
-                        {image && (
-                            <ConfirmAction
-                                trigger={<Button type="button" variant="outline" className="h-10">Remover</Button>}
-                                title={`Remover ${label.toLowerCase()}?`}
-                                description="A imagem sai do rascunho. O site publicado só muda na próxima publicação."
-                                confirmLabel="Remover"
-                                destructive
-                                onConfirm={() => router.delete(imageDestroy.url({ kind }), { preserveScroll: true })}
-                            />
-                        )}
-                    </div>
-                </form>
-            )}
-        </div>
     );
 }
 

@@ -29,6 +29,8 @@ class SiteHostGuard
         '/atendimento' => ['GET', 'HEAD'],
         '/atendimento/conversa' => ['POST'],
         '/atendimento/mensagens' => ['GET', 'HEAD', 'POST'],
+        '/localizacao/municipios' => ['GET', 'HEAD'],
+        '/localizacao/municipio' => ['POST'],
     ];
 
     /**
@@ -41,6 +43,8 @@ class SiteHostGuard
         '/' => ['GET', 'HEAD'],
         '/robots.txt' => ['GET', 'HEAD'],
         '/sitemap.xml' => ['GET', 'HEAD'],
+        '/localizacao/municipios' => ['GET', 'HEAD'],
+        '/localizacao/municipio' => ['POST'],
     ];
 
     /**

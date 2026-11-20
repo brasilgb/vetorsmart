@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Portal;
 
 use App\Http\Controllers\Controller;
 use App\Models\PortalListing;
+use App\Services\Location\MunicipalityDirectory;
 use App\Services\Portal\PortalReferral;
 use App\Services\Portal\PortalSearch;
 use App\Services\Portal\PortalText;
@@ -156,6 +157,20 @@ class PortalController extends Controller
         }
 
         $featured = ! $searched && ! $listAll && ! $invalid ? $this->search->search([], 1, $seed, 6) : null;
+        $hasProviders = $this->search->hasProviders();
+        // The municipality searched, in the registry: it travels to the company site (IBGE code only) and fills its form.
+        $municipality = $filters['cidade'] === null ? null : app(MunicipalityDirectory::class)->fromText($filters['cidade'], $filters['uf']);
+        // Why a search found nothing: no company in the portal at all, no company serving the municipality, or
+        // companies there that do not match the other criteria.
+        $emptyReason = null;
+
+        if ($results !== null && $results->total() === 0) {
+            $emptyReason = match (true) {
+                ! $hasProviders => 'portal',
+                $filters['cidade'] !== null && $this->search->search(['cidade' => $filters['cidade'], 'uf' => $filters['uf']], 1, $seed, 1)->total() === 0 => 'region',
+                default => 'match',
+            };
+        }
         $friendly = $path !== null && $extraFilters === [];
         $indexable = ! $invalid && ! $listAll && (! $searched || ($friendly && $results !== null && $results->total() > 0 && $results->currentPage() === 1));
         $place = $this->place($filters, $citySlug);
@@ -176,6 +191,10 @@ class PortalController extends Controller
             'friendlyHeading' => $path !== null ? $this->heading($categoryName, $place) : null,
             'activeFilters' => $this->activeFilters($filters, $categoryName),
             'suggestions' => $results !== null && $results->total() === 0 ? $this->suggestions($filters, $categoryName) : [],
+            'emptyReason' => $emptyReason,
+            'hasProviders' => $hasProviders,
+            'municipality' => $municipality,
+            'stateCoverage' => $emptyReason === 'region' && $filters['uf'] !== null && $this->search->search(['uf' => $filters['uf']], 1, $seed, 1)->total() > 0,
             'breadcrumbs' => $path === null ? [] : $this->breadcrumbs($categoryName, $place),
             'canonical' => $this->home().($path === null ? '' : ltrim($request->path(), '/')),
             'indexable' => $indexable,
@@ -206,6 +225,10 @@ class PortalController extends Controller
             'friendlyHeading' => null,
             'activeFilters' => [],
             'suggestions' => [],
+            'emptyReason' => null,
+            'hasProviders' => $this->search->hasProviders(),
+            'municipality' => null,
+            'stateCoverage' => false,
             'breadcrumbs' => [],
             'canonical' => $this->home(),
             'indexable' => false,
@@ -242,6 +265,17 @@ class PortalController extends Controller
 
         if (is_string($query['uf'] ?? null)) {
             $query['uf'] = strtoupper(trim($query['uf']));
+        }
+
+        // The municipality field accepts "Salvador do Sul - RS" (as the suggestions and the location button fill it):
+        // the state goes to its own filter, so the address and the search are the same as choosing both apart.
+        if (is_string($query['cidade'] ?? null) && preg_match('/^(.+?)\s*(?:-|,|\/)\s*([A-Za-z]{2})$/u', trim($query['cidade']), $match) === 1 && PortalText::state($match[2]) !== null) {
+            $state = PortalText::state($match[2]);
+
+            if (($query['uf'] ?? '') === '' || $query['uf'] === $state) {
+                $query['cidade'] = trim($match[1]);
+                $query['uf'] = $state;
+            }
         }
 
         return $query;

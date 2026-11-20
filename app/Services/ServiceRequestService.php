@@ -49,6 +49,8 @@ class ServiceRequestService
                 // Campaign tags of the visit (complementary, sanitised again here); written once, at creation.
                 // Only the public channels carry a visit (site form, portal form, assistant); the panel never does.
                 ...$this->campaignTags->sanitise(in_array($origin, [RequestOrigin::PublicSite, RequestOrigin::Portal, RequestOrigin::Ai], true) && is_array($attributes['campaign'] ?? null) ? $attributes['campaign'] : []),
+                // Municipality confirmed by the visitor (IBGE code only); the panel may also inform it.
+                'municipality_id' => is_int($attributes['municipality_id'] ?? null) ? $attributes['municipality_id'] : null,
                 'priority' => $attributes['priority'] ?? RequestPriority::Normal,
                 'status' => RequestStatus::Requested,
                 'created_by_user_id' => $actor?->getKey(),

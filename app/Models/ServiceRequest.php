@@ -32,6 +32,7 @@ use Illuminate\Validation\ValidationException;
  * @property string|null $utm_source campaign tags of the visit (complementary, declared by the link; never a portal proof)
  * @property string|null $utm_medium
  * @property string|null $utm_campaign
+ * @property int|null $municipality_id municipality of the service confirmed by the visitor (IBGE code); null = unknown
  * @property RequestPriority $priority
  * @property RequestStatus $status
  * @property string|null $closing_reason
@@ -43,11 +44,19 @@ use Illuminate\Validation\ValidationException;
  * @property Carbon|null $realized_amount_recorded_at
  * @property int|null $realized_amount_recorded_by
  */
-#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'discovery', 'utm_source', 'utm_medium', 'utm_campaign', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at', 'assigned_user_id', 'assigned_at', 'realized_amount_cents', 'realized_amount_recorded_at', 'realized_amount_recorded_by'])]
+#[Fillable(['tenant_id', 'customer_id', 'service_id', 'professional_id', 'description', 'origin', 'discovery', 'utm_source', 'utm_medium', 'utm_campaign', 'municipality_id', 'priority', 'status', 'closing_reason', 'created_by_user_id', 'closed_at', 'assigned_user_id', 'assigned_at', 'realized_amount_cents', 'realized_amount_recorded_at', 'realized_amount_recorded_by'])]
 class ServiceRequest extends Model
 {
     /** @use HasFactory<ServiceRequestFactory> */
     use BelongsToTenant, HasFactory;
+
+    /**
+     * @return BelongsTo<Municipality, $this>
+     */
+    public function municipality(): BelongsTo
+    {
+        return $this->belongsTo(Municipality::class);
+    }
 
     /**
      * @return BelongsTo<Customer, $this>

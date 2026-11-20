@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Site;
 
 use App\Enums\DomainKind;
 use App\Http\Controllers\Controller;
-use App\Models\AssistantSetting;
 use App\Models\Tenant;
+use App\Services\Location\VisitorMunicipality;
 use App\Services\Portal\PortalReferral;
 use App\Services\Websites\CampaignTags;
+use App\Services\Websites\OnlineService;
 use App\Services\Websites\PublicSiteAddress;
 use App\Services\Websites\SegmentTheme;
 use App\Services\Websites\WebsiteResolver;
@@ -230,7 +231,7 @@ class SiteController extends Controller
      */
     private function render(Tenant $tenant, array $content, string $page, string $base, bool $onCustomDomain): Response
     {
-        $assistantEnabled = (bool) AssistantSetting::query()->forTenant($tenant)->value('enabled');
+        $online = app(OnlineService::class)->mode($tenant);
         $home = $onCustomDomain ? $base.'/' : $base;
         $noindex = $tenant->isHomolog() || ! ($content['seo']['indexable'] ?? true);
 
@@ -239,6 +240,8 @@ class SiteController extends Controller
         // request form and the assistant read that record (PortalReferral), never a parameter of the browser.
         app(PortalReferral::class)->capture(request(), $tenant);
         app(CampaignTags::class)->capture(request(), $tenant);
+        // The municipality the visitor confirmed in the portal travels as its IBGE code only and fills the request form.
+        app(VisitorMunicipality::class)->capture(request(), $tenant);
         // The service chosen in the portal pre-selects the main request button, only when this company published it.
         $chosen = request()->integer('servico');
         $preferredService = collect((array) ($content['services'] ?? []))->contains(fn (mixed $service): bool => is_array($service) && ($service['id'] ?? null) === $chosen) ? $chosen : null;
@@ -254,10 +257,11 @@ class SiteController extends Controller
             'preview' => false,
             'preferredService' => $preferredService,
             'page' => $page,
+            'online' => $online,
             'links' => [
                 'home' => $home,
                 'services' => empty($content['services'] ?? []) ? null : $base.'/servicos',
-                'assistant' => $assistantEnabled ? $base.'/atendimento' : null,
+                'assistant' => $online !== null ? $base.'/atendimento' : null,
                 'request' => $base.'/solicitar',
             ],
         ]);

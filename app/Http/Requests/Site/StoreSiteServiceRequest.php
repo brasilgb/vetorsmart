@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\Site;
 
+use App\Models\Municipality;
 use App\Services\Assistant\AssistantText;
+use App\Services\Location\MunicipalityDirectory;
+use App\Services\Portal\PortalText;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -27,6 +30,8 @@ class StoreSiteServiceRequest extends FormRequest
             'website' => ['nullable', 'string', 'max:200'],
             'origem' => ['nullable', 'string', 'in:portal'],
             'envio' => ['nullable', 'string', 'size:40', 'alpha_num:ascii'],
+            'municipality' => ['required', 'string', 'max:80'],
+            'municipality_id' => ['nullable', 'integer'],
         ];
     }
 
@@ -45,6 +50,11 @@ class StoreSiteServiceRequest extends FormRequest
                     $validator->errors()->add('phone', 'Informe um telefone com DDD.');
                 }
             },
+            function (Validator $validator): void {
+                if (! $validator->errors()->has('municipality') && $this->municipality() === null) {
+                    $validator->errors()->add('municipality', 'Escolha o município na lista, por exemplo: Salvador do Sul - RS.');
+                }
+            },
         ];
     }
 
@@ -57,11 +67,28 @@ class StoreSiteServiceRequest extends FormRequest
     }
 
     /**
+     * The municipality chosen in the form: the registry entry of the selected suggestion when its name is still the one
+     * in the field, otherwise the text read as "Município - UF". Null when it is not a municipality of the registry.
+     */
+    public function municipality(): ?Municipality
+    {
+        $directory = app(MunicipalityDirectory::class);
+        $text = (string) $this->input('municipality');
+        $chosen = $directory->find($this->input('municipality_id'));
+
+        if ($chosen !== null && PortalText::normalize($chosen->inputLabel()) === PortalText::normalize($text)) {
+            return $chosen;
+        }
+
+        return $directory->fromText($text);
+    }
+
+    /**
      * @return array<string, string>
      */
     public function attributes(): array
     {
-        return ['name' => 'nome', 'phone' => 'telefone', 'email' => 'e-mail', 'description' => 'descrição', 'consent' => 'autorização de contato'];
+        return ['name' => 'nome', 'phone' => 'telefone', 'email' => 'e-mail', 'description' => 'descrição', 'consent' => 'autorização de contato', 'municipality' => 'município'];
     }
 
     /**
@@ -69,6 +96,6 @@ class StoreSiteServiceRequest extends FormRequest
      */
     public function messages(): array
     {
-        return ['consent.accepted' => 'Autorize o contato para enviar a solicitação.'];
+        return ['consent.accepted' => 'Autorize o contato para enviar a solicitação.', 'municipality.required' => 'Informe o município do atendimento.'];
     }
 }

@@ -57,7 +57,7 @@ function journeyRequest(string $token, int $serviceId): void
     test()->get('/climatizacao/clima-total/solicitar?'.app(PortalReferral::class)->query($tenant->id))->assertOk();
 
     test()->post('/climatizacao/clima-total/solicitar', [
-        'name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1',
+        'name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1', 'municipality' => 'Campinas - SP',
         'service_id' => $serviceId, 'envio' => $token,
     ])->assertSessionHas('site_request_sent', true);
 }
@@ -133,7 +133,7 @@ test('a second send while the first is still registering never confirms and crea
     $lock = Cache::lock('site-request:'.$this->tenant->id.':'.hash('sha256', $token).':lock', 15);
     $lock->get();
 
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1', 'envio' => $token])
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1', 'municipality' => 'Campinas - SP', 'envio' => $token])
         ->assertSessionHasErrors(['envio' => 'Sua solicitação ainda está sendo registrada. Aguarde alguns segundos e tente novamente.'])
         ->assertSessionMissing('site_request_sent');
     expect(ServiceRequest::query()->count())->toBe(0);

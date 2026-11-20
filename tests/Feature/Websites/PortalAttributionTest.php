@@ -43,7 +43,7 @@ beforeEach(function () {
 
 function sendFromSite(): void
 {
-    test()->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1'])
+    test()->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'description' => 'Instalar um split.', 'consent' => '1', 'municipality' => 'Campinas - SP'])
         ->assertSessionHas('site_request_sent', true);
 }
 

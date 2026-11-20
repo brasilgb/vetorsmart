@@ -34,6 +34,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->encryptCookies(except: ['appearance', 'sidebar_state']);
 
+        // "Usar minha localização" only answers which municipality a position is in: no session, no record, no company.
+        $middleware->validateCsrfTokens(except: ['localizacao/municipio']);
+
         // Every response, including errors and the API.
         $middleware->append(SecurityHeaders::class);
         $middleware->append(ContentSecurityPolicy::class);

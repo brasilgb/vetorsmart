@@ -120,6 +120,10 @@ class AppServiceProvider extends ServiceProvider
         // Regional Portal search: generous for people, short enough to make scraping the directory slow.
         RateLimiter::for('portal-search', fn (Request $request): Limit => Limit::perMinute(60)->by('portal:'.$request->ip()));
 
+        // Municipality lookups of the portal and the sites: suggestions while typing, and "Usar minha localização".
+        RateLimiter::for('location-suggest', fn (Request $request): Limit => Limit::perMinute(90)->by('location-suggest:'.$request->ip()));
+        RateLimiter::for('location-locate', fn (Request $request): Limit => Limit::perMinute(max(1, (int) config('geolocation.visitor_per_minute', 6)))->by('location-locate:'.$request->ip()));
+
         // Request form of a public site: a few sends per visitor and company, so the triage queue cannot be flooded.
         RateLimiter::for('site-request', function (Request $request): array {
             $site = is_string($request->route('segment')) ? $request->route('segment').'/'.$request->route('company') : $request->getHost();

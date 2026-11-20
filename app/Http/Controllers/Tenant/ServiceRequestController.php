@@ -167,7 +167,7 @@ class ServiceRequestController extends Controller
 
         $this->authorize('view', $record);
 
-        $record->load(['assignee:id,name', 'customer:id,name,phone,whatsapp', 'service:id,name,duration_minutes', 'professional:id,name', 'events.user:id,name', 'appointments.professional:id,name', ...ServiceRequest::attendanceRelations($record->tenant_id)]);
+        $record->load(['assignee:id,name', 'customer:id,name,phone,whatsapp', 'service:id,name,duration_minutes', 'professional:id,name', 'events.user:id,name', 'appointments.professional:id,name', 'municipality', ...ServiceRequest::attendanceRelations($record->tenant_id)]);
 
         $tenant = $context->requireTenant();
 
@@ -178,6 +178,8 @@ class ServiceRequestController extends Controller
                 'origin' => $record->origin->label(),
                 'origin_value' => $record->origin->value,
                 ...$record->traceability(),
+                // Municipality the visitor confirmed in the request form (IBGE registry), when known.
+                'municipality' => $record->municipality?->label(),
                 'closing_reason' => $record->closing_reason,
                 'customer_phone' => $record->customer->whatsapp ?? $record->customer->phone,
                 'service_id' => $record->service_id,

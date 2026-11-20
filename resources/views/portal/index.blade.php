@@ -4,7 +4,11 @@
     use Illuminate\Support\Facades\Vite;
 
     $value = fn (string $field): string => (string) ($filters[$field] ?? '');
-    $moreOpen = $value('categoria') !== '' || $value('nome') !== '' || $searchErrors->has('nome') || $searchErrors->has('categoria');
+    $moreOpen = $value('categoria') !== '' || $value('nome') !== '' || ($value('uf') !== '' && $value('cidade') === '') || $searchErrors->has('nome') || $searchErrors->has('categoria') || $searchErrors->has('uf');
+    $municipality = $municipality ?? null;
+    $emptyReason = $emptyReason ?? null;
+    $hasProviders = $hasProviders ?? true;
+    $stateCoverage = $stateCoverage ?? false;
     $tokens = PortalText::tokens($filters['q'] ?? null);
     $icons = [
         'search' => 'M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14zM21 21l-4.35-4.35',
@@ -141,7 +145,18 @@
         nav.crumbs [aria-current="page"] { color: #F8FAFC; font-weight: 600; }
         form.search { background: var(--card); color: var(--text); border-radius: 16px; padding: 14px; display: grid; gap: 12px; box-shadow: 0 8px 24px rgba(2, 6, 23, .25); }
         .row { display: grid; gap: 12px; }
-        @media (min-width: 760px) { .row.main { grid-template-columns: minmax(0, 1.7fr) 110px minmax(0, 1.3fr) auto; align-items: start; } .row.main > .submit { padding-top: calc(.9rem * 1.55 + 6px); } .row.more { grid-template-columns: 1fr 1fr; } }
+        @media (min-width: 860px) { .row.main { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1.6fr) auto; align-items: start; } .row.main > .submit { padding-top: calc(.9rem * 1.55 + 6px); } .row.more { grid-template-columns: 1fr 1fr 1fr; } }
+        .municipality-field label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
+        .municipality-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .municipality-row input { flex: 1 1 200px; width: auto; }
+        .municipality-field .hint { margin: 6px 0 0; color: var(--muted); font-size: .84rem; }
+        button.locate { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--input); background: var(--card); color: var(--text); font: inherit; font-weight: 600; font-size: .92rem; cursor: pointer; flex: 0 0 auto; }
+        button.locate:hover { border-color: var(--brand); }
+        button.locate[disabled] { opacity: .8; cursor: progress; }
+        .locate-status p { margin: 8px 0 0; font-size: .92rem; }
+        button.link-button { background: none; border: 0; padding: 4px 2px; color: var(--link); text-decoration: underline; font: inherit; font-weight: 700; cursor: pointer; }
+        a.clear-inline { font-weight: 600; }
+        @media (max-width: 520px) { button.locate { width: 100%; } }
         .field label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: 6px; }
         .field .hint { margin: 6px 0 0; color: var(--muted); font-size: .84rem; }
         .control { position: relative; }
@@ -212,7 +227,12 @@
         .card .about { margin: 0; color: var(--muted); }
         .card .match { margin: 0; display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text); }
         .card .match .icon { width: 18px; height: 18px; color: var(--success); }
-        .card .served { margin: 0; font-size: .9rem; padding: 6px 10px; border-radius: 10px; background: var(--surface); border: 1px solid var(--border); }
+        .card ul.places { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: .94rem; }
+        .card ul.places li { display: flex; align-items: center; gap: 6px; }
+        .card ul.places .icon { width: 18px; height: 18px; color: var(--accent-icon); }
+        .card ul.places li.served-here { font-weight: 600; }
+        .card ul.places li.served-here .icon { color: var(--success); }
+        .card .services-title { margin: 0; font-size: .86rem; font-weight: 600; color: var(--muted); }
         .card .region { margin: 0; font-size: .92rem; }
         .card ul.services { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px; }
         .card ul.services li { font-size: .86rem; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); }
@@ -302,28 +322,16 @@
                     @if ($searchErrors->has('q'))<p class="field-error" id="q-error">{{ $searchErrors->first('q') }}</p>@endif
                 </div>
                 <div class="field">
-                    <label for="uf">UF</label>
-                    <select id="uf" name="uf" data-state-select @if ($searchErrors->has('uf')) aria-invalid="true" aria-describedby="uf-error" @endif>
-                        <option value="">Todas</option>
-                        @foreach ($states as $state)
-                            <option value="{{ $state }}" @selected($value('uf') === $state)>{{ $state }}</option>
-                        @endforeach
-                    </select>
-                    @if ($searchErrors->has('uf'))<p class="field-error" id="uf-error">{{ $searchErrors->first('uf') }}</p>@endif
-                </div>
-                <div class="field">
-                    <label for="cidade">Município</label>
-                    <div class="control">
-                        {!! $icon($icons['pin']) !!}
-                        <input id="cidade" name="cidade" type="text" value="{{ $value('cidade') }}" maxlength="80" list="cidades" placeholder="Ex.: Campinas" autocomplete="address-level2" aria-describedby="cidade-hint{{ $searchErrors->has('cidade') ? ' cidade-error' : '' }}" @if ($searchErrors->has('cidade')) aria-invalid="true" @endif>
-                    </div>
-                    <datalist id="cidades" data-city-list>
-                        @foreach ($places as $item)
-                            <option value="{{ $item['city'] }}" data-uf="{{ $item['state'] }}">{{ $item['city'] }} - {{ $item['state'] }}</option>
-                        @endforeach
-                    </datalist>
-                    <p class="hint" id="cidade-hint">Sugestões de municípios com empresas participantes.</p>
-                    @if ($searchErrors->has('cidade'))<p class="field-error" id="cidade-error">{{ $searchErrors->first('cidade') }}</p>@endif
+                    @include('website.partials.municipality-field', [
+                        'fieldId' => 'cidade',
+                        'fieldName' => 'cidade',
+                        'idName' => false,
+                        'label' => 'Em qual município?',
+                        'value' => $municipality?->inputLabel() ?? trim($value('cidade').($value('cidade') !== '' && $value('uf') !== '' ? ' - '.$value('uf') : '')),
+                        'municipalityId' => $municipality?->id,
+                        'error' => $searchErrors->first('cidade') ?: null,
+                        'hint' => 'Mostramos empresas com sede no município e as que atendem nele.',
+                    ])
                 </div>
                 <div class="submit"><button class="btn primary" type="submit" data-search-button style="width:100%">{!! $icon($icons['search']) !!}<span data-search-label>Encontrar profissionais</span></button></div>
             </div>
@@ -345,7 +353,20 @@
                         <input id="nome" name="nome" type="text" value="{{ $value('nome') }}" maxlength="80" autocomplete="off" @if ($searchErrors->has('nome')) aria-invalid="true" aria-describedby="nome-error" @endif>
                         @if ($searchErrors->has('nome'))<p class="field-error" id="nome-error">{{ $searchErrors->first('nome') }}</p>@endif
                     </div>
+                    <div class="field">
+                        <label for="uf">Estado (sem município)</label>
+                        <select id="uf" name="uf" data-state-select @if ($searchErrors->has('uf')) aria-invalid="true" aria-describedby="uf-error" @endif>
+                            <option value="">Todos</option>
+                            @foreach ($states as $state)
+                                <option value="{{ $state }}" @selected($value('uf') === $state)>{{ PortalText::STATE_NAMES[$state] ?? $state }}</option>
+                            @endforeach
+                        </select>
+                        @if ($searchErrors->has('uf'))<p class="field-error" id="uf-error">{{ $searchErrors->first('uf') }}</p>@endif
+                    </div>
                 </div>
+                @if (array_filter($filters) !== [])
+                    <p style="margin:10px 0 0"><a href="/" class="clear-inline">Limpar todos os filtros</a></p>
+                @endif
             </details>
         </form>
 
@@ -391,19 +412,36 @@
 
                 @if ($results->total() === 0)
                     <div class="notice" role="status">
-                        <h2>Nenhum profissional encontrado</h2>
-                        <p>Ainda não há empresas participantes com esses critérios. Experimente ampliar a busca:</p>
-                        <ul>
-                            @foreach ($suggestions as $suggestion)
-                                <li><a href="{{ $suggestion['url'] }}">{{ $suggestion['label'] }}</a></li>
-                            @endforeach
-                        </ul>
+                        @if ($emptyReason === 'portal')
+                            <h2>O portal ainda não tem empresas participantes</h2>
+                            <p>As primeiras empresas da sua região estão se cadastrando. Volte em breve ou conheça como funciona.</p>
+                            <ul><li><a href="/#como-funciona">Como funciona o Portal Regional</a></li></ul>
+                        @elseif ($emptyReason === 'region')
+                            <h2>Ainda não há empresas que atendem em {{ $municipality?->label() ?? $filters['cidade'] }}</h2>
+                            <p>Nenhuma empresa participante tem sede ou atende neste município por enquanto.</p>
+                            <ul>
+                                <li><a href="#cidade" data-focus-municipality>Trocar o município</a></li>
+                                @if ($stateCoverage)
+                                    <li><a href="/regioes/{{ strtolower((string) $filters['uf']) }}{{ $keepText }}">Ampliar a busca para {{ PortalText::STATE_NAMES[$filters['uf']] ?? $filters['uf'] }}</a></li>
+                                @endif
+                                <li><a href="/?pagina=1">Ver todas as empresas do portal</a></li>
+                            </ul>
+                        @else
+                            <h2>Nenhuma empresa corresponde à sua busca</h2>
+                            <p>Há empresas {{ $filters['cidade'] !== null ? 'que atendem em '.($municipality?->label() ?? $filters['cidade']) : 'no portal' }}, mas nenhuma com todos esses critérios. Experimente:</p>
+                            <ul>
+                                @foreach ($suggestions as $suggestion)
+                                    <li><a href="{{ $suggestion['url'] }}">{{ $suggestion['label'] }}</a></li>
+                                @endforeach
+                                <li><a href="/">Limpar os filtros</a></li>
+                            </ul>
+                        @endif
                     </div>
                 @else
                     <p class="summary" role="status">
                         {{ $results->total() }} {{ $results->total() === 1 ? 'profissional encontrado' : 'profissionais encontrados' }}@if ($results->lastPage() > 1) · página {{ $results->currentPage() }} de {{ $results->lastPage() }}@endif
                     </p>
-                    @include('portal.partials.cards', ['listings' => $results, 'tokens' => $tokens])
+                    @include('portal.partials.cards', ['listings' => $results, 'tokens' => $tokens, 'municipality' => $municipality])
 
                     @if ($results->lastPage() > 1)
                         <nav class="pages" aria-label="Páginas de resultados">
@@ -456,11 +494,12 @@
             </div>
             @if ($featured->total() === 0)
                 <div class="notice">
-                    <h2 style="font-size:1.05rem">As primeiras empresas estão chegando</h2>
-                    <p>Ainda não há empresas participantes no portal. Volte em breve.</p>
+                    <h2 style="font-size:1.05rem">O portal ainda não tem empresas participantes</h2>
+                    <p>As primeiras empresas estão chegando. Volte em breve ou veja abaixo como funciona.</p>
+                    <ul><li><a href="#como-funciona">Como funciona o Portal Regional</a></li></ul>
                 </div>
             @else
-                @include('portal.partials.cards', ['listings' => $featured, 'tokens' => []])
+                @include('portal.partials.cards', ['listings' => $featured, 'tokens' => [], 'municipality' => null])
                 @if ($featured->total() > $featured->count())
                     <p style="margin-top:16px"><a class="btn secondary" href="/?pagina=1">Ver todos os profissionais {!! $icon($icons['arrow']) !!}</a></p>
                 @endif
@@ -563,20 +602,10 @@
             });
         }
 
-        // Municipality suggestions follow the chosen state.
-        var stateSelect = document.querySelector('[data-state-select]');
-        var cityList = document.querySelector('[data-city-list]');
-        if (stateSelect && cityList) {
-            var allCities = Array.prototype.slice.call(cityList.querySelectorAll('option'));
-            var filterCities = function () {
-                cityList.innerHTML = '';
-                allCities.forEach(function (option) {
-                    if (stateSelect.value === '' || option.getAttribute('data-uf') === stateSelect.value) { cityList.appendChild(option); }
-                });
-            };
-            stateSelect.addEventListener('change', filterCities);
-            filterCities();
-        }
+        // "Trocar o município" puts the cursor in the municipality field.
+        Array.prototype.forEach.call(document.querySelectorAll('[data-focus-municipality]'), function (link) {
+            link.addEventListener('click', function (event) { var field = document.getElementById('cidade'); if (field) { event.preventDefault(); field.focus(); field.select(); } });
+        });
 
         // Search: empty fields stay out of the address, and the button shows the search is running.
         var form = document.querySelector('[data-search-form]');
@@ -600,5 +629,6 @@
         });
     })();
 </script>
+@include('website.partials.municipality-script')
 </body>
 </html>

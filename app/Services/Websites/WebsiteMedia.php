@@ -23,9 +23,12 @@ class WebsiteMedia
      *
      * @var array<string, int>
      */
-    public const array MAX_WIDTH = ['logo' => 600, 'hero' => 1600];
+    public const array MAX_WIDTH = ['logo' => 600, 'hero' => 1600, 'about' => 1200, 'service' => 900];
 
-    public const string FILE_PATTERN = '(?:logo|hero)-[a-z0-9]{40}\.webp';
+    /** Kinds of image a company may send: logo, main image, "Quem somos" photo and photo of a service. */
+    public const array KINDS = ['logo', 'hero', 'about', 'service'];
+
+    public const string FILE_PATTERN = '(?:logo|hero|about|service)-[a-z0-9]{40}\.webp';
 
     /**
      * @return array{file: string, width: int, height: int}
@@ -83,13 +86,35 @@ class WebsiteMedia
      */
     public function isReferenced(array $content, string $file): bool
     {
-        foreach (['logo', 'hero'] as $kind) {
-            if (is_array($content[$kind] ?? null) && ($content[$kind]['file'] ?? null) === $file) {
-                return true;
+        return in_array($file, $this->referencedFiles($content), true);
+    }
+
+    /**
+     * Every image a draft or a published version uses: logo, main image, "Quem somos" photo and the photos of the
+     * services (service_details in a draft, services[].photo in a published version).
+     *
+     * @param  array<string, mixed>  $content
+     * @return list<string>
+     */
+    public function referencedFiles(array $content): array
+    {
+        $files = [];
+
+        foreach (['logo', 'hero', 'about_photo'] as $key) {
+            if (is_array($content[$key] ?? null) && is_string($content[$key]['file'] ?? null)) {
+                $files[] = $content[$key]['file'];
             }
         }
 
-        return false;
+        foreach ([(array) ($content['service_details'] ?? []), (array) ($content['services'] ?? [])] as $items) {
+            foreach ($items as $item) {
+                if (is_array($item) && is_array($item['photo'] ?? null) && is_string($item['photo']['file'] ?? null)) {
+                    $files[] = $item['photo']['file'];
+                }
+            }
+        }
+
+        return $files;
     }
 
     /**

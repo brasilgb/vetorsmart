@@ -2,11 +2,14 @@
 
 namespace App\Services\Portal;
 
+use App\Models\Municipality;
 use App\Models\PortalListing;
 use App\Models\Tenant;
 use App\Models\TenantWebsite;
 use App\Models\WebsiteVersion;
+use App\Services\Location\MunicipalityDirectory;
 use App\Services\Websites\WebsiteMedia;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -32,13 +35,27 @@ class PortalDirectory
         }
 
         $tenant->loadMissing('segment');
+        $areas = $entry['areas'];
+        unset($entry['areas']);
 
-        return PortalListing::query()->updateOrCreate(['tenant_id' => $tenant->getKey()], [
-            ...$entry,
-            'website_version_id' => (int) $website->published_version_id,
-            'segment_id' => $tenant->segment_id,
-            'segment_search' => PortalText::normalize($tenant->segment?->name),
-        ]);
+        return DB::transaction(function () use ($tenant, $website, $entry, $areas): PortalListing {
+            $listing = PortalListing::query()->updateOrCreate(['tenant_id' => $tenant->getKey()], [
+                ...$entry,
+                'website_version_id' => (int) $website->published_version_id,
+                'segment_id' => $tenant->segment_id,
+                'segment_search' => PortalText::normalize($tenant->segment?->name),
+            ]);
+
+            // Municipalities served, from the published version only; the search reads them by municipality.
+            DB::table('portal_listing_areas')->where('portal_listing_id', $listing->getKey())->delete();
+            DB::table('portal_listing_areas')->insert(array_map(fn (int $municipality): array => [
+                'portal_listing_id' => $listing->getKey(),
+                'tenant_id' => $tenant->getKey(),
+                'municipality_id' => $municipality,
+            ], $areas));
+
+            return $listing;
+        });
     }
 
     /**
@@ -107,6 +124,18 @@ class PortalDirectory
         $headline = trim((string) ($content['headline'] ?? ''));
         $summary = $about !== '' ? Str::limit((string) preg_replace('/\s+/', ' ', $about), 220) : ($headline !== '' ? Str::limit($headline, 220) : null);
         $region = trim((string) ($content['service_region'] ?? ''));
+        $location = is_array($content['location'] ?? null) ? $content['location'] : [];
+        $directory = app(MunicipalityDirectory::class);
+        $base = $directory->find(is_array($location['base'] ?? null) ? ($location['base']['id'] ?? null) : null) ?? $directory->byName($city, $state);
+        $areas = array_values(array_unique(array_map(
+            fn (Municipality $municipality): int => (int) $municipality->id,
+            $directory->many(array_map(fn ($item): int => is_array($item) ? (int) ($item['id'] ?? 0) : 0, (array) ($location['served'] ?? []))),
+        )));
+        $areas = array_values(array_filter($areas, fn (int $id): bool => $base === null || $id !== (int) $base->id));
+        // The listing shows the served municipalities as its region when there is no free-text region.
+        if ($region === '' && $areas !== []) {
+            $region = implode(', ', array_map(fn ($item): string => is_array($item) ? (string) ($item['name'] ?? '') : '', array_slice((array) ($location['served'] ?? []), 0, 12)));
+        }
         $logo = is_array($content['logo'] ?? null) && is_string($content['logo']['file'] ?? null) && preg_match('/^'.WebsiteMedia::FILE_PATTERN.'$/', $content['logo']['file']) === 1
             ? ['file' => $content['logo']['file'], 'width' => (int) ($content['logo']['width'] ?? 0), 'height' => (int) ($content['logo']['height'] ?? 0)]
             : null;
@@ -117,6 +146,8 @@ class PortalDirectory
             'city' => Str::limit($city, 117),
             'city_search' => Str::limit(PortalText::normalize($city), 117, ''),
             'state' => $state,
+            'municipality_id' => $base?->id,
+            'areas' => $areas,
             'region' => $region === '' ? null : Str::limit($region, 250),
             'region_search' => Str::limit(PortalText::normalize($region), 250, ''),
             'summary' => $summary,

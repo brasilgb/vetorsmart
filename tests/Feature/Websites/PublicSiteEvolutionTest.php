@@ -136,16 +136,24 @@ test('the home shows the segment theme, the service region, the request actions 
         ->assertSee('Atendemos: Campinas e região')
         ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar"', false)
         ->assertSee('href="https://vetorsmart.com.br/climatizacao/clima-total/solicitar?servico='.$this->service->id.'"', false)
-        ->assertSee('Agendar online')
+        // The assistant is on but no professional has availability: it chats, it does not promise a schedule.
+        ->assertSee('Atendimento online')
+        ->assertDontSee('Agendar online')
         ->assertSee('R$ 250,00')
         ->assertSee('<meta property="og:image" content="https://vetorsmart.com.br/climatizacao/clima-total/midia/'.$hero.'">', false)
         ->assertSee('"areaServed":"Campinas e região"', false);
+
+    $professional = Professional::factory()->create(['tenant_id' => $this->tenant->id]);
+    $professional->services()->attach($this->service->id, ['tenant_id' => $this->tenant->id]);
+    ProfessionalAvailability::create(['tenant_id' => $this->tenant->id, 'professional_id' => $professional->id, 'weekday' => 1, 'start_time' => '08:00:00', 'end_time' => '12:00:00']);
+
+    $this->get('/climatizacao/clima-total')->assertOk()->assertSee('Agendar online');
 });
 
 test('prices can be hidden from the site without hiding the services', function () {
     publishSiteWith([$this->service->id], showPrices: false);
 
-    $this->get('/climatizacao/clima-total/servicos')->assertOk()->assertSee('Instalação de split')->assertDontSee('R$ 250,00');
+    $this->get('/climatizacao/clima-total/servicos')->assertOk()->assertSee('Instalação de split')->assertDontSee('R$ 250,00')->assertSee('Sob consulta');
 });
 
 test('a visitor request enters the triage queue of the right company, with the chosen published service', function () {
@@ -160,7 +168,7 @@ test('a visitor request enters the triage queue of the right company, with the c
 
     $this->post('/climatizacao/clima-total/solicitar', [
         'name' => 'Maria Souza', 'phone' => '(19) 98888-7777', 'email' => 'maria@example.com',
-        'service_id' => $this->service->id, 'description' => 'Instalar um split de 12 mil BTUs.', 'consent' => '1',
+        'service_id' => $this->service->id, 'description' => 'Instalar um split de 12 mil BTUs.', 'consent' => '1', 'municipality' => 'Campinas - SP',
     ])->assertRedirect('https://vetorsmart.com.br/climatizacao/clima-total/solicitar');
 
     $request = ServiceRequest::query()->sole();
@@ -173,7 +181,7 @@ test('a visitor request enters the triage queue of the right company, with the c
 
     $this->get('/climatizacao/clima-total/solicitar')->assertSee('Solicitação recebida.');
 
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'João', 'phone' => '19977776666', 'service_id' => $hidden->id, 'description' => 'Outro pedido aqui.', 'consent' => '1']);
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'João', 'phone' => '19977776666', 'service_id' => $hidden->id, 'description' => 'Outro pedido aqui.', 'consent' => '1', 'municipality' => 'Campinas - SP']);
     expect(ServiceRequest::query()->latest('id')->first()->only(['status', 'service_id']))->toBe(['status' => RequestStatus::Requested, 'service_id' => null]);
 });
 
@@ -184,18 +192,18 @@ test('the request form refuses invalid data, ignores robots and limits repeated 
     $this->from('/climatizacao/clima-total/solicitar')->post('/climatizacao/clima-total/solicitar', ['name' => 'Ana', 'phone' => '123', 'description' => 'Preciso de ajuda.'])
         ->assertSessionHasErrors(['phone' => 'Informe um telefone com DDD.', 'consent' => 'Autorize o contato para enviar a solicitação.']);
 
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Robô', 'phone' => '19977776666', 'description' => 'Spam spam spam.', 'consent' => '1', 'website' => 'https://spam.example'])
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Robô', 'phone' => '19977776666', 'description' => 'Spam spam spam.', 'consent' => '1', 'municipality' => 'Campinas - SP', 'website' => 'https://spam.example'])
         ->assertRedirect()->assertSessionHas('site_request_sent', true);
     expect(ServiceRequest::query()->count())->toBe(0);
 
-    $valid = ['name' => 'Ana Lima', 'phone' => '19977776666', 'description' => 'Preciso de manutenção.', 'consent' => '1'];
+    $valid = ['name' => 'Ana Lima', 'phone' => '19977776666', 'description' => 'Preciso de manutenção.', 'consent' => '1', 'municipality' => 'Campinas - SP'];
     $this->post('/climatizacao/clima-total/solicitar', $valid)->assertRedirect();
     $this->post('/climatizacao/clima-total/solicitar', $valid)->assertStatus(429);
 });
 
 test('the request form does not exist for a site that is not live, and is never in the sitemap', function () {
     $this->get('/climatizacao/clima-total/solicitar')->assertNotFound();
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Ana Lima', 'phone' => '19977776666', 'description' => 'Preciso de ajuda.', 'consent' => '1'])->assertNotFound();
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Ana Lima', 'phone' => '19977776666', 'description' => 'Preciso de ajuda.', 'consent' => '1', 'municipality' => 'Campinas - SP'])->assertNotFound();
     expect(ServiceRequest::query()->count())->toBe(0);
 
     publishSiteWith([$this->service->id]);
@@ -227,7 +235,7 @@ test('a request from the site follows triage and scheduling, respecting the prof
     publishSiteWith([$this->service->id]);
     auth()->logout();
 
-    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'service_id' => $this->service->id, 'description' => 'Instalar um split.', 'consent' => '1']);
+    $this->post('/climatizacao/clima-total/solicitar', ['name' => 'Maria Souza', 'phone' => '19988887777', 'service_id' => $this->service->id, 'description' => 'Instalar um split.', 'consent' => '1', 'municipality' => 'Campinas - SP']);
     $request = ServiceRequest::query()->sole();
 
     $this->actingAs($this->owner)->post(route('tenant.requests.schedule', $request), ['professional_id' => $professional->id, 'starts_at' => $monday->setTime(14, 0)->format('Y-m-d H:i')])

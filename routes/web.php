@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\LandingController;
+use App\Http\Controllers\LocationController;
 use App\Http\Controllers\Portal\PortalController;
 use App\Http\Controllers\Site\AssistantController;
 use App\Http\Controllers\Site\SiteController;
@@ -29,6 +30,8 @@ Route::domain((string) config('platform.portal_host'))->group(function () {
         ->name('portal.region');
     Route::get('/robots.txt', [PortalController::class, 'robots'])->name('portal.robots');
     Route::get('/sitemap.xml', [PortalController::class, 'sitemap'])->name('portal.sitemap');
+    Route::get('/localizacao/municipios', [LocationController::class, 'suggestions'])->middleware('throttle:location-suggest')->name('portal.location.suggest');
+    Route::post('/localizacao/municipio', [LocationController::class, 'locate'])->middleware('throttle:location-locate')->name('portal.location.locate');
 });
 
 /*
@@ -56,6 +59,8 @@ Route::domain('{siteHost}')
         Route::post('/atendimento/conversa', [AssistantController::class, 'start'])->middleware('throttle:assistant-public')->name('site.host.assistant.start');
         Route::get('/atendimento/mensagens', [AssistantController::class, 'messages'])->middleware('throttle:assistant-public')->name('site.host.assistant.messages');
         Route::post('/atendimento/mensagens', [AssistantController::class, 'send'])->middleware('throttle:assistant-public')->name('site.host.assistant.send');
+        Route::get('/localizacao/municipios', [LocationController::class, 'suggestions'])->middleware('throttle:location-suggest')->name('site.host.location.suggest');
+        Route::post('/localizacao/municipio', [LocationController::class, 'locate'])->middleware('throttle:location-locate')->name('site.host.location.locate');
     });
 
 Route::get('/', LandingController::class)->name('home');
@@ -63,6 +68,10 @@ Route::get('/', LandingController::class)->name('home');
 // Central sitemap and robots rules. A static public/robots.txt would take precedence over this route.
 Route::get('/sitemap.xml', [SiteController::class, 'sitemap'])->name('site.sitemap');
 Route::get('/robots.txt', [SiteController::class, 'robots'])->name('site.robots');
+
+// Municipality lookups of the request form of the sites on their standard address (see LocationController).
+Route::get('/localizacao/municipios', [LocationController::class, 'suggestions'])->middleware('throttle:location-suggest')->name('location.suggest');
+Route::post('/localizacao/municipio', [LocationController::class, 'locate'])->middleware('throttle:location-locate')->name('location.locate');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)

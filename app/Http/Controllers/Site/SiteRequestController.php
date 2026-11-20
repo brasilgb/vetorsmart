@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Site;
 use App\Enums\RequestOrigin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Site\StoreSiteServiceRequest;
-use App\Models\AssistantSetting;
 use App\Models\Service;
 use App\Services\Assistant\AssistantOperations;
+use App\Services\Location\VisitorMunicipality;
 use App\Services\Portal\PortalReferral;
 use App\Services\ServiceRequestService;
 use App\Services\Websites\CampaignTags;
+use App\Services\Websites\OnlineService;
 use App\Services\Websites\PublicSiteContext;
 use App\Services\Websites\SegmentTheme;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -34,14 +35,21 @@ class SiteRequestController extends Controller
 {
     public function __construct(private PublicSiteContext $sites) {}
 
-    public function show(Request $request, PortalReferral $referral, CampaignTags $campaignTags): Response
+    public function show(Request $request, PortalReferral $referral, CampaignTags $campaignTags, VisitorMunicipality $visitorMunicipality, OnlineService $online): Response
     {
         $site = $this->sites->forRequest($request) ?? abort(404);
         $referral->capture($request, $site['tenant']);
         $campaignTags->capture($request, $site['tenant']);
+        $visitorMunicipality->capture($request, $site['tenant']);
         $content = $site['content'];
         $services = $content['services'] ?? [];
         $chosen = $request->integer('servico');
+        $municipality = $visitorMunicipality->current($request, $site['tenant']);
+        $location = is_array($content['location'] ?? null) ? $content['location'] : [];
+        // Coverage declared by the company: its base and the municipalities it serves (empty for versions published
+        // before the service area existed, which then skip the coverage check).
+        $coverage = array_values(array_filter([is_array($location['base'] ?? null) && ! empty($location['served']) ? $location['base'] : null, ...(array) ($location['served'] ?? [])], 'is_array'));
+        $onlineMode = $online->mode($site['tenant']);
 
         return response()->view('website.solicitar', [
             'content' => $content,
@@ -50,7 +58,10 @@ class SiteRequestController extends Controller
             'chosen' => in_array($chosen, $this->publishedServiceIds($content), true) ? $chosen : null,
             'home' => $site['on_host'] ? $site['base'].'/' : $site['base'],
             'action' => $site['base'].'/solicitar',
-            'assistant' => AssistantSetting::query()->forTenant($site['tenant'])->value('enabled') ? $site['base'].'/atendimento' : null,
+            'assistant' => $onlineMode !== null ? $site['base'].'/atendimento' : null,
+            'onlineLabel' => $onlineMode === 'schedule' ? 'Agendar online' : 'Atendimento online',
+            'municipality' => $municipality,
+            'coverage' => $coverage,
             'sent' => (bool) $request->session()->get('site_request_sent', false),
             // One token per form shown: a second send of the same form (double click, reload, slow network) is recognised.
             'sendToken' => is_string(old('envio')) && preg_match('/^[A-Za-z0-9]{40}$/', old('envio')) === 1 ? old('envio') : Str::random(40),
@@ -58,7 +69,7 @@ class SiteRequestController extends Controller
         ])->header('X-Robots-Tag', 'noindex, nofollow');
     }
 
-    public function store(StoreSiteServiceRequest $request, AssistantOperations $operations, ServiceRequestService $requests, PortalReferral $referral, CampaignTags $campaignTags): RedirectResponse
+    public function store(StoreSiteServiceRequest $request, AssistantOperations $operations, ServiceRequestService $requests, PortalReferral $referral, CampaignTags $campaignTags, VisitorMunicipality $visitorMunicipality): RedirectResponse
     {
         $site = $this->sites->forRequest($request) ?? abort(404);
         // Attribution comes only from the arrival recorded on the server; any "origem" sent by the browser is ignored.
@@ -84,11 +95,17 @@ class SiteRequestController extends Controller
         $origin = $fromPortal ? RequestOrigin::Portal : RequestOrigin::PublicSite;
         // Campaign tags of the visit (first touch, kept on the server); complementary only, never a portal proof.
         $campaign = $campaignTags->current($request, $tenant);
+        // The municipality the visitor confirmed in the form (only the registry code is kept, never a position).
+        $municipality = $request->municipality();
 
-        $register = fn (): int => DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin, $campaign): int {
+        if ($municipality !== null) {
+            $visitorMunicipality->remember($request, $tenant, $municipality);
+        }
+
+        $register = fn (): int => DB::transaction(function () use ($tenant, $request, $operations, $requests, $service, $description, $origin, $campaign, $municipality): int {
             $customer = $operations->findOrCreateCustomer($tenant, trim((string) $request->validated('name')), (string) $request->phoneDigits());
 
-            $serviceRequest = $requests->create($tenant, ['customer_id' => $customer->getKey(), 'description' => $description, 'campaign' => $campaign], null, $origin);
+            $serviceRequest = $requests->create($tenant, ['customer_id' => $customer->getKey(), 'description' => $description, 'campaign' => $campaign, 'municipality_id' => $municipality?->id], null, $origin);
 
             if ($service !== null) {
                 try {

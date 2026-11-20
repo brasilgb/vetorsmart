@@ -90,8 +90,10 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
     Route::patch('meu-site/portal', [WebsiteController::class, 'portal'])->name('tenant.website.portal');
     Route::get('meu-site/previa', [WebsiteController::class, 'preview'])->name('tenant.website.preview');
     Route::get('meu-site/previa/midia/{file}', [WebsiteController::class, 'previewMedia'])->where('file', WebsiteMedia::FILE_PATTERN)->name('tenant.website.preview.media');
-    Route::post('meu-site/imagens/{kind}', [WebsiteController::class, 'storeImage'])->whereIn('kind', ['logo', 'hero'])->middleware('throttle:20,1')->name('tenant.website.images.store');
-    Route::delete('meu-site/imagens/{kind}', [WebsiteController::class, 'removeImage'])->whereIn('kind', ['logo', 'hero'])->name('tenant.website.images.destroy');
+    Route::post('meu-site/imagens/{kind}', [WebsiteController::class, 'storeImage'])->whereIn('kind', ['logo', 'hero', 'about'])->middleware('throttle:20,1')->name('tenant.website.images.store');
+    Route::delete('meu-site/imagens/{kind}', [WebsiteController::class, 'removeImage'])->whereIn('kind', ['logo', 'hero', 'about'])->name('tenant.website.images.destroy');
+    Route::post('meu-site/servicos/{service}/foto', [WebsiteController::class, 'storeServicePhoto'])->whereNumber('service')->middleware('throttle:20,1')->name('tenant.website.service-photo.store');
+    Route::delete('meu-site/servicos/{service}/foto', [WebsiteController::class, 'removeServicePhoto'])->whereNumber('service')->name('tenant.website.service-photo.destroy');
     Route::patch('meu-site/subdominio', [WebsiteSubdomainController::class, 'update'])->middleware('throttle:10,1')->name('tenant.website.subdomain.update');
     Route::post('meu-site/dominios', [WebsiteDomainController::class, 'store'])->name('tenant.website.domains.store');
     Route::post('meu-site/dominios/{domain}/verificar', [WebsiteDomainController::class, 'verify'])->whereNumber('domain')->name('tenant.website.domains.verify');

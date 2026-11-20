@@ -137,24 +137,47 @@ class WebsiteService
     }
 
     /**
-     * Replace the logo or the main image of the draft. The published site keeps its own image until the next
-     * publication; an earlier draft image that nothing uses any more is removed.
+     * Draft key of each kind of site image (the photo of a service lives in service_details).
+     */
+    public const array IMAGE_KEYS = ['logo' => 'logo', 'hero' => 'hero', 'about' => 'about_photo'];
+
+    /**
+     * Replace the logo, the main image or the "Quem somos" photo of the draft. The published site keeps its own image
+     * until the next publication; an earlier draft image that nothing uses any more is removed.
      */
     public function storeImage(Tenant $tenant, string $kind, UploadedFile $upload, User $actor): TenantWebsite
     {
         $stored = $this->media->store($tenant, $kind, $upload);
-        $website = $this->saveDraft($tenant, [$kind => $stored], $actor);
+        $website = $this->saveDraft($tenant, [self::IMAGE_KEYS[$kind] => $stored], $actor);
         $this->pruneMedia($tenant, $website);
 
         return $website;
     }
 
     /**
-     * Take the logo or the main image out of the draft.
+     * Take the logo, the main image or the "Quem somos" photo out of the draft.
      */
     public function removeImage(Tenant $tenant, string $kind, User $actor): TenantWebsite
     {
-        $website = $this->saveDraft($tenant, [$kind => null], $actor);
+        $website = $this->saveDraft($tenant, [self::IMAGE_KEYS[$kind] => null], $actor);
+        $this->pruneMedia($tenant, $website);
+
+        return $website;
+    }
+
+    /**
+     * Photo of one service of the company in the draft (null removes it). The service always belongs to the company of
+     * the session; the caller resolves it with forTenant.
+     */
+    public function setServicePhoto(Tenant $tenant, int $serviceId, ?UploadedFile $upload, User $actor): TenantWebsite
+    {
+        $website = $this->ensure($tenant);
+        $details = is_array($website->draft_content['service_details'] ?? null) ? $website->draft_content['service_details'] : [];
+        $detail = is_array($details[(string) $serviceId] ?? null) ? $details[(string) $serviceId] : [];
+        $detail['photo'] = $upload === null ? null : $this->media->store($tenant, 'service', $upload);
+        $details[(string) $serviceId] = $detail;
+
+        $website = $this->saveDraft($tenant, ['service_details' => $details], $actor);
         $this->pruneMedia($tenant, $website);
 
         return $website;

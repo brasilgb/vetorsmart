@@ -8,6 +8,7 @@ use App\Enums\WebsiteStatus;
 use App\Models\PortalListing;
 use App\Models\Segment;
 use App\Services\Billing\BillingEnforcement;
+use App\Services\Location\MunicipalityDirectory;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -23,7 +24,8 @@ use Illuminate\Support\Facades\DB;
  * Ordering, transparent and without any commercial criterion (plan, credits, payments are never read):
  *
  * 1. service match: 2 when every searched word is in the published service names, 1 when only in the segment;
- * 2. region match: 2 when the city is the company's city, 1 when it is only mentioned in its service region;
+ * 2. region match: 2 when the municipality is the company's base, 1 when the company declared it serves it (published
+ *    service area) or mentions it in its free-text service region;
  * 3. public information: 0 to 3 points (logo, description, at least one service);
  * 4. tie: a hash of the company and the day (CRC32), stable within a day so pages never shuffle, different every day
  *    so no company keeps the first place because of its name or registration order.
@@ -55,11 +57,28 @@ class PortalSearch
             $query->where(fn (Builder $match) => $match->where('portal_listings.services_search', 'like', "%{$token}%")->orWhere('portal_listings.segment_search', 'like', "%{$token}%"));
         }
 
+        // The searched municipality in the IBGE registry, when it can be identified (name and state, or a unique name).
+        $municipality = $city === '' ? null : app(MunicipalityDirectory::class)->fromText($filters['cidade'] ?? null, $state);
+
         if ($city !== '') {
-            $query->where(fn (Builder $match) => $match->where('portal_listings.city_search', $city)->orWhere('portal_listings.region_search', 'like', "%{$city}%"));
+            $query->where(function (Builder $match) use ($city, $state, $municipality) {
+                // Based there, or mentioning it in the free-text region (both inside the state, when one is given)...
+                $match->where(fn (Builder $local) => $local
+                    ->where(fn (Builder $text) => $text->where('portal_listings.city_search', $city)->orWhere('portal_listings.region_search', 'like', "%{$city}%"))
+                    ->when($state !== null, fn (Builder $inState) => $inState->where('portal_listings.state', $state)));
+
+                // ...or declared it serves this municipality of the registry.
+                if ($municipality !== null) {
+                    $match->orWhereExists(fn ($area) => $area->selectRaw('1')->from('portal_listing_areas')
+                        ->whereColumn('portal_listing_areas.portal_listing_id', 'portal_listings.id')
+                        ->where('portal_listing_areas.municipality_id', $municipality->id));
+                }
+            });
         }
 
-        if ($state !== null) {
+        // A state alone limits the companies based in it; with a municipality, the municipality decides (a company
+        // based in another state that serves it still appears).
+        if ($state !== null && $city === '') {
             $query->where('portal_listings.state', $state);
         }
 
@@ -82,7 +101,7 @@ class PortalSearch
         $query->addSelect($serviceScore);
 
         if ($city !== '') {
-            $query->selectRaw('(CASE WHEN portal_listings.city_search = ? THEN 2 ELSE 1 END) as region_score', [$city]);
+            $query->selectRaw('(CASE WHEN portal_listings.city_search = ?'.($state !== null ? ' AND portal_listings.state = ?' : '').' THEN 2 ELSE 1 END) as region_score', $state !== null ? [$city, $state] : [$city]);
         } else {
             $query->selectRaw('0 as region_score');
         }
@@ -139,8 +158,8 @@ class PortalSearch
     }
 
     /**
-     * Display name of a municipality where at least one participating company is based, or null. Only the companies
-     * based there count: a municipality mentioned only in a service region has no page of its own.
+     * Display name of a municipality with at least one participating company based there or that declared it serves it
+     * (published service area), or null. A municipality mentioned only in a free-text region has no page of its own.
      */
     public function municipality(string $state, string $slug): ?string
     {
@@ -150,25 +169,49 @@ class PortalSearch
             ->orderBy('portal_listings.id')
             ->value('portal_listings.city');
 
-        return is_string($name) ? $name : null;
+        if (is_string($name)) {
+            return $name;
+        }
+
+        $served = $this->eligible()
+            ->join('portal_listing_areas', 'portal_listing_areas.portal_listing_id', '=', 'portal_listings.id')
+            ->join('municipalities', 'municipalities.id', '=', 'portal_listing_areas.municipality_id')
+            ->where('municipalities.state', $state)
+            ->where('municipalities.name_search', PortalText::cityFromSlug($slug))
+            ->value('municipalities.name');
+
+        return is_string($served) ? $served : null;
     }
 
     /**
-     * Places with participating companies based there, with the categories present in each one. Bounded by the real
-     * companies, so it never creates a page for an empty municipality.
+     * Whether any company appears in the portal right now.
+     */
+    public function hasProviders(): bool
+    {
+        return $this->eligible()->exists();
+    }
+
+    /**
+     * Places with participating companies based there or serving there, with the categories present in each one.
+     * Bounded by the real companies, so it never creates a page for an empty municipality.
      *
      * @return list<array{state: string, city: string, slug: string, categories: list<string>}>
      */
     public function places(): array
     {
-        $rows = $this->eligible()
+        $based = $this->eligible()
             ->select('portal_listings.state', 'portal_listings.city', 'portal_listings.city_search', 'segments.slug as segment_slug')
-            ->orderBy('portal_listings.state')
-            ->orderBy('portal_listings.city_search')
-            ->orderBy('portal_listings.id')
             ->toBase()
             ->get();
 
+        $served = $this->eligible()
+            ->join('portal_listing_areas', 'portal_listing_areas.portal_listing_id', '=', 'portal_listings.id')
+            ->join('municipalities', 'municipalities.id', '=', 'portal_listing_areas.municipality_id')
+            ->select('municipalities.state', 'municipalities.name as city', 'municipalities.name_search as city_search', 'segments.slug as segment_slug')
+            ->toBase()
+            ->get();
+
+        $rows = $based->concat($served)->sortBy(fn ($row): string => $row->state.'/'.$row->city_search)->values();
         $places = [];
 
         foreach ($rows as $row) {
