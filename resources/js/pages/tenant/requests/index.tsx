@@ -6,11 +6,13 @@ import { selectClass } from '@/components/vetor-smart/field';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { index as requestsIndex, create, show } from '@/routes/tenant/requests';
+import { show as customerShow } from '@/routes/tenant/customers';
 import type { Paginator } from '@/types';
 
 type Row = {
     id: number;
     customer: string | null;
+    customer_id: number | null;
     service: string | null;
     priority: string;
     origin: string;
@@ -142,7 +144,7 @@ export default function RequestsIndex({ filters, statuses, origins, assignees, r
                                     {requests.data.map((item) => (
                                         <tr key={item.id} className="border-t border-vs-border/70">
                                             <td className="px-4 py-3 font-medium text-vs-text">#{item.id}</td>
-                                            <td className="px-4 py-3 text-vs-text">{item.customer ?? '—'}</td>
+                                            <td className="px-4 py-3 text-vs-text">{item.customer && item.customer_id ? <Link href={customerShow.url({ customer: item.customer_id })} className="hover:text-vs-link hover:underline">{item.customer}</Link> : (item.customer ?? '—')}</td>
                                             <td className="px-4 py-3 text-vs-muted">{item.service ?? 'A definir'}</td>
                                             <td className="px-4 py-3"><OriginLabel origin={item.origin} label={item.origin_label} /></td>
                                             <td className="px-4 py-3 text-vs-muted">{item.assignee ?? '—'}</td>

@@ -6,12 +6,14 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { index as requestsIndex, triage, schedule, start, complete, notPerformed, cancel, assign, amount } from '@/routes/tenant/requests';
+import { show as customerShow } from '@/routes/tenant/customers';
 import { index as agendaIndex } from '@/routes/tenant/agenda';
 import { OriginLabel } from './index';
 
 type RequestDetail = {
     id: number;
     customer: string | null;
+    customer_id: number | null;
     customer_phone: string | null;
     service: string | null;
     service_id: number | null;
@@ -93,7 +95,7 @@ export default function RequestShow({ request, events, appointments, services, p
                     <Card className="grid gap-3 border-vs-border/70 p-5 shadow-sm">
                         <h2 className="text-base font-semibold text-vs-text">Dados</h2>
                         <dl className="grid gap-2 text-sm">
-                            <div><dt className="text-vs-muted">Cliente</dt><dd className="text-vs-text">{request.customer ?? '—'}{request.customer_phone ? ` · ${request.customer_phone}` : ''}</dd></div>
+                            <div><dt className="text-vs-muted">Cliente</dt><dd className="text-vs-text">{request.customer && request.customer_id ? <Link href={customerShow.url({ customer: request.customer_id })} className="font-medium text-vs-link hover:underline">{request.customer}</Link> : (request.customer ?? '—')}{request.customer_phone ? ` · ${request.customer_phone}` : ''}</dd></div>
                             <div><dt className="text-vs-muted">Serviço</dt><dd className="text-vs-text">{request.service ?? 'A definir na triagem'}</dd></div>
                             <div><dt className="text-vs-muted">Prioridade</dt><dd className="text-vs-text">{request.priority}</dd></div>
                             <div><dt className="text-vs-muted">Responsável</dt><dd className="text-vs-text">{request.assignee ?? 'Sem responsável'}</dd></div>

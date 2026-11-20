@@ -33,6 +33,7 @@ Route::middleware(['auth', 'verified', 'tenant.resolve', 'subscription.access'])
     Route::get('clientes', [CustomerController::class, 'index'])->name('tenant.customers.index');
     Route::get('clientes/novo', [CustomerController::class, 'create'])->name('tenant.customers.create');
     Route::post('clientes', [CustomerController::class, 'store'])->name('tenant.customers.store');
+    Route::get('clientes/{customer}', [CustomerController::class, 'show'])->whereNumber('customer')->name('tenant.customers.show');
     Route::get('clientes/{customer}/editar', [CustomerController::class, 'edit'])->whereNumber('customer')->name('tenant.customers.edit');
     Route::patch('clientes/{customer}', [CustomerController::class, 'update'])->whereNumber('customer')->name('tenant.customers.update');
     Route::delete('clientes/{customer}', [CustomerController::class, 'archive'])->whereNumber('customer')->name('tenant.customers.archive');

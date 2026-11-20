@@ -331,6 +331,7 @@ class ServiceRequestController extends Controller
         return [
             'id' => $serviceRequest->id,
             'customer' => $serviceRequest->customer?->name,
+            'customer_id' => $serviceRequest->customer_id,
             'service' => $serviceRequest->service?->name,
             'priority' => $serviceRequest->priority->label(),
             'origin' => $serviceRequest->origin->value,
