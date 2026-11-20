@@ -227,6 +227,45 @@ test('commercial origin and channel are separate views of the same cohort, and u
         ->and($page['campaigns'][0])->toMatchArray(['source' => 'instagram', 'received' => 1]);
 });
 
+test('the channel filter limits commercial origin and channel to the same requests (GROWTH-03.1)', function () {
+    $now = now()->subMinutes(5);
+    // One request per channel in the period, a panel request before the period and one of another company.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Panel]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Ai]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Completed, ['created_at' => $now, 'closed_at' => $now, 'origin' => RequestOrigin::PublicSite, 'utm_source' => 'instagram']);
+    // Old record from the portal: grouped with the site form in the channel view.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Portal, 'discovery' => DiscoverySource::Portal]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(60), 'origin' => RequestOrigin::Panel]);
+    growthRequest($this->other, $this->otherCustomer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Panel]);
+
+    $views = function (string $query): array {
+        $page = $this->actingAs($this->owner)->get('/meu-crescimento?'.$query)->viewData('page')['props'];
+
+        return [collect($page['commercialOrigins']), collect($page['channels'])];
+    };
+
+    // Without the channel filter: the whole period, the historical portal record counted in the site form.
+    [$origins, $channels] = $views('periodo=30-dias');
+    expect($origins->sum('received'))->toBe(4)->and($channels->sum('received'))->toBe(4)
+        ->and($channels->keyBy('key')['site_form']['received'])->toBe(2);
+
+    // Panel in the same period: both views count only the panel request, and the channel view shows only the panel.
+    [$origins, $channels] = $views('periodo=30-dias&origem=panel');
+    expect($origins->sum('received'))->toBe(1)->and($channels->sum('received'))->toBe(1)
+        ->and($channels->where('received', '>', 0)->pluck('key')->all())->toBe(['panel'])
+        ->and($origins->where('received', '>', 0)->pluck('key')->all())->toBe(['unknown']);
+
+    // Panel over a longer period: the earlier panel request joins both views.
+    [$origins, $channels] = $views('periodo=90-dias&origem=panel');
+    expect($origins->sum('received'))->toBe(2)->and($channels->sum('received'))->toBe(2)
+        ->and($channels->where('received', '>', 0)->pluck('key')->all())->toBe(['panel']);
+
+    // Site form: the stored value is filtered, so the portal record stays out of both views alike.
+    [$origins, $channels] = $views('periodo=30-dias&origem=public_site');
+    expect($origins->sum('received'))->toBe(1)->and($channels->sum('received'))->toBe(1)
+        ->and($channels->where('received', '>', 0)->pluck('key')->all())->toBe(['site_form']);
+});
+
 test('rolling periods compare with the same number of days just before, without a percentage over a zero base', function () {
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(10)]);
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(20)]);

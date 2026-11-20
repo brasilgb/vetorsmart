@@ -313,13 +313,14 @@ class GrowthMetrics
     /**
      * Requests received in the period by entry channel (RequestOrigin::channel), apart from the commercial origin:
      * the site's request form (whether opened from the portal or not), the site assistant, the panel and the API.
-     * Followed as a cohort, like the commercial origin.
+     * Followed as a cohort, like the commercial origin, over the same requests (company, period, channel filter and
+     * responsible), so both views always add up to the same total.
      *
      * @return list<array{key: string, label: string, received: int, completed: int, conversion: int|null, revenue_cents: int, revenue_known: int}>
      */
-    public function byChannel(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, int|string|null $responsible = null): array
+    public function byChannel(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
     {
-        $rows = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), null, $responsible)
+        $rows = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
             ->whereBetween('created_at', [$from, $to])
             ->groupBy('origin')
             ->selectRaw('origin, COUNT(*) AS received')

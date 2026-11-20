@@ -103,7 +103,7 @@ class GrowthController extends Controller
             // Commercial origin (how the customer found the company) and entry channel, in separate views (GROWTH-03).
             'commercialOrigins' => array_map(fn (array $row): array => [...$row, 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null], $commercial['origins']),
             'campaigns' => array_map(fn (array $row): array => [...$row, 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null], $commercial['campaigns']),
-            'channels' => array_map(fn (array $row): array => [...$row, 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null], $metrics->byChannel($tenant->id, $from->utc(), $to->utc(), $responsible)),
+            'channels' => array_map(fn (array $row): array => [...$row, 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null], $metrics->byChannel($tenant->id, $from->utc(), $to->utc(), $origin, $responsible)),
             // Customer relationship (CustomerPortfolio, the same rules as the portfolio). It covers the whole company,
             // so the origin and responsible filters do not apply here.
             'relationship' => [...$portfolio->growth($tenant->id, $from->utc(), $to->utc(), $windowDays), 'days' => $windowDays],
