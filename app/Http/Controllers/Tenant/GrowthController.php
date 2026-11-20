@@ -59,7 +59,10 @@ class GrowthController extends Controller
         Gate::authorize('viewGrowth', $tenant);
 
         $period = array_key_exists($request->string('periodo')->value(), self::PERIODS) ? $request->string('periodo')->value() : 'mes';
-        $origin = RequestOrigin::tryFrom($request->string('origem')->value());
+        // Entry channel filter: any stored value selects its whole channel, represented by its first value
+        // ("portal" falls into the site form, as in the channel view).
+        $origin = RequestOrigin::tryFrom($request->string('origem')->value())?->sameChannel()[0];
+        $channelValues = $origin === null ? null : array_map(fn (RequestOrigin $value): string => $value->value, $origin->sameChannel());
         $assignees = $this->assignees($tenant->id);
         $responsibleInput = $request->string('responsavel')->value();
         $responsible = match (true) {
@@ -119,8 +122,8 @@ class GrowthController extends Controller
             ],
             'options' => [
                 'periods' => array_map(fn (string $key, array $preset): array => ['value' => $key, 'label' => $preset['label']], array_keys(self::PERIODS), self::PERIODS),
-                // The channel filter keeps the stored values; the portal value is the site form opened from the portal.
-                'origins' => array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item === RequestOrigin::Portal ? 'Site — formulário (vindo do portal)' : $item->channel()['label']], RequestOrigin::cases()),
+                // One option per entry channel: the site form already includes the requests opened from the portal.
+                'origins' => array_values(array_map(fn (RequestOrigin $item): array => ['value' => $item->value, 'label' => $item->channel()['label']], array_filter(RequestOrigin::cases(), fn (RequestOrigin $item): bool => $item->sameChannel()[0] === $item))),
                 'assignees' => $assignees,
             ],
             'current' => $now,
@@ -151,14 +154,14 @@ class GrowthController extends Controller
             // Requests of the period by origin, followed until appointment, completion or closing without the service.
             'origins' => array_map(fn (array $row): array => [...$row, 'href' => $list([...$received, 'origem' => $row['origin']])], array_values(array_filter(
                 $metrics->byOrigin($tenant->id, $from->utc(), $to->utc(), $responsible),
-                fn (array $row): bool => $origin === null || $row['origin'] === $origin->value,
+                fn (array $row): bool => $channelValues === null || in_array($row['origin'], $channelValues, true),
             ))),
             'previousOrigins' => $metrics->byOrigin($tenant->id, $previousFrom->utc(), $previousTo->utc(), $responsible),
             'revenueByOrigin' => array_map(fn (array $row): array => [
                 ...$row,
                 'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null,
                 'ticket' => ($ticket = $metrics->averageTicket($row['revenue_cents'], $row['revenue_known'])) === null ? null : Money::format($ticket),
-            ], array_values(array_filter($metrics->revenueByOrigin($tenant->id, $from->utc(), $to->utc(), $responsible), fn (array $row): bool => $origin === null || $row['origin'] === $origin->value))),
+            ], array_values(array_filter($metrics->revenueByOrigin($tenant->id, $from->utc(), $to->utc(), $responsible), fn (array $row): bool => $channelValues === null || in_array($row['origin'], $channelValues, true)))),
         ]);
     }
 

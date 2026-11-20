@@ -31,6 +31,23 @@ enum RequestOrigin: string
         };
     }
 
+    /**
+     * Stored values with the same entry channel as this one, in declaration order: the set the channel filter of Meu
+     * Crescimento selects, so the filter follows the grouping shown in the channel view (the site form includes the
+     * "portal" records). The first one is the value that represents the channel in the filter.
+     *
+     * @return non-empty-list<self>
+     */
+    public function sameChannel(): array
+    {
+        $key = $this->channel()['key'];
+
+        /** @var non-empty-list<self> $values */
+        $values = array_values(array_filter(self::cases(), fn (self $value): bool => $value->channel()['key'] === $key));
+
+        return $values;
+    }
+
     public function label(): string
     {
         return match ($this) {

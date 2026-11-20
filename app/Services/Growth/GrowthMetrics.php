@@ -139,7 +139,8 @@ class GrowthMetrics
     }
 
     /**
-     * Limit a query of requests to one origin and one responsible (a user id, or "none").
+     * Limit a query of requests to one entry channel and one responsible (a user id, or "none"). The origin selects
+     * every stored value of its channel (RequestOrigin::sameChannel), the same grouping as the channel view.
      *
      * @template TModel of \Illuminate\Database\Eloquent\Model
      *
@@ -149,7 +150,7 @@ class GrowthMetrics
     private function scoped(Builder $query, ?RequestOrigin $origin, int|string|null $responsible): Builder
     {
         return $query
-            ->when($origin !== null, fn (Builder $scoped) => $scoped->where('origin', $origin?->value))
+            ->when($origin !== null, fn (Builder $scoped) => $scoped->whereIn('origin', array_map(fn (RequestOrigin $value): string => $value->value, $origin?->sameChannel() ?? [])))
             ->when($responsible === 'none', fn (Builder $scoped) => $scoped->whereNull('assigned_user_id'))
             ->when(is_int($responsible), fn (Builder $scoped) => $scoped->where('assigned_user_id', $responsible));
     }

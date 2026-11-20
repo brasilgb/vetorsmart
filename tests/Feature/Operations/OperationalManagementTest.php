@@ -178,8 +178,12 @@ test('Meu Crescimento sums known amounts by origin, keeps unknown apart and igno
                 && collect($rows)->firstWhere('origin', 'public_site')['revenue'] === null
                 && collect($rows)->firstWhere('origin', 'public_site')['revenue_unknown'] === 1));
 
+    // The site form channel includes the requests opened from the portal (GROWTH-03.2).
     $this->actingAs($this->owner)->get('/meu-crescimento?origem=public_site')
-        ->assertInertia(fn (AssertableInertia $page) => $page->where('current.completed', 1)->where('current.revenue', null)->where('current.revenue_unknown', 1));
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('current.completed', 3)->where('current.revenue', 'R$ 300,50')->where('current.revenue_unknown', 1));
+
+    $this->actingAs($this->owner)->get('/meu-crescimento?origem=panel')
+        ->assertInertia(fn (AssertableInertia $page) => $page->where('current.completed', 0)->where('current.revenue', null));
 
     $this->actingAs($this->owner)->get("/meu-crescimento?responsavel={$this->operator->id}")
         ->assertInertia(fn (AssertableInertia $page) => $page->where('current.completed', 1)->where('current.revenue', 'R$ 100,50'));

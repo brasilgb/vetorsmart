@@ -227,16 +227,19 @@ test('commercial origin and channel are separate views of the same cohort, and u
         ->and($page['campaigns'][0])->toMatchArray(['source' => 'instagram', 'received' => 1]);
 });
 
-test('the channel filter limits commercial origin and channel to the same requests (GROWTH-03.1)', function () {
+test('the channel filter limits commercial origin and channel to the same requests (GROWTH-03.1 and 03.2)', function () {
     $now = now()->subMinutes(5);
     // One request per channel in the period, a panel request before the period and one of another company.
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Panel]);
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Ai]);
     growthRequest($this->tenant, $this->customer, RequestStatus::Completed, ['created_at' => $now, 'closed_at' => $now, 'origin' => RequestOrigin::PublicSite, 'utm_source' => 'instagram']);
-    // Old record from the portal: grouped with the site form in the channel view.
-    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Portal, 'discovery' => DiscoverySource::Portal]);
+    // Old record from the portal, without a confirmed arrival: grouped with the site form in the channel view, but not
+    // attributed to the Regional Portal by the stored value alone.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Portal, 'discovery' => null]);
     growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(60), 'origin' => RequestOrigin::Panel]);
     growthRequest($this->other, $this->otherCustomer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Panel]);
+    growthRequest($this->other, $this->otherCustomer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::PublicSite]);
+    growthRequest($this->other, $this->otherCustomer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Portal]);
 
     $views = function (string $query): array {
         $page = $this->actingAs($this->owner)->get('/meu-crescimento?'.$query)->viewData('page')['props'];
@@ -260,10 +263,25 @@ test('the channel filter limits commercial origin and channel to the same reques
     expect($origins->sum('received'))->toBe(2)->and($channels->sum('received'))->toBe(2)
         ->and($channels->where('received', '>', 0)->pluck('key')->all())->toBe(['panel']);
 
-    // Site form: the stored value is filtered, so the portal record stays out of both views alike.
+    // Site form (GROWTH-03.2): the filter follows the grouping of the channel view, so the historical portal record
+    // is included in both views. The commercial origin stays apart: the campaign of the direct form, and no portal
+    // attribution for the historical record (the stored "portal" alone is not evidence of the Regional Portal).
     [$origins, $channels] = $views('periodo=30-dias&origem=public_site');
-    expect($origins->sum('received'))->toBe(1)->and($channels->sum('received'))->toBe(1)
-        ->and($channels->where('received', '>', 0)->pluck('key')->all())->toBe(['site_form']);
+    expect($origins->sum('received'))->toBe(2)->and($channels->sum('received'))->toBe(2)
+        ->and($channels->where('received', '>', 0)->pluck('key')->all())->toBe(['site_form'])
+        ->and($origins->where('received', '>', 0)->pluck('received', 'key')->all())->toBe(['campaign' => 1, 'unknown' => 1]);
+
+    // The stored value "portal" selects the same channel, shown as the site form in the filter.
+    $page = $this->actingAs($this->owner)->get('/meu-crescimento?periodo=30-dias&origem=portal')->viewData('page')['props'];
+    expect(collect($page['channels'])->sum('received'))->toBe(2)->and(collect($page['commercialOrigins'])->sum('received'))->toBe(2)
+        ->and($page['current']['requests'])->toBe(2)->and($page['current']['completed'])->toBe(1)
+        ->and($page['filters']['origem'])->toBe('public_site')
+        ->and(collect($page['origins'])->pluck('origin')->all())->toBe(['public_site', 'portal'])
+        ->and(collect($page['options']['origins'])->pluck('value')->all())->not->toContain('portal');
+
+    // Site form over a longer period: nothing earlier on this channel, and still only this company's requests.
+    [$origins, $channels] = $views('periodo=90-dias&origem=public_site');
+    expect($origins->sum('received'))->toBe(2)->and($channels->sum('received'))->toBe(2);
 });
 
 test('rolling periods compare with the same number of days just before, without a percentage over a zero base', function () {
