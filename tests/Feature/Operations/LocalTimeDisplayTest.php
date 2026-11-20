@@ -60,8 +60,8 @@ test('the dashboard counts today’s appointments by the local day and shows loc
     $this->actingAs($this->owner)
         ->get(route('dashboard'))
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->where('operations.today_appointments', 1)
-            ->where('operations.upcoming.0.starts_at', '12/07/2027 22:00'));
+            ->where('work.today.count', 1)
+            ->where('work.today.items.0.when', 'Hoje, 22:00'));
 });
 
 test('the request list shows the creation time in the tenant timezone', function () {

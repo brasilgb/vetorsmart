@@ -126,7 +126,7 @@ export default function RequestShow({ request, events, appointments, services, p
                 </div>
 
                 {request.can_triage && (
-                    <Card className="grid max-w-3xl gap-4 border-vs-border/70 p-5 shadow-sm">
+                    <Card id="triagem" className="grid max-w-3xl scroll-mt-20 gap-4 border-vs-border/70 p-5 shadow-sm">
                         <h2 className="text-base font-semibold text-vs-text">Triagem</h2>
                         {triageErrorsWithoutField.length > 0 && (
                             <p role="alert" className="rounded-md border border-vs-danger/30 bg-vs-danger-soft px-3 py-2 text-sm text-vs-danger">
@@ -163,7 +163,7 @@ export default function RequestShow({ request, events, appointments, services, p
                 )}
 
                 {request.can_schedule && (
-                    <Card className="grid max-w-3xl gap-4 border-vs-border/70 p-5 shadow-sm">
+                    <Card id="agendamento" className="grid max-w-3xl scroll-mt-20 gap-4 border-vs-border/70 p-5 shadow-sm">
                         <h2 className="text-base font-semibold text-vs-text">Agendamento</h2>
                         <p className="text-sm text-vs-muted">Os horários são validados no servidor, conforme a jornada, os bloqueios e os agendamentos do profissional.</p>
                         <form
