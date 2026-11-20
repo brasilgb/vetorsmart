@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ConversationStatus;
+use App\Enums\DiscoverySource;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestStatus;
 use App\Models\Appointment;
@@ -75,15 +76,31 @@ test('the average ticket rounds half up with integers and is absent without amou
         ->and($metrics->averageTicket(0, 0))->toBeNull();
 });
 
-test('customers are new when their first request to the company is in the period, recurring otherwise', function () {
+test('relationship comes from completed services (GROWTH-02): returning, recurring, without recent service and frequency', function () {
+    // Came back to hire in the period: a service completed 40 days ago and another one now.
     $returning = Customer::factory()->create(['tenant_id' => $this->tenant->id]);
-    growthRequest($this->tenant, $returning, RequestStatus::Completed, ['created_at' => now()->subMonths(3), 'closed_at' => now()->subMonths(3)]);
-    growthRequest($this->tenant, $returning, RequestStatus::Requested, ['created_at' => now()->subMinutes(5)]);
-    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subMinutes(5)]);
-    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subMinutes(4)]);
+    $returning->forceFill(['created_at' => now()->subDays(200)])->save();
+    growthRequest($this->tenant, $returning, RequestStatus::Completed, ['closed_at' => now()->subDays(40)]);
+    growthRequest($this->tenant, $returning, RequestStatus::Completed, ['closed_at' => now()->subDay()]);
+    // Requests only, never a completed service: not recurring, whatever the number of requests.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Cancelled, ['closed_at' => now()]);
+    // Served long ago: without recent service in the last 30 days.
+    $quiet = Customer::factory()->create(['tenant_id' => $this->tenant->id]);
+    $quiet->forceFill(['created_at' => now()->subDays(200)])->save();
+    growthRequest($this->tenant, $quiet, RequestStatus::Completed, ['closed_at' => now()->subDays(50)]);
+    // Another company never counts.
+    growthRequest($this->other, $this->otherCustomer, RequestStatus::Completed, ['closed_at' => now()]);
 
-    $this->actingAs($this->owner)->get('/meu-crescimento')
-        ->assertInertia(fn (AssertableInertia $page) => $page->where('customers', ['total' => 2, 'new' => 1, 'recurring' => 1]));
+    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=30-dias')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('relationship.new', 1)
+            ->where('relationship.served', 1)
+            ->where('relationship.returning', 1)
+            ->where('relationship.recurring', 1)
+            ->where('relationship.without_recent', 1)
+            ->where('relationship.frequency_days', 39)
+            ->where('relationship.days', 30));
 });
 
 test('cancellations are listed with their reasons, most frequent first', function () {
@@ -156,4 +173,71 @@ test('a conversation handed from the assistant to the team keeps the AI origin o
     $request = app(AssistantOperations::class)->identifyConversation($this->tenant, $conversation, 'Maria Souza', '11988887777', null, $this->owner);
 
     expect($request->origin)->toBe(RequestOrigin::Ai);
+});
+
+/*
+| GROWTH-02: funnel, stock, commercial origin and rolling periods.
+*/
+
+test('the funnel follows one cohort without double counting, and a later stage always implies the earlier ones', function () {
+    $now = now()->subMinutes(5);
+    $professional = Professional::factory()->create(['tenant_id' => $this->tenant->id]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Triaged, ['created_at' => $now]);
+    $scheduled = growthRequest($this->tenant, $this->customer, RequestStatus::Scheduled, ['created_at' => $now]);
+    Appointment::factory()->create(['tenant_id' => $this->tenant->id, 'service_request_id' => $scheduled->id, 'professional_id' => $professional->id]);
+    // Completed without any history entry (old record): still counted in every earlier stage.
+    $completed = growthRequest($this->tenant, $this->customer, RequestStatus::Completed, ['created_at' => $now, 'closed_at' => $now]);
+    $completed->events()->delete();
+    // Cancelled before triage: received only, and lost.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Cancelled, ['created_at' => $now, 'closed_at' => $now]);
+    // Received before the period: never part of this funnel, but it is in the stock of today.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(100)]);
+
+    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=30-dias')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('funnel', ['received' => 5, 'triaged' => 3, 'scheduled' => 2, 'completed' => 1, 'lost' => 1])
+            ->where('stock', ['requested' => 2, 'triaged' => 1, 'scheduled' => 1, 'in_progress' => 0]));
+});
+
+test('the commercial origin is kept apart from the channel, and unidentified requests are shown apart', function () {
+    $now = now()->subMinutes(5);
+    // Portal form: channel and discovery portal. Assistant after a portal arrival: channel AI, discovery portal.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Completed, ['created_at' => $now, 'closed_at' => $now, 'origin' => RequestOrigin::Portal, 'discovery' => DiscoverySource::Portal, 'realized_amount_cents' => 20000]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Ai, 'discovery' => DiscoverySource::Portal]);
+    // Assistant of a direct visit: AI channel, but never attributed to the portal (or to anything) by passing there.
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Ai]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => $now, 'origin' => RequestOrigin::Panel]);
+
+    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=30-dias')
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->where('discovery.0', ['discovery' => 'portal', 'label' => 'Portal Regional', 'received' => 2, 'completed' => 1, 'revenue_cents' => 20000, 'revenue_known' => 1, 'revenue' => 'R$ 200,00'])
+            ->where('discovery.1.discovery', 'unknown')
+            ->where('discovery.1.received', 2)
+            ->where('origins', fn ($rows) => collect($rows)->firstWhere('origin', 'ai')['received'] === 2 && collect($rows)->firstWhere('origin', 'portal')['received'] === 1));
+});
+
+test('rolling periods compare with the same number of days just before, without a percentage over a zero base', function () {
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(10)]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(20)]);
+    growthRequest($this->tenant, $this->customer, RequestStatus::Requested, ['created_at' => now()->subDays(45)]);
+
+    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=30-dias')->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('current.requests', 2)->where('previous.requests', 1)->where('comparison.requests', 100)
+        ->where('current.completed', 0)->where('comparison.completed', null));
+
+    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=90-dias')->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('current.requests', 3)->where('previous.requests', 0)->where('comparison.requests', null));
+
+    // An unknown period falls back to the default.
+    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=7-dias')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->where('filters.periodo', 'mes'));
+});
+
+test('an empty company sees zeros and empty states, never invented figures', function () {
+    $this->actingAs($this->owner)->get('/meu-crescimento?periodo=60-dias')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page
+        ->where('funnel', ['received' => 0, 'triaged' => 0, 'scheduled' => 0, 'completed' => 0, 'lost' => 0])
+        ->where('current.revenue', null)
+        ->where('current.ticket', null)
+        ->where('relationship.frequency_days', null)
+        ->where('hasActivity', false));
 });

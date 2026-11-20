@@ -8,6 +8,7 @@ use App\Enums\RequestStatus;
 use App\Enums\UserStatus;
 use App\Http\Controllers\Controller;
 use App\Models\TenantUser;
+use App\Services\Customers\CustomerPortfolio;
 use App\Services\Growth\GrowthMetrics;
 use App\Services\Growth\GrowthRecommendations;
 use App\Services\Tenancy\TenantContext;
@@ -23,7 +24,8 @@ use Inertia\Response;
  *
  * - Operational: requests received, converted (received in the period and completed), conversion rate (converted ÷
  *   received, from five requests), services completed and requests closed without the service, with their reasons;
- *   new and recurring customers; origin of the requests followed as a cohort.
+ *   the funnel of the requests received (cohort) apart from the stock of today; channel and commercial origin
+ *   (discovery) apart; customer relationship from CustomerPortfolio (recurrence by completed services).
  * - Financial (declared by the company, not proof of payment): revenue of the services completed in the period, the
  *   average ticket of the services with an amount, and how many have none. Unknown amounts never count as zero.
  * - What to do now: deterministic recommendations with links to the records behind them.
@@ -35,11 +37,15 @@ use Inertia\Response;
 class GrowthController extends Controller
 {
     /**
-     * Period presets: months covered, counting the current one (0 = the previous month alone).
+     * Period presets. "days": the last N days counting today; "months": calendar months counting the current one
+     * (0 = the previous month alone). The comparison base is always the period of the same length just before.
      *
-     * @var array<string, array{label: string, months: int}>
+     * @var array<string, array{label: string, months?: int, days?: int}>
      */
     private const array PERIODS = [
+        '30-dias' => ['label' => 'Últimos 30 dias', 'days' => 30],
+        '60-dias' => ['label' => 'Últimos 60 dias', 'days' => 60],
+        '90-dias' => ['label' => 'Últimos 90 dias', 'days' => 90],
         'mes' => ['label' => 'Este mês', 'months' => 1],
         'mes-anterior' => ['label' => 'Mês anterior', 'months' => 0],
         '3-meses' => ['label' => 'Últimos 3 meses', 'months' => 3],
@@ -47,7 +53,7 @@ class GrowthController extends Controller
         '12-meses' => ['label' => 'Últimos 12 meses', 'months' => 12],
     ];
 
-    public function __invoke(Request $request, TenantContext $context, GrowthMetrics $metrics, GrowthRecommendations $recommendations): Response
+    public function __invoke(Request $request, TenantContext $context, GrowthMetrics $metrics, GrowthRecommendations $recommendations, CustomerPortfolio $portfolio): Response
     {
         $tenant = $context->requireTenant();
         Gate::authorize('viewGrowth', $tenant);
@@ -83,9 +89,28 @@ class GrowthController extends Controller
         $received = ['de' => $from->toDateString(), 'ate' => $to->toDateString()];
         $closed = [...$received, 'data' => 'encerramento'];
 
+        $byDays = isset(self::PERIODS[$period]['days']);
+        // Days analysed, for the "without recent service" segment (same rule as the customer portfolio).
+        $windowDays = max(1, (int) $from->diffInDays(CarbonImmutable::now($tenant->timezone)) + 1);
+
         return Inertia::render('tenant/growth/index', [
-            'period' => $this->label($from, $to),
-            'previousPeriod' => $this->label($previousFrom, $previousTo),
+            'period' => $this->label($from, $to, $byDays),
+            'previousPeriod' => $this->label($previousFrom, $previousTo, $byDays),
+            // Funnel of the requests received in the period (conversion), and what is in each stage now (stock).
+            'funnel' => $metrics->funnel($tenant->id, $from->utc(), $to->utc(), $origin, $responsible),
+            'stock' => $metrics->stock($tenant->id, $origin, $responsible),
+            'discovery' => array_map(fn (array $row): array => [
+                ...$row,
+                'revenue' => $row['revenue_known'] > 0 ? Money::format($row['revenue_cents']) : null,
+            ], $metrics->byDiscovery($tenant->id, $from->utc(), $to->utc(), $origin, $responsible)),
+            // Customer relationship (CustomerPortfolio, the same rules as the portfolio). It covers the whole company,
+            // so the origin and responsible filters do not apply here.
+            'relationship' => [...$portfolio->growth($tenant->id, $from->utc(), $to->utc(), $windowDays), 'days' => $windowDays],
+            'customerLinks' => [
+                'recurring' => route('tenant.customers.index', ['relacao' => 'recorrentes'], false),
+                'without_recent' => route('tenant.customers.index', ['relacao' => 'sem-atendimento', 'dias' => in_array($windowDays, CustomerPortfolio::PERIODS, true) ? $windowDays : 90], false),
+                'new' => route('tenant.customers.index', ['relacao' => 'novos', 'dias' => in_array($windowDays, CustomerPortfolio::PERIODS, true) ? $windowDays : 90], false),
+            ],
             'filters' => [
                 'periodo' => $period,
                 'origem' => $origin->value ?? '',
@@ -107,7 +132,6 @@ class GrowthController extends Controller
                 'without_amount' => $list([...$closed, 'status' => RequestStatus::Completed->value, 'sem_valor' => 1]),
             ],
             'recommendations' => $recommendations->for($tenant, $now, $before),
-            'customers' => $metrics->customers($tenant->id, $from->utc(), $to->utc(), $origin, $responsible),
             'closingReasons' => $metrics->closingReasons($tenant->id, $from->utc(), $to->utc(), $origin, $responsible),
             'services' => ['active' => (int) ($activity['active_services'][$tenant->id] ?? 0), 'on_site' => $site['public_services'], 'site' => $site['site']],
             'seo' => $site['seo'],
@@ -143,7 +167,14 @@ class GrowthController extends Controller
      */
     private function window(string $period, CarbonImmutable $now): array
     {
-        $months = self::PERIODS[$period]['months'];
+        if (isset(self::PERIODS[$period]['days'])) {
+            $days = self::PERIODS[$period]['days'];
+            $start = $now->startOfDay()->subDays($days - 1);
+
+            return [$start, $now->endOfDay(), $start->subDays($days), $start->subSecond()];
+        }
+
+        $months = self::PERIODS[$period]['months'] ?? 1;
         $end = $months === 0 ? $now->startOfMonth()->subMonth()->endOfMonth() : $now->endOfMonth();
         $length = max(1, $months);
         $start = $end->startOfMonth()->subMonths($length - 1);
@@ -151,8 +182,12 @@ class GrowthController extends Controller
         return [$start, $end, $start->subMonths($length), $start->subSecond()];
     }
 
-    private function label(CarbonImmutable $from, CarbonImmutable $to): string
+    private function label(CarbonImmutable $from, CarbonImmutable $to, bool $days = false): string
     {
+        if ($days) {
+            return $from->format('d/m/Y').' a '.$to->format('d/m/Y');
+        }
+
         return $from->format('m/Y') === $to->format('m/Y') ? $from->format('m/Y') : $from->format('m/Y').' a '.$to->format('m/Y');
     }
 

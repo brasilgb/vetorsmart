@@ -102,6 +102,45 @@ class CustomerPortfolio
     }
 
     /**
+     * Relationship figures of the company for a period (Meu Crescimento), with the same definitions as the portfolio:
+     * - new: customers whose first contact (record) is in the period;
+     * - served: customers with a service completed in the period;
+     * - returning: of those, the ones who already had an earlier completed service (they came back to hire);
+     * - recurring: customers with RECURRING_FROM or more completed services up to the end of the period;
+     * - without recent service: completed before, but nothing in the last $days days (as in the portfolio);
+     * - frequency: average interval, in days, between completed services of the recurring customers.
+     * Grouped queries only, never one query per customer.
+     *
+     * @return array{new: int, served: int, returning: int, recurring: int, without_recent: int, frequency_days: int|null}
+     */
+    public function growth(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, int $days): array
+    {
+        $completed = ServiceRequest::query()->forTenant($tenantId)
+            ->where('status', RequestStatus::Completed->value)
+            ->whereNotNull('closed_at')
+            ->where('closed_at', '<=', $to)
+            ->groupBy('customer_id')
+            ->selectRaw('customer_id, COUNT(*) AS total, MIN(closed_at) AS first_at, MAX(closed_at) AS last_at')
+            ->selectRaw('SUM(CASE WHEN closed_at >= ? THEN 1 ELSE 0 END) AS in_period', [$from])
+            ->toBase()
+            ->get();
+
+        $served = $completed->filter(fn (object $row): bool => (int) $row->in_period > 0);
+        $recurring = $completed->filter(fn (object $row): bool => (int) $row->total >= self::RECURRING_FROM);
+        $intervals = $recurring->map(fn (object $row): float => CarbonImmutable::parse((string) $row->first_at, 'UTC')->diffInDays(CarbonImmutable::parse((string) $row->last_at, 'UTC')) / ((int) $row->total - 1));
+
+        return [
+            'new' => Customer::query()->forTenant($tenantId)->whereBetween('created_at', [$from, $to])->count(),
+            'served' => $served->count(),
+            // Served in the period with two or more completed services up to its end: at least one of them is a return.
+            'returning' => $served->filter(fn (object $row): bool => (int) $row->total >= self::RECURRING_FROM)->count(),
+            'recurring' => $recurring->count(),
+            'without_recent' => $this->segment(Customer::query()->forTenant($tenantId), 'sem-atendimento', $days)->count(),
+            'frequency_days' => $intervals->isEmpty() ? null : (int) max(1, round($intervals->avg())),
+        ];
+    }
+
+    /**
      * Commercial and operational summary of one customer.
      *
      * @return array{requests: int, completed: int, cancelled: int, open: int, revenue: string|null, revenue_known: int, revenue_unknown: int, last_service: array{date: CarbonImmutable, service: string|null}|null, frequency_days: int|null, recurring: bool}

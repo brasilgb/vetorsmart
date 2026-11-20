@@ -3,6 +3,7 @@
 namespace App\Services\Growth;
 
 use App\Enums\AppointmentStatus;
+use App\Enums\DiscoverySource;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestStatus;
 use App\Enums\TenantStatus;
@@ -192,26 +193,98 @@ class GrowthMetrics
     }
 
     /**
-     * Customers who sent requests in the period: "new" sent their first request ever to the company in the period;
-     * "recurring" had sent an earlier one (any origin). Read from the requests, never from a stored counter.
+     * Commercial funnel of the requests received in the period, followed as one cohort: each stage counts the same
+     * requests that reached it (so stages are never added up as different opportunities). A stage reached is inferred
+     * from the history and the current status together, so a later stage always implies the earlier ones:
+     * - triaged: has a "triaged" entry in the history, an appointment, or a status after triage;
+     * - scheduled: has an appointment, or a status after scheduling;
+     * - completed: status completed. "lost" are closed without the service (cancelled or not performed).
      *
-     * @return array{total: int, new: int, recurring: int}
+     * @return array{received: int, triaged: int, scheduled: int, completed: int, lost: int}
      */
-    public function customers(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
+    public function funnel(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
     {
-        $inPeriod = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
+        $afterTriage = [RequestStatus::Triaged->value, RequestStatus::Scheduled->value, RequestStatus::InProgress->value, RequestStatus::Completed->value, RequestStatus::NotPerformed->value];
+        $afterScheduling = [RequestStatus::Scheduled->value, RequestStatus::InProgress->value, RequestStatus::Completed->value, RequestStatus::NotPerformed->value];
+        $hasAppointment = 'EXISTS (SELECT 1 FROM appointments WHERE appointments.tenant_id = service_requests.tenant_id AND appointments.service_request_id = service_requests.id)';
+        $wasTriaged = "EXISTS (SELECT 1 FROM service_request_events WHERE service_request_events.service_request_id = service_requests.id AND service_request_events.to_status = 'triaged')";
+
+        $row = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
             ->whereBetween('created_at', [$from, $to])
-            ->distinct()
-            ->pluck('customer_id');
+            ->selectRaw('COUNT(*) AS received')
+            ->selectRaw('SUM(CASE WHEN status IN (?, ?, ?, ?, ?) OR '.$wasTriaged.' OR '.$hasAppointment.' THEN 1 ELSE 0 END) AS triaged', $afterTriage)
+            ->selectRaw('SUM(CASE WHEN status IN (?, ?, ?, ?) OR '.$hasAppointment.' THEN 1 ELSE 0 END) AS scheduled', $afterScheduling)
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS completed', [RequestStatus::Completed->value])
+            ->selectRaw('SUM(CASE WHEN status IN (?, ?) THEN 1 ELSE 0 END) AS lost', [RequestStatus::Cancelled->value, RequestStatus::NotPerformed->value])
+            ->toBase()
+            ->first();
 
-        $recurring = $inPeriod->isEmpty() ? 0 : ServiceRequest::query()
-            ->where('tenant_id', $tenantId)
-            ->whereIn('customer_id', $inPeriod)
-            ->where('created_at', '<', $from)
-            ->distinct()
-            ->count('customer_id');
+        return [
+            'received' => (int) ($row->received ?? 0),
+            'triaged' => (int) ($row->triaged ?? 0),
+            'scheduled' => (int) ($row->scheduled ?? 0),
+            'completed' => (int) ($row->completed ?? 0),
+            'lost' => (int) ($row->lost ?? 0),
+        ];
+    }
 
-        return ['total' => $inPeriod->count(), 'new' => $inPeriod->count() - $recurring, 'recurring' => $recurring];
+    /**
+     * What is in each stage right now (stock), whatever the date the request arrived. Not a conversion figure.
+     *
+     * @return array{requested: int, triaged: int, scheduled: int, in_progress: int}
+     */
+    public function stock(int $tenantId, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
+    {
+        $counts = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
+            ->whereIn('status', [RequestStatus::Requested->value, RequestStatus::Triaged->value, RequestStatus::Scheduled->value, RequestStatus::InProgress->value])
+            ->groupBy('status')
+            ->selectRaw('status, COUNT(*) AS total')
+            ->toBase()
+            ->pluck('total', 'status');
+
+        return [
+            'requested' => (int) ($counts[RequestStatus::Requested->value] ?? 0),
+            'triaged' => (int) ($counts[RequestStatus::Triaged->value] ?? 0),
+            'scheduled' => (int) ($counts[RequestStatus::Scheduled->value] ?? 0),
+            'in_progress' => (int) ($counts[RequestStatus::InProgress->value] ?? 0),
+        ];
+    }
+
+    /**
+     * Requests received in the period by commercial origin (how the customer found the company, JOURNEY-01), apart
+     * from the channel: "portal" only when the arrival through the Regional Portal was verified; every other request is
+     * "not identified" (shown apart, never guessed). Followed until completion, with the value recorded on the
+     * completed ones.
+     *
+     * @return list<array{discovery: string, label: string, received: int, completed: int, revenue_cents: int, revenue_known: int}>
+     */
+    public function byDiscovery(int $tenantId, CarbonImmutable $from, CarbonImmutable $to, ?RequestOrigin $origin = null, int|string|null $responsible = null): array
+    {
+        $rows = $this->scoped(ServiceRequest::query()->where('tenant_id', $tenantId), $origin, $responsible)
+            ->whereBetween('created_at', [$from, $to])
+            ->groupBy('discovery')
+            ->selectRaw('discovery, COUNT(*) AS received')
+            ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) AS completed', [RequestStatus::Completed->value])
+            ->selectRaw('SUM(CASE WHEN status = ? AND realized_amount_cents IS NOT NULL THEN realized_amount_cents ELSE 0 END) AS revenue_cents', [RequestStatus::Completed->value])
+            ->selectRaw('SUM(CASE WHEN status = ? AND realized_amount_cents IS NOT NULL THEN 1 ELSE 0 END) AS revenue_known', [RequestStatus::Completed->value])
+            ->toBase()
+            ->get();
+
+        $result = [];
+
+        foreach ([[DiscoverySource::Portal->value, DiscoverySource::Portal->label()], [null, 'Não identificada']] as [$key, $label]) {
+            $row = $rows->first(fn (object $row): bool => $row->discovery === $key);
+            $result[] = [
+                'discovery' => $key ?? 'unknown',
+                'label' => $label,
+                'received' => (int) ($row->received ?? 0),
+                'completed' => (int) ($row->completed ?? 0),
+                'revenue_cents' => (int) ($row->revenue_cents ?? 0),
+                'revenue_known' => (int) ($row->revenue_known ?? 0),
+            ];
+        }
+
+        return $result;
     }
 
     /**
