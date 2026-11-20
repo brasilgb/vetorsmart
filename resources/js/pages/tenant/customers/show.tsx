@@ -4,12 +4,13 @@ import { EmptyState } from '@/components/vetor-smart/empty-state';
 import { PageHeader } from '@/components/vetor-smart/page-header';
 import { Pagination } from '@/components/vetor-smart/pagination';
 import { StatusBadge } from '@/components/vetor-smart/status-badge';
+import { TraceabilityInline, type Traceability } from '@/components/vetor-smart/traceability';
 import { Card } from '@/components/ui/card';
 import { edit, index as customersIndex } from '@/routes/tenant/customers';
 import { show as requestShow } from '@/routes/tenant/requests';
 import type { Paginator } from '@/types';
 
-type HistoryItem = {
+type HistoryItem = Traceability & {
     id: number;
     service: string | null;
     priority: string;
@@ -18,6 +19,7 @@ type HistoryItem = {
     created_at: string;
     closed_at: string | null;
     closing_reason: string | null;
+    assignee: string | null;
     appointments: { starts_at: string; professional: string | null; status: string; cancelling_reason: string | null; cancelled_by: string | null; cancelled_at: string | null }[];
     last_event: { note: string | null; user: string | null; at: string } | null;
 };
@@ -170,7 +172,8 @@ export default function CustomerShow({ customer, summary, financial, upcoming, h
                                         </Link>
                                         <span className="text-xs font-medium text-vs-text">{item.status}</span>
                                     </div>
-                                    <p className="text-vs-muted">Aberta em {item.created_at}{item.closed_at ? ` · encerrada em ${item.closed_at}` : ''}</p>
+                                    <p className="text-vs-muted">Aberta em {item.created_at}{item.closed_at ? ` · encerrada em ${item.closed_at}` : ''} · {item.assignee ? `Responsável: ${item.assignee}` : 'Sem responsável'}</p>
+                                    <TraceabilityInline value={item} />
                                     {item.closing_reason && <p className="text-vs-muted">Motivo: {item.closing_reason}</p>}
                                     {item.appointments.length > 0 && (
                                         <ul className="mt-1 grid gap-1">

@@ -8,9 +8,9 @@ import { Input } from '@/components/ui/input';
 import { index as requestsIndex, triage, schedule, start, complete, notPerformed, cancel, assign, amount } from '@/routes/tenant/requests';
 import { show as customerShow } from '@/routes/tenant/customers';
 import { index as agendaIndex } from '@/routes/tenant/agenda';
-import { OriginLabel } from './index';
+import { TraceabilityRows, type Traceability } from '@/components/vetor-smart/traceability';
 
-type RequestDetail = {
+type RequestDetail = Traceability & {
     id: number;
     customer: string | null;
     customer_id: number | null;
@@ -99,11 +99,7 @@ export default function RequestShow({ request, events, appointments, services, p
                             <div><dt className="text-vs-muted">Serviço</dt><dd className="text-vs-text">{request.service ?? 'A definir na triagem'}</dd></div>
                             <div><dt className="text-vs-muted">Prioridade</dt><dd className="text-vs-text">{request.priority}</dd></div>
                             <div><dt className="text-vs-muted">Responsável</dt><dd className="text-vs-text">{request.assignee ?? 'Sem responsável'}</dd></div>
-                            <div>
-                                <dt className="text-vs-muted">Origem</dt>
-                                <dd><OriginLabel origin={request.origin_value} label={request.origin} /></dd>
-                                {request.discovery && request.origin_value !== 'portal' && <dd className="mt-1 text-xs text-vs-muted">O cliente chegou pelo {request.discovery}.</dd>}
-                            </div>
+                            <TraceabilityRows value={request} />
                             <div><dt className="text-vs-muted">Descrição</dt><dd className="whitespace-pre-line text-vs-text">{request.description}</dd></div>
                             {request.closing_reason && <div><dt className="text-vs-muted">Motivo do encerramento</dt><dd className="text-vs-text">{request.closing_reason}</dd></div>}
                         </dl>

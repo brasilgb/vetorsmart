@@ -181,10 +181,12 @@ class CustomerController extends Controller
     }
 
     /**
-     * Requests of this customer with their appointments, cancellations and last history note.
-     * Read from the existing records (no copies), most recent activity first, 10 per page.
+     * Requests of this customer with their appointments, cancellations and last history note, and, per request, the
+     * commercial origin, the entry channel, who conducted it and the person responsible (a customer may arrive
+     * through different origins and channels over time). Read from the existing records (no copies), most recent
+     * activity first, 10 per page.
      *
-     * @return LengthAwarePaginator<int, array{id: int, service: string|null, priority: string, status: string, professional: string|null, created_at: string, closed_at: string|null, closing_reason: string|null, appointments: array<int, array{starts_at: string, professional: string|null, status: string, cancelling_reason: string|null, cancelled_by: string|null, cancelled_at: string|null}>, last_event: array{note: string|null, user: string|null, at: string}|null}>
+     * @return LengthAwarePaginator<int, array{id: int, service: string|null, priority: string, status: string, professional: string|null, created_at: string, closed_at: string|null, closing_reason: string|null, commercial_origin: array{key: string, label: string, detail: string|null}, channel: array{key: string, label: string}, attendance: array{key: string, label: string, detail: string|null}, assignee: string|null, appointments: array<int, array{starts_at: string, professional: string|null, status: string, cancelling_reason: string|null, cancelled_by: string|null, cancelled_at: string|null}>, last_event: array{note: string|null, user: string|null, at: string}|null}>
      */
     private function history(Request $request, TenantContext $context, Customer $customer): LengthAwarePaginator
     {
@@ -199,6 +201,8 @@ class CustomerController extends Controller
                 'appointments.professional:id,name',
                 'appointments.cancelledBy:id,name',
                 'events.user:id,name',
+                'assignee:id,name',
+                ...ServiceRequest::attendanceRelations((int) $tenant->getKey()),
             ])
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
@@ -213,6 +217,8 @@ class CustomerController extends Controller
                 'created_at' => $tenant->toLocal($serviceRequest->created_at)->format('d/m/Y H:i'),
                 'closed_at' => $serviceRequest->closed_at ? $tenant->toLocal($serviceRequest->closed_at)->format('d/m/Y H:i') : null,
                 'closing_reason' => $serviceRequest->closing_reason,
+                ...$serviceRequest->traceability(),
+                'assignee' => $serviceRequest->assignee?->name,
                 'appointments' => $serviceRequest->appointments->map(fn ($appointment): array => [
                     'starts_at' => $tenant->toLocal($appointment->starts_at)->format('d/m/Y H:i'),
                     'professional' => $appointment->professional?->name,

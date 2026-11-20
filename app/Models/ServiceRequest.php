@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Concerns\BelongsToTenant;
 use App\Enums\AppointmentStatus;
+use App\Enums\AssistantMessageRole;
+use App\Enums\ConversationStatus;
 use App\Enums\DiscoverySource;
 use App\Enums\RequestOrigin;
 use App\Enums\RequestPriority;
@@ -108,6 +110,83 @@ class ServiceRequest extends Model
         }
 
         return ['key' => 'unknown', 'label' => 'Não identificada', 'detail' => null];
+    }
+
+    /**
+     * Assistant conversations that registered this request (normally one). Not scoped by tenant on its own: load it
+     * through attendanceRelations(), which limits it to the request's company.
+     *
+     * @return HasMany<AssistantConversation, $this>
+     */
+    public function conversations(): HasMany
+    {
+        return $this->hasMany(AssistantConversation::class)->orderBy('id');
+    }
+
+    /**
+     * Eager loads needed by attendance(), limited to one company: the conversation, the attendant who assumed it and
+     * whether the team wrote in it.
+     *
+     * @return array<string, \Closure>
+     */
+    public static function attendanceRelations(int $tenantId): array
+    {
+        return [
+            'conversations' => fn (HasMany $query) => $query
+                ->where('tenant_id', $tenantId)
+                ->with('handledBy:id,name')
+                ->withExists(['messages as team_replied' => fn (Builder $messages) => $messages->where('role', AssistantMessageRole::Operator->value)]),
+        ];
+    }
+
+    /**
+     * Who conducted the request, from records already kept and apart from the channel and the commercial origin: the
+     * virtual assistant alone, the assistant with a hand-off to the team (a hand-off reason, a conversation waiting for
+     * or held by a person, or a reply written by the team), or the team when no conversation registered it. A request
+     * from the assistant whose conversation is no longer available (retention) stays with the virtual assistant.
+     * The person responsible (INTEGRATION-02) is shown apart. Expects attendanceRelations() loaded.
+     *
+     * @return array{key: string, label: string, detail: string|null}
+     */
+    public function attendance(): array
+    {
+        $conversation = $this->conversations->firstWhere('tenant_id', $this->tenant_id);
+
+        if ($conversation === null) {
+            return $this->origin === RequestOrigin::Ai
+                ? ['key' => 'assistant', 'label' => 'Atendimento virtual', 'detail' => 'conversa não disponível']
+                : ['key' => 'team', 'label' => 'Equipe', 'detail' => null];
+        }
+
+        $handedOff = $conversation->handoff_reason !== null
+            || in_array($conversation->status, [ConversationStatus::AwaitingHuman, ConversationStatus::HumanAssumed], true)
+            || (bool) $conversation->getAttribute('team_replied');
+
+        if (! $handedOff) {
+            return ['key' => 'assistant', 'label' => 'Atendimento virtual', 'detail' => null];
+        }
+
+        $detail = match (true) {
+            $conversation->status === ConversationStatus::AwaitingHuman => 'aguardando a equipe',
+            $conversation->handledBy !== null => 'atendido por '.$conversation->handledBy->name,
+            default => null,
+        };
+
+        return ['key' => 'assistant_team', 'label' => 'Atendimento virtual, encaminhado à equipe', 'detail' => $detail];
+    }
+
+    /**
+     * The three views of where a request came from and who conducted it, ready for the panel screens.
+     *
+     * @return array{commercial_origin: array{key: string, label: string, detail: string|null}, channel: array{key: string, label: string}, attendance: array{key: string, label: string, detail: string|null}}
+     */
+    public function traceability(): array
+    {
+        return [
+            'commercial_origin' => $this->commercialOrigin(),
+            'channel' => $this->origin->channel(),
+            'attendance' => $this->attendance(),
+        ];
     }
 
     /**
